@@ -24,6 +24,7 @@ export function deviceRoutes(route, { machine, grinder, cfg }) {
   route('GET', '/api/maintenance', async () => machine.maintenance());
   route('PUT', '/api/maintenance', async ({ body }) => machine.setMaintenance(body));
   route('POST', '/api/maintenance/backflush', async () => machine.markBackflush());
+  route('POST', '/api/maintenance/backflush/run', async () => machine.runBackflush());
   route('GET', '/api/shots.csv', async () => ({ download: { data: enc(machine.shotsCsv()), filename: `Xenia-Bezuege-${new Date().toISOString().slice(0, 10)}.csv`, type: 'text/csv; charset=utf-8' } }));
 
   // Maschine

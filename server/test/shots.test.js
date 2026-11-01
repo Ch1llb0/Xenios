@@ -84,3 +84,34 @@ test('Doppelte Einträge aus älteren Versionen werden beim Start zusammengefüh
   const later = { endedAt: '2026-10-24T18:00:00.000Z', timeMs: 28500, no: 356, estimated: true };
   assert.equal(machine([later, live]).history.data.shots.length, 2);
 });
+
+test('Kurze Pumpvorgänge und Backflush kommen nicht ins Protokoll', () => {
+  const m = machine();
+  m._checkCounter(400);
+  m.state.counters = { extractions: 400 };
+  // Rückspülen von Hand: 8 s, zählt nicht
+  m._applyLive(diag(1));
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 8000));
+  m._checkCounter(401); // der Zähler zählt ihn mit, das ergibt keinen „verpassten“ Eintrag
+  assert.equal(m.history.data.shots.length, 0);
+  // Backflush-Skript: kein Bezug, aber als erledigt eingetragen
+  m.noteScript(150, { title: 'Backflush', steps: [] });
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 90000));
+  assert.equal(m.history.data.shots.length, 0);
+  assert.ok(m.maintenance().backflush.lastAt);
+  // Echter Bezug zählt
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 27000));
+  assert.equal(m.history.data.shots.length, 1);
+});
+
+test('Alte zu kurze Einträge ohne Notizen werden aufgeräumt', () => {
+  const m = machine([
+    { id: 'a', endedAt: '2026-10-30T15:10:00.000Z', timeMs: 6300 },
+    { id: 'b', endedAt: '2026-10-30T15:09:00.000Z', timeMs: 5500, notes: { text: 'behalten' } },
+    { id: 'c', endedAt: '2026-10-30T08:00:00.000Z', timeMs: 28000 },
+  ]);
+  assert.deepEqual(m.history.data.shots.map((s) => s.id), ['b', 'c']);
+});

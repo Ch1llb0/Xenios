@@ -184,8 +184,17 @@ export function createApp(cfg, hooks = {}) {
       boiler: m.temp?.boiler ?? null, boilerSet: m.temp?.boilerSet ?? null, steamSet: m.pressure?.steamSet ?? null,
       shot: Boolean(m.shot?.running), at: Date.now(),
       next: nextPlannedOn(),
+      // Für den Notbetrieb der App, falls der Server ausfällt: dann spricht sie die Maschine direkt im Heimnetz an
+      machine: directMachine(),
     };
   });
+  function directMachine() {
+    let host = '';
+    try { host = new URL(cfg.machine.url).hostname; } catch { /* keine gültige Adresse */ }
+    // Die App spricht im Notbetrieb nur private IPv4-Adressen an
+    if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || !/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return null;
+    return { ip: host, api: cfg.machine.api === 'classic' ? 'classic' : 'bbs' };
+  }
   // Nächstes geplantes Einschalten: Wecker-Automatik oder Server-Zeitplan, was früher kommt
   function nextPlannedOn() {
     const w = wake.state().plan;

@@ -51,7 +51,7 @@ function listTab(root) {
   root.append(
     h('div', { class: 'section-title' }, 'Schnellstart'),
     h('div', { class: 'quick' },
-      quickBtn('Einfach', 7), quickBtn('Doppelt', 8), quickBtn('Dauerbezug', 2)),
+      quickBtn('Einfach', 7), quickBtn('Doppelt', 8), quickBtn('Dauerbezug', 2), backflushBtn()),
     h('div', { style: { height: '12px' } }),
     stopBtn,
     gbsBox,
@@ -109,6 +109,20 @@ function listTab(root) {
     runButtons.push(b);
     return b;
   }
+  // Backflush: Skript wird bei Bedarf angelegt; der Lauf zählt nicht als Bezug
+  function backflushBtn() {
+    const b = h('button', { class: 'btn tonal', disabled: !machineOn(), onclick: async () => {
+      try {
+        await api('/api/maintenance/backflush/run', { method: 'POST' });
+        snackbar('Backflush läuft – Blindsieb eingesetzt?', { action: 'Stopp', onAction: stop, duration: 6000 });
+        load();
+      } catch (e) {
+        snackbar(e.status === 502 ? 'Start nicht möglich (Maschine aus oder nicht bereit?)' : e.message);
+      }
+    } }, icon('play', 's18'), 'Backflush');
+    runButtons.push(b);
+    return b;
+  }
   function paintEnabled() {
     const on = machineOn();
     for (const b of runButtons) b.disabled = !on;
@@ -138,7 +152,7 @@ function listTab(root) {
       listEl.replaceChildren(h('div', { class: 'empty' }, 'Keine eigenen Skripte auf der Maschine.', features.scriptEditor ? h('div', {}, h('button', { class: 'btn text', onclick: () => openEditor(null, data, load) }, icon('add', 's18'), 'Skript anlegen')) : null));
       return;
     }
-    runButtons.splice(3); // die drei Schnellstart-Knöpfe bleiben
+    runButtons.splice(4); // die vier Schnellstart-Knöpfe bleiben
     listEl.replaceChildren(...list.map((s) => {
       const play = h('button', { class: 'icon-btn tonal', 'aria-label': `${s.title} starten`, disabled: !machineOn(), onclick: () => run(s.id, s.title) }, icon('play'));
       runButtons.push(play);

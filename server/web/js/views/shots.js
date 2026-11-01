@@ -44,13 +44,17 @@ export function shotsView(root) {
     const done = h('button', { class: `btn ${m.due ? 'filled' : 'tonal'}`, onclick: async () => {
       try { await api('/api/maintenance/backflush', { method: 'POST' }); snackbar('Backflush eingetragen'); loadCare(); } catch (e) { snackbar(e.message); }
     } }, icon('check', 's18'), 'Erledigt');
+    // Startet das Backflush-Skript (legt es bei Bedarf an); trägt sich nach dem Lauf selbst als erledigt ein
+    const run = h('button', { class: 'btn text', onclick: async () => {
+      try { await api('/api/maintenance/backflush/run', { method: 'POST' }); snackbar('Backflush läuft – Blindsieb eingesetzt?'); } catch (e) { snackbar(e.status === 502 ? 'Start nicht möglich (Maschine aus oder nicht bereit?)' : e.message); }
+    } }, icon('play', 's18'), 'Starten');
     const status = m.lastAt === null ? 'Noch nie eingetragen'
       : `Vor ${m.daysSince === 0 ? 'weniger als einem Tag' : `${fmtInt(m.daysSince)} ${m.daysSince === 1 ? 'Tag' : 'Tagen'}`} · ${fmtInt(m.shotsSince)} Bezüge seitdem`;
     care.replaceChildren(h('section', { class: `card care ${m.due ? 'due' : ''}` },
       h('div', { class: 'row' },
         icon(m.due ? 'warn' : 'check', 's20'),
         h('div', { class: 'grow' }, h('div', {}, m.due ? 'Backflush fällig' : 'Backflush'), h('div', { class: 'small muted' }, status)),
-        done),
+        run, done),
       h('div', { class: 'row', style: { 'margin-top': '8px' } }, h('span', { class: 'small muted grow' }, 'Erinnerung'), intervalSel)));
   }
 

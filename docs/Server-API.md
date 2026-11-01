@@ -54,8 +54,9 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | GET / PUT | `/api/gbs` | `{"scriptId":10..199|null,"extend":bool}` | Grind-by-Sync-Vermittler (nur Server): Profil für den Drehknopf der Mühle (`null` = Original-Skript 9), Halten bis zum Zielgewicht. Antwort `{enabled,port,grinderIp,scriptId,extend,helperId,helperName,lastGrind:{weight,filter,at},lastContact,lastStart:{at,swapped,title,weight,ok},lastError,refused:{ip,at}}` |
 | GET / PUT | `/api/maintenance` | `{"intervalDays":1..60}` | Backflush-Erinnerung: `{backflush:{lastAt,daysSince,shotsSince,intervalDays,due}}` |
 | POST | `/api/maintenance/backflush` | – | Backflush als erledigt eintragen |
+| POST | `/api/maintenance/backflush/run` | – | Skript „Backflush“ anlegen (falls nötig) und starten; der Lauf zählt nicht als Bezug und trägt den Backflush ein |
 | GET | `/api/shots.csv` | – | gesamtes Protokoll als CSV (Excel, Semikolon) |
-| GET | `/api/widget` | – | kompakter Zustand für Widgets/Kachel: `{online,status,label,heated,steamOn,steamReady,tankOk,group,groupSet,boiler,boilerSet,steam,steamSet,shot,next:{at,reason}|null}` |
+| GET | `/api/widget` | – | kompakter Zustand für Widgets/Kachel: `{online,status,label,heated,steamOn,steamReady,tankOk,group,groupSet,boiler,boilerSet,steam,steamSet,shot,next:{at,reason}|null,machine:{ip,api}|null}`; `machine` nur bei privater IPv4 (Notbetrieb der App) |
 | POST | `/api/machine/power` | `{"mode":"on"\|"off"\|"eco","steam":bool?}` | `{"ok":true}` |
 | POST | `/api/machine/steam` | `{"on":bool}` | `{"ok":true}` |
 | POST | `/api/machine/temperature` | `{"group":93.5,"boiler":93.5?}` | `{"ok":true}` |

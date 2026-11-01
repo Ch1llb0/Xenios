@@ -40,6 +40,9 @@ class MainActivity : Activity() {
     private lateinit var prefs: Prefs
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var errorShown = false
+    /** Notbetrieb: Server nicht erreichbar, Web-App aus der APK spricht die Maschine direkt an (Modus bleibt „Server“). */
+    @Volatile private var fallback = false
+    private val direct: Boolean get() = prefs.direct || fallback
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,6 +107,7 @@ class MainActivity : Activity() {
             web.loadUrl(DIRECT_ORIGIN + path)
             return
         }
+        fallback = false
         val app = applicationContext
         thread(name = "xenia-base") {
             val base = try { Api.activeBase(app, fresh) } catch (_: Exception) { prefs.bases.firstOrNull() }
@@ -173,7 +177,15 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun isOwnUrl(uri: Uri): Boolean = if (prefs.direct) uri.scheme == "https" && uri.host == DIRECT_HOST else prefs.bases.any { b ->
+    /** Server ausgefallen: auf den Notbetrieb umschalten, falls die Maschinen-IP bekannt ist. */
+    private fun enterFallback(path: String?): Boolean {
+        if (prefs.direct || fallback || prefs.machineIp.isNullOrBlank()) return false
+        fallback = true
+        web.loadUrl(DIRECT_ORIGIN + (path?.takeIf { it.startsWith("/") } ?: "/"))
+        return true
+    }
+
+    private fun isOwnUrl(uri: Uri): Boolean = if (direct) uri.scheme == "https" && uri.host == DIRECT_HOST else prefs.bases.any { b ->
         val base = Uri.parse(b)
         uri.scheme == base.scheme && uri.host == base.host && uri.port == base.port
     }
@@ -196,8 +208,8 @@ class MainActivity : Activity() {
         if (errorShown || isFinishing) return
         errorShown = true
         AlertDialog.Builder(this)
-            .setTitle(if (prefs.direct) "Seite nicht ladbar" else "Server nicht erreichbar")
-            .setMessage(if (prefs.direct) message else "$message\n\n${prefs.bases.joinToString("\n")}")
+            .setTitle(if (direct) "Seite nicht ladbar" else "Server nicht erreichbar")
+            .setMessage(if (direct) message else "$message\n\n${prefs.bases.joinToString("\n")}")
             .setPositiveButton("Erneut versuchen") { _, _ -> errorShown = false; load(intent, fresh = true) }
             .setNeutralButton("Verbindung ändern") { _, _ -> errorShown = false; openSetup() }
             .setOnCancelListener { errorShown = false }
@@ -218,12 +230,19 @@ class MainActivity : Activity() {
 
         // Direkt-Modus: Dateien der Web-App aus den Assets (web/…) ausliefern
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-            if (!prefs.direct || request.url.host != DIRECT_HOST) return null
+            if (!direct || request.url.host != DIRECT_HOST) return null
             return serveAsset(request.url.path ?: "/")
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-            if (request.isForMainFrame) showLoadError(error.description?.toString() ?: "Unbekannter Fehler")
+            if (!request.isForMainFrame) return
+            if (enterFallback(request.url.path)) return
+            showLoadError(error.description?.toString() ?: "Unbekannter Fehler")
+        }
+
+        // Tunnel steht, Server dahinter nicht (Cloudflare liefert dann eine eigene Fehlerseite)
+        override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
+            if (request.isForMainFrame && response.statusCode in Api.SERVER_DOWN) enterFallback(request.url.path)
         }
     }
 
@@ -272,12 +291,22 @@ class MainActivity : Activity() {
     /** Für die Web-App: „window.XeniaApp“. Anmeldung öffnen, Wecker, im Direkt-Modus HTTP zu Maschine/Mühle und Dateien speichern. */
     private inner class Bridge {
         @JavascriptInterface
-        fun mode(): String = prefs.mode
+        fun mode(): String = if (direct) "direct" else prefs.mode
+
+        /** true im Notbetrieb (Server nicht erreichbar). */
+        @JavascriptInterface
+        fun fallback(): Boolean = fallback && !prefs.direct
+
+        /** Notbetrieb verlassen und den Server erneut versuchen. */
+        @JavascriptInterface
+        fun retryServer() {
+            runOnUiThread { errorShown = false; load(intent, fresh = true) }
+        }
 
         /** Adressen für den Direkt-Modus (nur dort). */
         @JavascriptInterface
         fun directConfig(): String {
-            if (!prefs.direct) return "{}"
+            if (!direct) return "{}"
             return JSONObject()
                 .put("machineUrl", "http://" + prefs.machineIp)
                 .put("machineApi", prefs.machineApi)
@@ -292,7 +321,7 @@ class MainActivity : Activity() {
         fun http(id: Int, json: String) {
             httpPool.execute {
                 val result = try {
-                    if (!prefs.direct) throw IllegalStateException("Nur im Direkt-Modus")
+                    if (!direct) throw IllegalStateException("Nur im Direkt-Modus")
                     val hosts = listOfNotNull(prefs.machineIp, prefs.grinderIp).filter { it.isNotBlank() }.toSet()
                     DirectHttp.request(JSONObject(json), hosts)
                 } catch (e: Exception) {

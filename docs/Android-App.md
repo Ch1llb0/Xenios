@@ -26,6 +26,10 @@ Widgets aktualisieren sich beim Schalten, beim Verlassen der App, alle 30 min un
 - **Cloudflare Access** (zusätzliche Anmeldeseite vor dem Tunnel) verträgt sich nicht mit Widgets: deren Aufrufe würden umgeleitet. Für die App den Tunnel ohne Access betreiben. Der Schutz übernimmt das App-Passwort mit Sperre gegen Durchprobieren.
 - „Abmelden“ in der App oder ein widerrufenes Token führt zurück zur Anmeldung der App.
 
+## Notbetrieb, wenn der Server ausfällt
+
+Ist der Server nicht erreichbar, schaltet die App mit Server-Verbindung automatisch auf die Web-App aus der APK um und spricht die Maschine direkt an (wie im Direkt-Modus, nur im Heimnetz). Die IP der Maschine merkt sie sich vom Server. Widgets und Kachel schalten dann ebenfalls direkt. Ein Hinweis unten bietet „Server“ an, um es erneut über den Server zu versuchen. Zeitplan, Wecker-Automatik und das Bezugs-Protokoll des Servers gibt es im Notbetrieb nicht.
+
 ## Direkt-Modus (ohne Server, nur im Heimnetz)
 Bei der Einrichtung „Direkt im Heimnetz“ wählen und dieselbe Umschaltung wie am Server: **Neue Xenia** (Brew-by-Sync) oder **Alte Xenia** (DBL / offizielle API). Die IP-Adressen von Maschine und optional der Mühle eintragen, dazu optional das Owner-Passwort der Mühle. Ohne Mühle bleiben Mühlen-Navigation, Kacheln und Grind-by-Sync aus; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Bei der alten API blendet die App Paddle, den Wochenplan der Maschine und „Uhr stellen“ aus und zählt die Bezugszeit selbst. Die App bringt die Web-Oberfläche selbst mit und nutzt denselben Geräte-Code wie der Server (`public/shared/`). Sie spricht Maschine (http) und Mühle (https mit gemerktem Zertifikat) direkt an. Widgets, Kachel und Shortcuts funktionieren ebenfalls.
 

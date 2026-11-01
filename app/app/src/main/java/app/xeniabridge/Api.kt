@@ -124,7 +124,17 @@ object Api {
 
     fun state(context: Context): State {
         if (Prefs(context).direct) return DirectMachine.state(context)
+        return serverOrDirect(context, { serverState(context) }) { DirectMachine.state(context) }
+    }
+
+    private fun serverState(context: Context): State {
         val o = request(context, "GET", "/api/widget")
+        // Maschinen-IP merken: damit geht es auch, wenn der Server einmal ausfällt
+        o.optJSONObject("machine")?.let { m ->
+            val prefs = Prefs(context)
+            prefs.machineIp = m.optString("ip").ifBlank { null }
+            prefs.machineApi = m.optString("api", "bbs")
+        }
         fun dbl(k: String): Double? = if (o.isNull(k) || !o.has(k)) null else o.optDouble(k).takeIf { !it.isNaN() }
         return State(
             online = o.optBoolean("online"),
@@ -149,8 +159,20 @@ object Api {
     /** mode: "on" | "off" | "eco" */
     fun power(context: Context, mode: String) {
         if (Prefs(context).direct) return DirectMachine.power(context, mode)
-        request(context, "POST", "/api/machine/power", JSONObject().put("mode", mode))
+        serverOrDirect(context, { request(context, "POST", "/api/machine/power", JSONObject().put("mode", mode)); Unit }) { DirectMachine.power(context, mode) }
     }
+
+    /** Server nicht erreichbar (oder Cloudflare meldet ihn als down)? Dann die Maschine direkt im Heimnetz ansprechen. */
+    private fun <T> serverOrDirect(context: Context, server: () -> T, direct: () -> T): T = try {
+        server()
+    } catch (e: IOException) {
+        val down = e !is ApiException || e.status in SERVER_DOWN
+        if (!down || Prefs(context).machineIp.isNullOrBlank()) throw e
+        direct()
+    }
+
+    /** HTTP-Status, mit denen Cloudflare oder ein Proxy einen ausgefallenen Server meldet. */
+    val SERVER_DOWN = setOf(502, 503, 504, 521, 522, 523, 530)
 
     /** Ein/Aus umschalten: Aus oder Eco → Ein, sonst → Aus. Gibt den gesendeten Modus zurück. */
     fun toggle(context: Context): String {

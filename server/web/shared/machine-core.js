@@ -81,6 +81,20 @@ export const SCRIPT_OPS = {
 // Skript 9 (Bezug per Drehknopf der Mühle, Grind-by-Sync) ist bewusst nicht dabei: an einem Taster funktioniert es nicht.
 export const BUILTIN_SCRIPTS = { 0: 'Keine', 2: 'Dauerbezug', 7: 'Einfache Dosis', 8: 'Doppelte Dosis' };
 
+// Kürzere Pumpvorgänge sind kein Bezug (Spülen, Rückspülen von Hand) und kommen nicht ins Protokoll.
+export const MIN_SHOT_MS = 15000;
+
+// Rückspülen mit Blindsieb: 5× 10 s Druck, dann über das Ablassventil entlasten. Läuft es, zählt kein Bezug,
+// sondern der Backflush wird als erledigt eingetragen.
+export const BACKFLUSH_NAME = 'Backflush';
+export const BACKFLUSH_STEPS = [
+  ...Array.from({ length: 5 }, () => [
+    { op: 13, args: [] }, { op: 4, args: [9, 10] }, { op: 6, args: [] }, { op: 14, args: [] },
+    { op: 15, args: [] }, { op: 12, args: [5] }, { op: 16, args: [] }, { op: 12, args: [5] },
+  ]).flat(),
+  { op: 20, args: [2, 300] },
+];
+
 // Geschmack in der Bewertung eines Bezugs
 export const TASTE = { sour: 'sauer', balanced: 'ausgewogen', bitter: 'bitter' };
 
@@ -508,7 +522,10 @@ export class Machine extends Emitter {
     };
     s.shot = { running: false, timeMs: 0, startedAt: null, curve: [] };
     s.lastShot = shot;
-    if (timeMs >= 3000) {
+    if (shot.script?.title === BACKFLUSH_NAME) {
+      this.markBackflush();
+      this._event('shot', { title: 'Backflush fertig', body: 'Als erledigt eingetragen.', tag: 'backflush' });
+    } else if (timeMs >= MIN_SHOT_MS) {
       shot.no = (s.counters?.extractions ?? null) !== null ? s.counters.extractions + this._liveStarts.length : null;
       this._log(shot);
       const parts = [`${fmt(timeMs / 1000)} s`];
@@ -624,6 +641,14 @@ export class Machine extends Emitter {
         list.splice(i, 1);
         removed++;
         i--;
+      }
+    }
+    // Zu kurze Einträge aus älteren Versionen (Spülen, Rückspülen), solange niemand etwas dazu notiert hat
+    for (let i = list.length - 1; i >= 0; i--) {
+      const s = list[i];
+      if (s.timeMs && s.timeMs < MIN_SHOT_MS && !s.notes && !s.dose) {
+        list.splice(i, 1);
+        removed++;
       }
     }
     // Ältere Einträge ohne ID bekommen eine stabile aus ihrem Zeitpunkt (für Notizen und die Detailansicht)
@@ -994,6 +1019,21 @@ export class Machine extends Emitter {
     this._pendingScript = pending;
     if (steps) return;
     this.readScript(id).then((r) => { pending.title = title ?? (r.title || BUILTIN_SCRIPTS[id] || null); pending.steps = r.steps; }).catch(() => {});
+  }
+
+  // Backflush-Skript auf der Maschine anlegen, falls es fehlt, und starten.
+  async runBackflush() {
+    let script = (await this.scripts()).find((x) => x.title === BACKFLUSH_NAME);
+    if (!script) {
+      await this.saveScript({ name: BACKFLUSH_NAME, steps: BACKFLUSH_STEPS });
+      script = (await this.scripts()).find((x) => x.title === BACKFLUSH_NAME);
+      if (!script) throw httpError(502, 'Backflush-Skript wurde nicht angelegt');
+    }
+    this._lastAppAction = Date.now();
+    await this.client.post('/api/v2/scripts/execute', { ID: script.id });
+    this.noteScript(script.id, { title: BACKFLUSH_NAME, steps: BACKFLUSH_STEPS });
+    this._acted();
+    return { ok: true, id: script.id };
   }
 
   async stopScript() {
