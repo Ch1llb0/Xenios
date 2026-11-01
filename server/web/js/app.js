@@ -232,11 +232,11 @@ if ('serviceWorker' in navigator && !directMode) {
     const s = await api('/auth/session');
     if (s.authenticated) await showApp();
     else if (s.setup) showSetupScreen();
+    else showLogin();
     // Notbetrieb der Android-App: Server weg, die App spricht die Maschine direkt an
     if (window.XeniaApp?.fallback?.()) {
       snackbar('Server nicht erreichbar – direkt mit der Maschine verbunden', { action: 'Server', onAction: () => window.XeniaApp.retryServer(), duration: 10000 });
     }
-    else showLogin();
   } catch {
     // Offline: App-Hülle zeigen, Verbindung wird erneut versucht
     showLogin({ offline: true });
