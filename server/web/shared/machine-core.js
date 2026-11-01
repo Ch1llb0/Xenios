@@ -87,7 +87,7 @@ export const MIN_SHOT_MS = 15000;
 // Rückspülen mit Blindsieb über die direkte Pumpensteuerung (Paddle). Skripte bricht die Xenia mit Blindsieb sofort ab
 // (Status 4, Pumpe aus). Paddle-Pumpe läuft nur, solange laufend Befehle kommen; an der Maschine gemessen (01.11.2026):
 // mit 35 % in ~12 s auf 8,5 bar, Spitze ~9,5 bar, beim Halten bis ~10 bar; bei 0 % bleibt er stehen, paddle/stop entlastet.
-export const BACKFLUSH = { cycles: 5, level: 35, bar: 8, holdMs: 5000, restMs: 5000, maxPumpMs: 30000 };
+export const BACKFLUSH = { cycles: 10, level: 35, bar: 8, holdMs: 5000, restMs: 5000, maxPumpMs: 30000 };
 
 // Geschmack in der Bewertung eines Bezugs
 export const TASTE = { sour: 'sauer', balanced: 'ausgewogen', bitter: 'bitter' };

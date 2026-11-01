@@ -109,7 +109,7 @@ function listTab(root) {
     runButtons.push(b);
     return b;
   }
-  // Backflush über die direkte Pumpensteuerung (5 Runden, mit Blindsieb); zählt nicht als Bezug
+  // Backflush über die direkte Pumpensteuerung (10 Runden, mit Blindsieb); zählt nicht als Bezug
   function backflushBtn() {
     const b = h('button', { class: 'btn tonal', disabled: !machineOn(), onclick: async () => {
       try {
