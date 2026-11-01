@@ -84,12 +84,13 @@ export const BUILTIN_SCRIPTS = { 0: 'Keine', 2: 'Dauerbezug', 7: 'Einfache Dosis
 // Kürzere Pumpvorgänge sind kein Bezug (Spülen, Rückspülen von Hand) und kommen nicht ins Protokoll.
 export const MIN_SHOT_MS = 15000;
 
-// Rückspülen mit Blindsieb: 5× 10 s Druck, dann über das Ablassventil entlasten. Läuft es, zählt kein Bezug,
+// Rückspülen mit Blindsieb: 5× 10 s Druck, dann über das Ablassventil entlasten. „Pumpendruck“ (4) regelt nur
+// eine laufende Pumpe; ohne „Pumpe an“ (2) davor bleibt sie aus (an der Maschine gesehen, 01.11.2026). Läuft es, zählt kein Bezug,
 // sondern der Backflush wird als erledigt eingetragen.
 export const BACKFLUSH_NAME = 'Backflush';
 export const BACKFLUSH_STEPS = [
   ...Array.from({ length: 5 }, () => [
-    { op: 13, args: [] }, { op: 4, args: [9, 10] }, { op: 6, args: [] }, { op: 14, args: [] },
+    { op: 13, args: [] }, { op: 2, args: [] }, { op: 4, args: [9, 10] }, { op: 6, args: [] }, { op: 14, args: [] },
     { op: 15, args: [] }, { op: 12, args: [5] }, { op: 16, args: [] }, { op: 12, args: [5] },
   ]).flat(),
   { op: 20, args: [2, 300] },
@@ -1021,14 +1022,13 @@ export class Machine extends Emitter {
     this.readScript(id).then((r) => { pending.title = title ?? (r.title || BUILTIN_SCRIPTS[id] || null); pending.steps = r.steps; }).catch(() => {});
   }
 
-  // Backflush-Skript auf der Maschine anlegen, falls es fehlt, und starten.
+  // Backflush-Skript auf der Maschine anlegen bzw. auf den aktuellen Stand bringen und starten.
   async runBackflush() {
-    let script = (await this.scripts()).find((x) => x.title === BACKFLUSH_NAME);
-    if (!script) {
-      await this.saveScript({ name: BACKFLUSH_NAME, steps: BACKFLUSH_STEPS });
-      script = (await this.scripts()).find((x) => x.title === BACKFLUSH_NAME);
-      if (!script) throw httpError(502, 'Backflush-Skript wurde nicht angelegt');
-    }
+    const find = async () => (await this.scripts()).find((x) => x.title === BACKFLUSH_NAME);
+    const old = await find();
+    await this.saveScript({ id: old?.id, name: BACKFLUSH_NAME, steps: BACKFLUSH_STEPS });
+    const script = old || await find();
+    if (!script) throw httpError(502, 'Backflush-Skript wurde nicht angelegt');
     this._lastAppAction = Date.now();
     await this.client.post('/api/v2/scripts/execute', { ID: script.id });
     this.noteScript(script.id, { title: BACKFLUSH_NAME, steps: BACKFLUSH_STEPS });

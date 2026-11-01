@@ -440,6 +440,28 @@ test('Bezugs-Analyse und Pflege über die API', async () => {
   assert.equal(r.status, 401);
 });
 
+test('Backflush: Skript wird angelegt, beim nächsten Start aktualisiert und gestartet', async () => {
+  await call('POST', '/api/machine/power', { mode: 'on' });
+  await until(() => app.machine.snapshot().statusKey === 'on');
+  const backflush = () => Object.entries(xenia.state.scripts).filter(([, sc]) => sc.title === 'Backflush');
+  let r = await call('POST', '/api/maintenance/backflush/run');
+  assert.equal(r.status, 200);
+  assert.equal(backflush().length, 1);
+  const [id] = backflush()[0];
+  // Pumpe an (2) vor dem Pumpendruck (4), sonst läuft die Pumpe auf der Xenia nicht an
+  assert.match(xenia.state.scripts[id].content, /^1;13;2;4 9000 10000;6;14;15;12 5000;16;12 5000;13;2;/);
+  await call('POST', '/api/machine/scripts/stop');
+  await until(() => app.machine.snapshot().statusKey === 'on');
+  xenia.state.scripts[id].content = '1;13;4 9000 10000;7;'; // alte Version auf der Maschine
+  r = await call('POST', '/api/maintenance/backflush/run');
+  assert.equal(r.status, 200);
+  assert.equal(backflush().length, 1, 'kein zweites Skript');
+  assert.match(xenia.state.scripts[id].content, /^1;13;2;4 9000 10000;/);
+  await call('POST', '/api/machine/scripts/stop');
+  await call('DELETE', `/api/machine/scripts/${id}`);
+  await until(() => app.machine.snapshot().statusKey === 'on');
+});
+
 test('Abmelden entwertet die Sitzung', async () => {
   let r = await call('POST', '/auth/logout');
   assert.equal(r.status, 200);
