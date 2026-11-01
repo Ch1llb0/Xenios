@@ -109,13 +109,12 @@ function listTab(root) {
     runButtons.push(b);
     return b;
   }
-  // Backflush: Skript wird bei Bedarf angelegt; der Lauf zählt nicht als Bezug
+  // Backflush über die direkte Pumpensteuerung (5 Runden, mit Blindsieb); zählt nicht als Bezug
   function backflushBtn() {
     const b = h('button', { class: 'btn tonal', disabled: !machineOn(), onclick: async () => {
       try {
         await api('/api/maintenance/backflush/run', { method: 'POST' });
-        snackbar('Backflush läuft – Blindsieb eingesetzt?', { action: 'Stopp', onAction: stop, duration: 6000 });
-        load();
+        snackbar('Backflush läuft – Blindsieb eingesetzt?', { action: 'Stopp', onAction: stopBackflush, duration: 8000 });
       } catch (e) {
         snackbar(e.status === 502 ? 'Start nicht möglich (Maschine aus oder nicht bereit?)' : e.message);
       }
@@ -136,6 +135,9 @@ function listTab(root) {
     } catch (e) {
       snackbar(e.status === 502 ? 'Start nicht möglich (Maschine aus oder nicht bereit?)' : e.message);
     }
+  }
+  async function stopBackflush() {
+    try { await api('/api/maintenance/backflush/stop', { method: 'POST' }); snackbar('Backflush wird gestoppt'); } catch (e) { snackbar(e.message); }
   }
   async function stop() {
     try {

@@ -65,7 +65,11 @@ export function createMockXenia({ speed = 1, api = 'bbs' } = {}) {
         s.MA_STATUS = 4; s.brewing = null; s.extractions++;
         setTimeout(() => { if (s.MA_STATUS === 4) s.MA_STATUS = 1; s.pump = 0; s.pumpPw = 0; }, 2500 / speed);
       }
-    } else if (!s.paddle) {
+    } else if (s.paddle) {
+      // Paddle wie an der echten Maschine mit Blindsieb: Druck steigt, solange die Pumpe läuft und Befehle kommen
+      // (ohne neuen Befehl hört sie nach ~1 s auf); bei 0 % bleibt er stehen
+      if (s.pumpPw > 0 && Date.now() - s.paddleAt < 1000) s.pump = Math.min(12, s.pump + s.pumpPw / 30);
+    } else {
       s.pump *= 0.5;
       if (s.pump < 0.05) s.pump = 0;
     }
@@ -230,10 +234,14 @@ export function createMockXenia({ speed = 1, api = 'bbs' } = {}) {
         case 'POST /api/v2/paddle/pumppower': {
           if (![1, 5].includes(s.MA_STATUS)) { res.writeHead(500); return res.end(); }
           const lv = Number(j.PU_SET_LEVEL_PW_CONTROL);
-          s.paddle = lv > 0; s.MA_STATUS = lv > 0 ? 5 : 1; s.pumpPw = lv; s.pump = lv / 10;
+          if (lv > 0) { s.paddle = true; s.MA_STATUS = 5; }
+          s.pumpPw = lv; s.paddleAt = Date.now();
           return json({ BB_SET_SUPPLY_VALVE: lv > 0 ? 1 : 0, BB_SET_SUPPLY_VALVE_2: 0 });
         }
-        case 'GET /api/v2/paddle/stop': s.paddle = false; s.pumpPw = 0; if (s.MA_STATUS === 5) s.MA_STATUS = 1; return ok();
+        case 'GET /api/v2/paddle/stop':
+          if (s.MA_STATUS !== 5) { res.writeHead(500); return res.end(); }
+          s.paddle = false; s.pumpPw = 0; s.pump = 0; s.MA_STATUS = 1; // entlastet
+          return ok();
         case 'GET /api/v2/brewgroup/pid': return json({ BG_P_VAL: 18, BG_I_VAL: 0.00033, BG_D_VAL: 0, BG_SET_SENSOR_SLOPE: 0.03501, BG_SET_SENSOR_OFFSET: -14.2, BG_SET_POWER: 300, BG_TEMPERATURE_OFFSET: 3 });
         // Endpunkte für die Mühle (Grind-by-Sync)
         case 'POST /api/v2/brewratio': s.lastBrewRatio = j; return ok();

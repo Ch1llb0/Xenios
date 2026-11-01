@@ -84,17 +84,10 @@ export const BUILTIN_SCRIPTS = { 0: 'Keine', 2: 'Dauerbezug', 7: 'Einfache Dosis
 // Kürzere Pumpvorgänge sind kein Bezug (Spülen, Rückspülen von Hand) und kommen nicht ins Protokoll.
 export const MIN_SHOT_MS = 15000;
 
-// Rückspülen mit Blindsieb: 5× 10 s Druck, dann über das Ablassventil entlasten. „Pumpendruck“ (4) regelt nur
-// eine laufende Pumpe; ohne „Pumpe an“ (2) davor bleibt sie aus (an der Maschine gesehen, 01.11.2026). Läuft es, zählt kein Bezug,
-// sondern der Backflush wird als erledigt eingetragen.
-export const BACKFLUSH_NAME = 'Backflush';
-export const BACKFLUSH_STEPS = [
-  ...Array.from({ length: 5 }, () => [
-    { op: 13, args: [] }, { op: 2, args: [] }, { op: 4, args: [9, 10] }, { op: 6, args: [] }, { op: 14, args: [] },
-    { op: 15, args: [] }, { op: 12, args: [5] }, { op: 16, args: [] }, { op: 12, args: [5] },
-  ]).flat(),
-  { op: 20, args: [2, 300] },
-];
+// Rückspülen mit Blindsieb über die direkte Pumpensteuerung (Paddle). Skripte bricht die Xenia mit Blindsieb sofort ab
+// (Status 4, Pumpe aus). Paddle-Pumpe läuft nur, solange laufend Befehle kommen; an der Maschine gemessen (01.11.2026):
+// mit 35 % in ~12 s auf 8,5 bar, Spitze ~9,5 bar, beim Halten bis ~10 bar; bei 0 % bleibt er stehen, paddle/stop entlastet.
+export const BACKFLUSH = { cycles: 5, level: 35, bar: 8, holdMs: 5000, restMs: 5000, maxPumpMs: 30000 };
 
 // Geschmack in der Bewertung eines Bezugs
 export const TASTE = { sour: 'sauer', balanced: 'ausgewogen', bitter: 'bitter' };
@@ -523,10 +516,7 @@ export class Machine extends Emitter {
     };
     s.shot = { running: false, timeMs: 0, startedAt: null, curve: [] };
     s.lastShot = shot;
-    if (shot.script?.title === BACKFLUSH_NAME) {
-      this.markBackflush();
-      this._event('shot', { title: 'Backflush fertig', body: 'Als erledigt eingetragen.', tag: 'backflush' });
-    } else if (timeMs >= MIN_SHOT_MS) {
+    if (timeMs >= MIN_SHOT_MS) {
       shot.no = (s.counters?.extractions ?? null) !== null ? s.counters.extractions + this._liveStarts.length : null;
       this._log(shot);
       const parts = [`${fmt(timeMs / 1000)} s`];
@@ -1022,20 +1012,6 @@ export class Machine extends Emitter {
     this.readScript(id).then((r) => { pending.title = title ?? (r.title || BUILTIN_SCRIPTS[id] || null); pending.steps = r.steps; }).catch(() => {});
   }
 
-  // Backflush-Skript auf der Maschine anlegen bzw. auf den aktuellen Stand bringen und starten.
-  async runBackflush() {
-    const find = async () => (await this.scripts()).find((x) => x.title === BACKFLUSH_NAME);
-    const old = await find();
-    await this.saveScript({ id: old?.id, name: BACKFLUSH_NAME, steps: BACKFLUSH_STEPS });
-    const script = old || await find();
-    if (!script) throw httpError(502, 'Backflush-Skript wurde nicht angelegt');
-    this._lastAppAction = Date.now();
-    await this.client.post('/api/v2/scripts/execute', { ID: script.id });
-    this.noteScript(script.id, { title: BACKFLUSH_NAME, steps: BACKFLUSH_STEPS });
-    this._acted();
-    return { ok: true, id: script.id };
-  }
-
   async stopScript() {
     try {
       await this.client.get('/api/v2/scripts/stop');
@@ -1262,6 +1238,69 @@ export class Machine extends Emitter {
     await this.client.get('/api/v2/paddle/stop');
     this.kick(200);
     return { ok: true };
+  }
+
+  // Backflush im Hintergrund starten: je Runde Druck aufbauen, halten, über paddle/stop entlasten.
+  async runBackflush() {
+    if (!this.api.paddle) throw httpError(409, 'Backflush braucht die direkte Pumpensteuerung, die alte Xenia hat sie nicht');
+    if (!this.features.paddle) throw httpError(403, 'Backflush braucht die Paddle-Steuerung, sie ist deaktiviert');
+    if (this._backflush) throw httpError(409, 'Backflush läuft schon');
+    if (this.state.status !== 1) throw httpError(409, 'Maschine muss eingeschaltet und bereit sein');
+    const run = { stop: false };
+    this._backflush = run;
+    this._backflushLoop(run)
+      .catch((e) => {
+        log.warn(`Backflush abgebrochen: ${e.message}`);
+        this._event('shot', { title: 'Backflush abgebrochen', body: e.message, tag: 'backflush' });
+      })
+      .finally(() => {
+        this._backflush = null;
+        this.state.backflush = null;
+        this.emit('state');
+      });
+    return { ok: true, cycles: BACKFLUSH.cycles };
+  }
+
+  stopBackflush() {
+    if (this._backflush) this._backflush.stop = true;
+    return { ok: true, stopped: Boolean(this._backflush) };
+  }
+
+  async _backflushLoop(run) {
+    const { cycles, level, bar, holdMs, restMs, maxPumpMs } = BACKFLUSH;
+    const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    const pump = (lv) => this.client.post('/api/v2/paddle/pumppower', { PU_SET_LEVEL_PW_CONTROL: lv });
+    const release = async () => {
+      try { await pump(0); } catch { /* Maschine evtl. schon entlastet */ }
+      try { await this.client.get('/api/v2/paddle/stop'); } catch { /* 500 = kein Paddle aktiv */ }
+    };
+    try {
+      for (let cycle = 1; cycle <= cycles && !run.stop; cycle++) {
+        this.state.backflush = { cycle, cycles };
+        this._lastAppAction = Date.now();
+        this.emit('state');
+        const start = Date.now();
+        let heldSince = null;
+        while (!run.stop) {
+          const p = num((await this.client.get('/api/v2/paddle/press')).PU_SENS_PRESS) ?? 0;
+          if (p >= bar) heldSince ??= Date.now();
+          if (heldSince && Date.now() - heldSince >= holdMs) break;
+          if (!heldSince && Date.now() - start > maxPumpMs) throw new Error('Kein Druckaufbau – Blindsieb eingesetzt?');
+          await pump(p >= bar ? 0 : level); // laufend senden, sonst bleibt die Pumpe stehen
+        }
+        await release();
+        if (cycle < cycles && !run.stop) await sleep(restMs);
+      }
+    } finally {
+      await release();
+      this._acted();
+    }
+    if (run.stop) {
+      this._event('shot', { title: 'Backflush gestoppt', body: 'Nicht als erledigt eingetragen.', tag: 'backflush' });
+      return;
+    }
+    this.markBackflush();
+    this._event('shot', { title: 'Backflush fertig', body: `${cycles} Runden, als erledigt eingetragen.`, tag: 'backflush' });
   }
 
   async details() {

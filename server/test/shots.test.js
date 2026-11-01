@@ -85,7 +85,7 @@ test('Doppelte Einträge aus älteren Versionen werden beim Start zusammengefüh
   assert.equal(machine([later, live]).history.data.shots.length, 2);
 });
 
-test('Kurze Pumpvorgänge und Backflush kommen nicht ins Protokoll', () => {
+test('Kurze Pumpvorgänge kommen nicht ins Protokoll', () => {
   const m = machine();
   m._checkCounter(400);
   m.state.counters = { extractions: 400 };
@@ -95,12 +95,6 @@ test('Kurze Pumpvorgänge und Backflush kommen nicht ins Protokoll', () => {
   m._applyLive(diag(1, 8000));
   m._checkCounter(401); // der Zähler zählt ihn mit, das ergibt keinen „verpassten“ Eintrag
   assert.equal(m.history.data.shots.length, 0);
-  // Backflush-Skript: kein Bezug, aber als erledigt eingetragen
-  m.noteScript(150, { title: 'Backflush', steps: [] });
-  m._applyLive(diag(3, 1000));
-  m._applyLive(diag(1, 90000));
-  assert.equal(m.history.data.shots.length, 0);
-  assert.ok(m.maintenance().backflush.lastAt);
   // Echter Bezug zählt
   m._applyLive(diag(3, 1000));
   m._applyLive(diag(1, 27000));

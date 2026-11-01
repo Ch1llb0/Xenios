@@ -322,6 +322,12 @@ Beim Bearbeiten erst `scriptsedit {"SCRIPT_ID":12}` senden, dann `create` mit `"
 | `GET /api/v2/paddle/stop` 📄 | – | Pumpe aus / Paddle beenden |
 
 `BB_SET_SUPPLY_VALVE` = Brühventil, `BB_SET_SUPPLY_VALVE_2` = Ablassventil.
+
+Live geprüft ✅ (01.11.2026, Firmware 4.226, mit Blindsieb):
+- Die Pumpe läuft nur, solange laufend `pumppower`-Befehle kommen (etwa alle 0,5 s). Ein einzelner Befehl öffnet nur das Ventil (Status 5).
+- 35 % bauen in ~12 s 8,5 bar auf, 80 % springen in einem Schritt auf ~12 bar. Bei 0 % bleibt der Druck stehen.
+- `paddle/stop` entlastet sofort. Status 5 bleibt danach noch einige Sekunden; Befehle während Status 4 (Ablassen) nimmt die Maschine nicht an.
+- Skripte (auch einfaches `13;4 9000 10000;6;14`) bricht die Xenia mit Blindsieb sofort ab (Status 4, Pumpe aus). Backflush geht deshalb nur über Paddle.
 Aufnahme in der Oberfläche: Pumpenwechsel werden als Skript `1;13;3 <p> ;<Δms>;12 <Δms>;3 <p> …;17;7;` gespeichert.
 
 ---

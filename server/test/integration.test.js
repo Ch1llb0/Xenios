@@ -213,6 +213,7 @@ test('Uhr stellen, Paddle, Diagnose', async () => {
   r = await call('POST', '/api/machine/paddle', { level: 40 });
   assert.equal(r.status, 200);
   assert.equal(xenia.state.pumpPw, 40);
+  await new Promise((ok) => setTimeout(ok, 400));
   r = await call('GET', '/api/machine/paddle');
   assert.ok(r.json.pressure > 0);
   r = await call('POST', '/api/machine/paddle/stop');
@@ -440,26 +441,40 @@ test('Bezugs-Analyse und Pflege über die API', async () => {
   assert.equal(r.status, 401);
 });
 
-test('Backflush: Skript wird angelegt, beim nächsten Start aktualisiert und gestartet', async () => {
-  await call('POST', '/api/machine/power', { mode: 'on' });
-  await until(() => app.machine.snapshot().statusKey === 'on');
-  const backflush = () => Object.entries(xenia.state.scripts).filter(([, sc]) => sc.title === 'Backflush');
-  let r = await call('POST', '/api/maintenance/backflush/run');
-  assert.equal(r.status, 200);
-  assert.equal(backflush().length, 1);
-  const [id] = backflush()[0];
-  // Pumpe an (2) vor dem Pumpendruck (4), sonst läuft die Pumpe auf der Xenia nicht an
-  assert.match(xenia.state.scripts[id].content, /^1;13;2;4 9000 10000;6;14;15;12 5000;16;12 5000;13;2;/);
-  await call('POST', '/api/machine/scripts/stop');
-  await until(() => app.machine.snapshot().statusKey === 'on');
-  xenia.state.scripts[id].content = '1;13;4 9000 10000;7;'; // alte Version auf der Maschine
-  r = await call('POST', '/api/maintenance/backflush/run');
-  assert.equal(r.status, 200);
-  assert.equal(backflush().length, 1, 'kein zweites Skript');
-  assert.match(xenia.state.scripts[id].content, /^1;13;2;4 9000 10000;/);
-  await call('POST', '/api/machine/scripts/stop');
-  await call('DELETE', `/api/machine/scripts/${id}`);
-  await until(() => app.machine.snapshot().statusKey === 'on');
+test('Backflush über die Pumpensteuerung: Runden, Entlasten, eingetragen; Stopp', async () => {
+  const { BACKFLUSH } = await import('../web/shared/machine-core.js');
+  const saved = { ...BACKFLUSH };
+  Object.assign(BACKFLUSH, { cycles: 2, holdMs: 300, restMs: 200 });
+  try {
+    await call('POST', '/api/machine/power', { mode: 'on' });
+    await until(() => app.machine.snapshot().status === 1);
+    const before = xenia.state.log.length;
+    const events = [];
+    const onEvent = (e) => events.push(e);
+    app.machine.on('event', onEvent);
+    let r = await call('POST', '/api/maintenance/backflush/run');
+    assert.equal(r.status, 200);
+    assert.equal((await call('POST', '/api/maintenance/backflush/run')).status, 409, 'nur einmal gleichzeitig');
+    assert.ok(await until(() => events.some((e) => e.title === 'Backflush fertig'), 15000));
+    const log = xenia.state.log.slice(before);
+    assert.ok(log.filter((l) => l.includes('paddle/pumppower')).length > 4, 'Pumpe laufend angesteuert');
+    assert.ok(log.filter((l) => l.includes('paddle/stop')).length >= 2, 'jede Runde entlastet');
+    assert.ok(!log.some((l) => l.includes('scripts/')), 'kein Skript');
+    assert.equal(xenia.state.pumpPw, 0);
+    assert.ok((await call('GET', '/api/maintenance')).json.backflush.daysSince === 0);
+    // Stopp mitten im Lauf
+    Object.assign(BACKFLUSH, { cycles: 5, holdMs: 5000 });
+    await until(() => app.machine.snapshot().status === 1);
+    await call('POST', '/api/maintenance/backflush/run');
+    await new Promise((ok) => setTimeout(ok, 300));
+    r = await call('POST', '/api/maintenance/backflush/stop');
+    assert.equal(r.json.stopped, true);
+    assert.ok(await until(() => events.some((e) => e.title === 'Backflush gestoppt'), 8000));
+    assert.equal(xenia.state.pumpPw, 0);
+    app.machine.off('event', onEvent);
+  } finally {
+    Object.assign(BACKFLUSH, saved);
+  }
 });
 
 test('Abmelden entwertet die Sitzung', async () => {
