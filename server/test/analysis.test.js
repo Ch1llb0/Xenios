@@ -100,6 +100,28 @@ test('Gestartetes Skript hängt am Bezug (für die Zielkurve)', async () => {
   assert.match(s.id, /^[a-z0-9]{6,}$/);
 });
 
+test('Paddle und Backflush: „bereit“ kommt nicht nach jeder Runde neu', () => {
+  const m = machine();
+  const events = [];
+  m.on('event', (e) => events.push(e.topic));
+  m.state.temp.groupSet = 93;
+  m.state.pressure.steamSet = 1.2;
+  const live = (status) => ({ MA_STATUS: status, SB_STATUS: 2, BG_SENS_TEMP_A: 93, SB_SENS_PRESS: 1.2 });
+  m._applyLive(live(1));
+  assert.ok(m.state.heated && m.state.steamReady);
+  for (let i = 0; i < 3; i++) {
+    m._applyLive(live(5));
+    m._applyLive(live(1));
+  }
+  assert.deepEqual(events, []);
+  assert.ok(m.state.heated && m.state.steamReady);
+  // Ausschalten setzt zurück: Nach dem nächsten Einschalten meldet sie sich wieder
+  m._applyLive(live(0));
+  assert.ok(!m.state.heated && !m.state.steamReady);
+  m._applyLive(live(1));
+  assert.ok(events.includes('heated') && events.includes('steam'));
+});
+
 test('Backflush-Erinnerung und IDs für alte Einträge', () => {
   const m = machine([{ endedAt: iso(10), timeMs: 25000 }, { endedAt: iso(5000), timeMs: 25000 }]);
   assert.ok(m.history.data.shots.every((s) => s.id), 'ältere Einträge bekommen eine ID');

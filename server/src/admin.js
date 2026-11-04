@@ -235,7 +235,8 @@ export function authRoutes(route, app) {
     const want = Buffer.from(normCode(app.setup.code));
     const ok = await throttle(ctx, () => {
       const got = Buffer.from(normCode(ctx.body.code));
-      return got.length === want.length && crypto.timingSafeEqual(got, want);
+      // Ohne Code keine Einrichtung: Zwei leere Werte wären sonst gleich.
+      return want.length > 0 && got.length === want.length && crypto.timingSafeEqual(got, want);
     });
     if (!ok) {
       log.warn(`Falscher Einrichtungscode von ${ctx.ip}`);

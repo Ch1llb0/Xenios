@@ -13,6 +13,7 @@ import { openSqlite } from '../src/sqlite-read.js';
 import { createSelfSignedCert } from '../src/tls.js';
 import { unzip } from '../src/grinder.js';
 import { makeZip, packBackup, readBackup } from '../src/backup.js';
+import { JsonStore } from '../src/store.js';
 import { compareVersions, helperAlive, requestUpdate, readUpdate, resetLatestCache, fetchLatest } from '../src/update.js';
 import { tunnelTokenFromPaste, requestTunnelToken, tunnelTokenFile, waitForTunnelApplied } from '../src/tunnel-token.js';
 
@@ -197,6 +198,38 @@ test('Selbstsigniertes Zertifikat ist gültig und enthält IPs', () => {
   assert.equal(x.checkIP('192.168.178.20'), '192.168.178.20');
   assert.equal(x.checkHost('xenia.local'), 'xenia.local');
   assert.ok(new Date(x.validTo) > new Date(Date.now() + 365 * 86400e3));
+});
+
+test('JsonStore: Beschädigtes bleibt erhalten, Schreibfehler beenden den Server nicht', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xenios-store-'));
+  try {
+    const file = path.join(dir, 'shots.json');
+    assert.deepEqual(new JsonStore(file, { shots: [] }).data, { shots: [] }, 'fehlende Datei: Anfangswert');
+    const broken = '{"shots":[{"id":"a"}';
+    fs.writeFileSync(file, broken);
+    const s = new JsonStore(file, { shots: [] });
+    assert.deepEqual(s.data, { shots: [] });
+    s.flush();
+    const kept = fs.readdirSync(dir).filter((n) => n.startsWith('shots.json.defekt-'));
+    assert.equal(kept.length, 1);
+    assert.equal(fs.readFileSync(path.join(dir, kept[0]), 'utf8'), broken, 'Speichern lässt die beschädigte Datei in Ruhe');
+    fs.writeFileSync(file, 'null');
+    assert.deepEqual(new JsonStore(file, { shots: [] }).data, { shots: [] }, 'kein Objekt zählt als beschädigt');
+    assert.throws(() => new JsonStore(dir, {}), /nicht lesbar/, 'andere Lesefehler brechen ab');
+
+    // Ein Ordner als Zwischendatei lässt das Schreiben scheitern; eine nicht abgefangene Ausnahme ließe den Test durchfallen
+    const blocked = path.join(dir, 'x.json');
+    fs.mkdirSync(`${blocked}.tmp`);
+    const b = new JsonStore(blocked, { a: 1 });
+    b.save(0);
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(b.timer, 'neuer Versuch ist geplant');
+    fs.rmdirSync(`${blocked}.tmp`);
+    b.flush();
+    assert.deepEqual(JSON.parse(fs.readFileSync(blocked, 'utf8')), { a: 1 });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('Sicherung: ZIP packen und wieder lesen', async () => {

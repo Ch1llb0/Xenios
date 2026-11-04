@@ -90,7 +90,7 @@ export function createApp(cfg, hooks = {}) {
   grinder.on('state', () => machine.linkGrinds(grinder.state.grinds));
   machine.on('event', (ev) => { if (ev.topic === 'shot' && cfg.grinder.enabled && started) grinder.kick(5000); });
   const scheduler = new Scheduler(cfg, machine, { onEvent });
-  const wake = new Wake(cfg, machine, { onEvent });
+  const wake = new Wake(cfg, machine, { onEvent, sessionExists: (id) => sessions.existsShort(id) });
   const updateViewers = () => {
     machine.setViewers(streams.size);
     grinder.setViewers(streams.size);

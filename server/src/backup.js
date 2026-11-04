@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { unzip } from './grinder.js';
 import { DEFAULTS, SECRET_PATHS, getPath, readConfigFile, writeConfigFile, secretBox, loadConfig } from './config.js';
 import { httpError } from './machine.js';
+import { isPasswordHash } from './auth.js';
 
 const inflateRaw = promisify(zlib.inflateRaw);
 const bad = (msg) => httpError(400, msg);
@@ -164,6 +165,8 @@ function writeAtomic(dest, buf) {
 
 export async function applyBackupFiles({ buf, configFile, dataDir, box }) {
   const { files, config, manifest } = await readBackup(buf);
+  // Ohne Passwort wäre der Server danach wieder im Einrichtungsmodus und für jeden offen, der ihn erreicht.
+  if (!isPasswordHash(getPath(config, 'auth.passwordHash'))) throw bad('In der Sicherung fehlt das App-Passwort, sie wurde nicht eingespielt');
   checkSecrets(config, files['secret.key']?.toString('utf8'), box);
   const current = readConfigFile(configFile);
   if (current.dataDir !== undefined) config.dataDir = current.dataDir;

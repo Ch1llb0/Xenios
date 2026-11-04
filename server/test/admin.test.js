@@ -12,11 +12,12 @@ import { GrinderHttp } from '../src/grinder.js';
 import { isPushEndpoint } from '../src/push.js';
 import { passwordProblem } from '../src/auth.js';
 import { probeTunnel } from '../src/admin.js';
+import { makeZip, BACKUP_KIND, BACKUP_FORMAT } from '../src/backup.js';
 import { setLogLevel } from '../src/log.js';
 
 setLogLevel('error');
 const PW = 'Erster-Espresso-42';
-let xenia, grinder, app, server, base, dir, cfgFile;
+let xenia, grinder, app, server, base, dir, cfgFile, cfg;
 const jar = {};
 
 const listen = (srv) => new Promise((r) => srv.listen(0, '127.0.0.1', () => r(srv.address().port)));
@@ -30,7 +31,7 @@ before(async () => {
   cfgFile = path.join(dir, 'config.json');
   // Wie ein frischer Container: nur Adressen vorgegeben, kein Passwort
   fs.writeFileSync(cfgFile, JSON.stringify({ machine: { url: `http://127.0.0.1:${xp}`, pollIdleMs: 300, pollActiveMs: 200, pollBackgroundMs: 300 }, grinder: { url: `https://127.0.0.1:${gp}` }, dataDir: '.' }));
-  const cfg = loadConfig(cfgFile);
+  cfg = loadConfig(cfgFile);
   prepare(cfg);
   app = createApp(cfg, {
     fetchImpl: async (url, init) => {
@@ -175,6 +176,32 @@ test('Sicherung: ZIP herunterladen und wieder einspielen', async () => {
   assert.equal(r.status, 400);
   r = await call('POST', '/api/admin/backup', zip, { binary: true, headers: { 'X-Xenia': '0' } });
   assert.equal(r.status, 403);
+});
+
+test('Sicherung ohne App-Passwort wird abgelehnt, Einrichtung bleibt gesperrt', async () => {
+  const zip = makeZip({
+    'manifest.json': JSON.stringify({ kind: BACKUP_KIND, version: BACKUP_FORMAT }),
+    'config.json': JSON.stringify({ logLevel: 'warn' }),
+  });
+  const before = fs.readFileSync(cfgFile, 'utf8');
+  let r = await call('POST', '/api/admin/backup', zip, { binary: true });
+  assert.equal(r.status, 400);
+  assert.match(r.json.error, /App-Passwort/);
+  assert.equal(fs.readFileSync(cfgFile, 'utf8'), before, 'config.json unverändert');
+  r = await call('GET', '/auth/session');
+  assert.deepEqual(r.json, { authenticated: true, setup: false });
+});
+
+test('Einrichtungsmodus ohne Code nimmt keinen leeren Code an', async () => {
+  const hash = cfg.auth.passwordHash;
+  cfg.auth.passwordHash = null;
+  try {
+    assert.equal(app.setup.code, null);
+    const r = await call('POST', '/auth/setup/check', { code: '' }, { who: 'none' });
+    assert.equal(r.status, 401);
+  } finally {
+    cfg.auth.passwordHash = hash;
+  }
 });
 
 test('Per Umgebungsvariable festgelegte Werte sind gesperrt und landen nicht in der Datei', () => {

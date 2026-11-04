@@ -229,7 +229,7 @@ export function writeConfigFile(file, data) {
   const clean = JSON.parse(JSON.stringify(data, (k, v) => (k.startsWith('_') ? undefined : v)));
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(clean, null, 2) + '\n', { mode: 0o600 });
+  fs.writeFileSync(tmp, JSON.stringify(clean, null, 2) + '\n', { mode: 0o600, flush: true });
   fs.renameSync(tmp, file);
 }
 

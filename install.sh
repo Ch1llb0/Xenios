@@ -127,7 +127,7 @@ apply_requested() {
     heartbeat
     say "Fertig${ver:+ · Xenios $ver}."
   else
-    write_status error ',"error":"Aktualisierung fehlgeschlagen (Protokoll auf dem Server)"}'
+    write_status error ',"error":"Aktualisierung fehlgeschlagen (Protokoll auf dem Server)"'
     die "Aktualisierung fehlgeschlagen"
   fi
 }
@@ -218,7 +218,7 @@ install_helper() {
   unit_dir=/etc/systemd/system
   if [ ! -d /run/systemd/system ]; then
     say "Kein systemd – Update-Button braucht einen Cronjob:"
-    say "  * * * * * $DIR/install.sh --apply-requested"
+    say "  * * * * * sh $DIR/install.sh --apply-requested"
     return 0
   fi
   service=$unit_dir/xenios-update.service
@@ -235,7 +235,7 @@ User=$owner
 Group=$owner
 SupplementaryGroups=docker
 WorkingDirectory=$DIR
-ExecStart=$DIR/install.sh --apply-requested
+ExecStart=/bin/sh $DIR/install.sh --apply-requested
 EOF
   as_root tee "$timer" >/dev/null <<EOF
 [Unit]

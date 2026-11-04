@@ -4,9 +4,9 @@ name: Server testen
 on:
   push:
     branches: [main]
-    paths: ['server/**', 'docker/**', '.github/workflows/ci.yml']
+    paths: ['server/**', 'docker/**', 'install.sh', '.github/workflows/ci.yml']
   pull_request:
-    paths: ['server/**', 'docker/**', '.github/workflows/ci.yml']
+    paths: ['server/**', 'docker/**', 'install.sh', '.github/workflows/ci.yml']
   workflow_dispatch:
   workflow_call:
 

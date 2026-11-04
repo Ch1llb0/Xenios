@@ -11,6 +11,8 @@ const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3)
 const p2 = (n) => String(n).padStart(2, '0');
 // Schlummern meldet Android als neuen Wecker kurz nach dem alten: so lange gilt er als derselbe Wecker.
 const SNOOZE_MS = 2 * 3600e3;
+// Ein Handy meldet jeden neuen Wecker sofort. Liegt sein letzter so lange zurück, ist die Meldung tot (App neu installiert).
+const STALE_MS = 24 * 3600e3;
 
 export const WAKE_DEFAULTS = {
   enabled: false,
@@ -22,9 +24,10 @@ export const WAKE_DEFAULTS = {
 };
 
 export class Wake {
-  constructor(cfg, machine, { onEvent } = {}) {
+  constructor(cfg, machine, { onEvent, sessionExists } = {}) {
     this.machine = machine;
     this.onEvent = onEvent || (() => {});
+    this.sessionExists = sessionExists || (() => true);
     this.store = new JsonStore(path.join(cfg.dataDir, 'wake.json'), { config: { ...WAKE_DEFAULTS }, devices: {}, fired: null });
     this.store.data.config = { ...WAKE_DEFAULTS, ...this.store.data.config };
     this.timer = null;
@@ -76,6 +79,21 @@ export class Wake {
     return this.state();
   }
 
+  // Einträge entfernen, deren Sitzung weg ist (abgemeldet, App neu eingerichtet) oder die seit einem Tag nichts mehr gemeldet haben.
+  // Abgewählte Handys bleiben bei bestehender Sitzung, sonst zählten sie nach der nächsten Meldung wieder mit.
+  _prune(now = Date.now()) {
+    const { devices } = this.store.data;
+    let changed = false;
+    for (const [id, d] of Object.entries(devices)) {
+      const stale = d.enabled && !(d.next > now) && now - d.updated > STALE_MS;
+      if (stale || !this.sessionExists(id)) {
+        delete devices[id];
+        changed = true;
+      }
+    }
+    if (changed) this.store.save();
+  }
+
   // Zählt ein Wecker nach Tag und Zeitfenster?
   _counts(at) {
     const c = this.store.data.config;
@@ -102,6 +120,7 @@ export class Wake {
   }
 
   state() {
+    this._prune();
     return {
       config: this.store.data.config,
       devices: Object.entries(this.store.data.devices).map(([id, d]) => ({ id, ...d })),
@@ -122,6 +141,7 @@ export class Wake {
 
   // Einschalten, sobald der Vorlauf vor dem Wecker erreicht ist (auch wenn der Wecker kurzfristig gestellt wurde).
   async tick(now = Date.now()) {
+    this._prune();
     if (!this.store.data.config.enabled) return;
     const p = this.plan(now);
     if (!p || now < p.at) return;

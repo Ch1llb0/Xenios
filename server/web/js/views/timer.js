@@ -261,7 +261,7 @@ export function timerView(root) {
         icon('bell', 's20'),
         h('div', { class: 'grow' },
           h('div', {}, d.name),
-          h('div', { class: 'small muted' }, d.next ? `Nächster Wecker ${when(d.next)}` : 'Kein Wecker gestellt', ` · gemeldet ${when(d.updated)}`)),
+          h('div', { class: 'small muted' }, d.next > Date.now() ? `Nächster Wecker ${when(d.next)}` : 'Kein Wecker gemeldet', ` · gemeldet ${when(d.updated)}`)),
         switchEl({ checked: deviceToggles[d.id] ?? d.enabled, label: `${d.name} berücksichtigen`, onChange: (on) => { deviceToggles[d.id] = on; markWake(); } }),
         h('button', { class: 'icon-btn', 'aria-label': `${d.name} entfernen`, onclick: async () => {
           try { wake = await api(`/api/wake/devices/${d.id}`, { method: 'DELETE' }); paintWake(); } catch (e) { snackbar(e.message); }

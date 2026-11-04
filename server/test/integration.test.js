@@ -381,6 +381,42 @@ test('Wecker: Handys melden, frühester Wecker zählt, Einschalten mit Vorlauf',
   await call('PUT', '/api/wake', { config: { enabled: false } });
 });
 
+test('Wecker-Liste: Einträge ohne Sitzung oder ohne neue Meldung verschwinden', async () => {
+  const dev = async (name, next) => {
+    const headers = { Authorization: `Bearer ${(await call('POST', '/auth/device', { password: PW, name }, { auth: false })).json.token}` };
+    await call('POST', '/api/wake/alarm', { next }, { auth: false, headers });
+    return headers;
+  };
+  const list = async () => (await call('GET', '/api/wake')).json.devices;
+  const names = async () => (await list()).map((d) => d.name);
+  const soon = Date.now() + 3600e3;
+  const later = Date.now() + 5 * 86400e3;
+  const out = await dev('Abgemeldet', later);
+  const old = await dev('Alter Wecker', soon);
+  const none = await dev('Ohne Wecker', null);
+  const off = await dev('Abgewählt', soon);
+  const live = await dev('Aktuell', later);
+  await call('PUT', '/api/wake', { devices: { [(await list()).find((d) => d.name === 'Abgewählt').id]: false } });
+  for (const n of ['Abgemeldet', 'Alter Wecker', 'Ohne Wecker', 'Abgewählt', 'Aktuell']) assert.ok((await names()).includes(n), n);
+
+  // Abmelden entfernt den Eintrag sofort, auch mit Wecker in der Zukunft
+  await call('POST', '/auth/logout', {}, { auth: false, headers: out });
+  assert.ok(!(await names()).includes('Abgemeldet'));
+
+  // Zwei Tage ohne Meldung: Vergangenes und „kein Wecker“ fliegen raus, Abgewähltes und Künftiges bleiben
+  app.wake._prune(Date.now() + 2 * 86400e3);
+  const left = await names();
+  assert.ok(!left.includes('Alter Wecker') && !left.includes('Ohne Wecker'));
+  assert.ok(left.includes('Abgewählt') && left.includes('Aktuell'));
+
+  // Neue Meldung bringt ein entferntes Handy zurück; Sitzungen wieder freigeben
+  await call('POST', '/api/wake/alarm', { next: soon }, { auth: false, headers: old });
+  assert.ok((await names()).includes('Alter Wecker'));
+  for (const headers of [old, none, off, live]) await call('POST', '/auth/logout', {}, { auth: false, headers });
+  const end = await names();
+  assert.ok(!['Alter Wecker', 'Ohne Wecker', 'Abgewählt', 'Aktuell'].some((n) => end.includes(n)));
+});
+
 test('Android-App: Geräte-Token, Bearer-Zugriff, Widget-Zustand', async () => {
   let r = await call('POST', '/auth/device', { password: 'falsch', name: 'Pixel' }, { auth: false });
   assert.equal(r.status, 401);

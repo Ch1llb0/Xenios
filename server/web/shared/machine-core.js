@@ -462,8 +462,8 @@ export class Machine extends Emitter {
       this._finishShot(extractionMs);
     }
 
-    // Aufgeheizt (einmal pro Einschaltvorgang)
-    const on = status === 1 || status === 3 || status === 4;
+    // Aufgeheizt (einmal pro Einschaltvorgang). Paddle zählt als an: sonst käme nach jeder Backflush-Runde erneut „bereit“.
+    const on = status === 1 || status === 3 || status === 4 || status === 5;
     if (!on) {
       s.heated = false;
       s.steamReady = false;

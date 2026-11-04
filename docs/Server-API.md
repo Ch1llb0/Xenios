@@ -42,7 +42,7 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | GET | `/api/admin/update` | – | Versionsstand: `{current,latest,newer,helper,job}` (`helper` = Update-Dienst von `install.sh` lebt) |
 | POST | `/api/admin/update` | – | Aktualisierung anfordern; der Host-Dienst holt Image/Git und startet neu |
 | GET | `/api/admin/backup` | – | ZIP mit `config.json`, `secret.key`, Bezügen, Zeitplänen, Sitzungen, Zertifikat (wie ein Passwort aufbewahren) |
-| POST | `/api/admin/backup` | ZIP-Körper (`application/zip`) | dieselbe Datei einspielen; ersetzt die Dateien, diese Sitzung bleibt |
+| POST | `/api/admin/backup` | ZIP-Körper (`application/zip`) | dieselbe Datei einspielen; ersetzt die Dateien, diese Sitzung bleibt. 400, wenn das App-Passwort darin fehlt |
 | GET | `/api/state` | – | `{machine, grinder, server}` (siehe unten) |
 | GET | `/api/stream` | – | **Server-Sent Events**: `snapshot`, `machine`, `grinder`, `event`, `server` (Funktionen geändert); höchstens 50 gleichzeitig |
 | GET | `/api/shots` | – | Bezugs-Protokoll (bis 500 Einträge, Druckkurven für die neuesten 20), `total`, `beans:[{name,roaster}]` |

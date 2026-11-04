@@ -11,11 +11,11 @@ export function hashPassword(password) {
   return `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${salt.toString('base64')}$${hash.toString('base64')}`;
 }
 
+export const isPasswordHash = (v) => typeof v === 'string' && v.startsWith('scrypt$') && v.split('$').length === 6;
+
 export function verifyPassword(password, stored) {
-  if (typeof password !== 'string' || typeof stored !== 'string') return false;
-  const parts = stored.split('$');
-  if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
-  const [, N, r, p, saltB64, hashB64] = parts;
+  if (typeof password !== 'string' || !isPasswordHash(stored)) return false;
+  const [, N, r, p, saltB64, hashB64] = stored.split('$');
   const expected = Buffer.from(hashB64, 'base64');
   const actual = crypto.scryptSync(password.normalize('NFC'), Buffer.from(saltB64, 'base64'), expected.length, {
     N: Number(N), r: Number(r), p: Number(p), maxmem: SCRYPT.maxmem,
@@ -89,6 +89,11 @@ export class Sessions {
     const keep = exceptId && this.store.data.sessions[exceptId];
     this.store.data.sessions = keep ? { [exceptId]: keep } : {};
     this.store.save(0);
+  }
+
+  // Gibt es eine Sitzung, deren ID so beginnt?
+  existsShort(shortId) {
+    return Object.keys(this.store.data.sessions).some((k) => k.startsWith(shortId));
   }
 
   // Sitzung über die gekürzte ID aus list() beenden.
