@@ -13,9 +13,9 @@ const listButton = (ic, title, sub, onclick) => h('button', { class: 'list-item 
 
 // Abschnitte in der Reihenfolge der Original-Oberfläche
 const SECTIONS = [
-  ['waage', 'Waage', 'scale'], ['maschine', 'Maschine', 'settings'], ['bruehgruppe', 'Brühgruppe', 'thermo'],
-  ['bruehkessel', 'Brühkessel', 'thermo'], ['dampfkessel', 'Dampfkessel', 'cloud'], ['pumpe', 'Pumpe', 'drop'],
-  ['pid', 'PID', 'tune'], ['timer', 'Timer', 'event'], ['schalter', 'Schalter', 'toggle'], ['system', 'System', 'palette'],
+  ['waage', 'Waage', 'scale'], ['maschine', 'Maschine', 'settings'], ['bruehgruppe', 'Brühgruppe', 'group'],
+  ['bruehkessel', 'Brühkessel', 'boiler'], ['dampfkessel', 'Dampfkessel', 'cloud'], ['pumpe', 'Pumpe', 'drop'],
+  ['pid', 'PID', 'pid'], ['timer', 'Timer', 'event'], ['schalter', 'Schalter', 'toggle'], ['system', 'System', 'palette'],
   ['wifi', 'Wi-Fi', 'wifi'], ['aufzeichnung', 'Aufzeichnung', 'record'], ['firmware', 'Firmware', 'info'], ['konto', 'Konto & Server', 'shield'],
 ];
 
@@ -324,7 +324,9 @@ function themeCard() {
     };
     box.replaceChildren(
       h('div', { class: 'muted small' }, 'Stil'),
-      chips(style, [['xenia', 'Xenia'], ['material', 'Material']], (v) => localStorageSet('uiStyle', v)),
+      chips(style, [['xenia', 'Xenia'], ['material', 'Material']], (v) => { localStorageSet('uiStyle', v); location.reload(); }),
+      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Temperatur- und Druckanzeigen'),
+      chips(localStorageGet('gaugeStyle') || THEME_DEFAULTS.gauge, [['black', 'Wie die Maschine: schwarz'], ['white', 'Wie die Maschine: weiß'], ['app', 'Flach']], (v) => localStorageSet('gaugeStyle', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
       chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Farben (gilt für dieses Gerät)'),

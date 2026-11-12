@@ -927,3 +927,19 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
 .set-section > .section-title { display: flex; align-items: center; gap: 8px; }
 .set-section > .section-title svg { width: 20px; height: 20px; color: var(--primary); }
 .set-section .sub-title { font-size: 13px; font-weight: 600; color: var(--on-surface-variant); margin: 14px 4px 6px; text-transform: none; }
+svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height: 16px; } svg.icon.xi.s20 { width: 18px; height: 18px; }
+
+/* Anzeigen wie die Manometer der Maschine: verchromter Rand, Zifferblatt schwarz oder weiß, dünner roter Zeiger */
+:root[data-gauge="black"] { --gauge-face: #121212; --gauge-tick: #f4f4f4; --gauge-label: #f4f4f4; --gauge-needle: #e53935; --gauge-value: #f4f4f4; --gauge-sub: #b8b8b8; --gauge-hub: #c9ccd0; }
+:root[data-gauge="white"] { --gauge-face: #fbfbf9; --gauge-tick: #151515; --gauge-label: #151515; --gauge-needle: #d32f2f; --gauge-value: #151515; --gauge-sub: #5b5b5b; --gauge-hub: #8e9196; }
+:root[data-gauge] .gauge .g-bezel { stroke: rgba(0,0,0,.35); stroke-width: .8; }
+:root[data-gauge] .gauge .g-face { fill: var(--gauge-face); stroke: rgba(0,0,0,.55); stroke-width: 1.5; }
+:root[data-gauge] .gauge .g-tick { stroke: var(--gauge-tick); stroke-width: 1.2; }
+:root[data-gauge] .gauge .g-tick.major { stroke-width: 2.6; }
+:root[data-gauge] .gauge .g-zone { stroke: #e53935; }
+:root[data-gauge] .gauge .g-label { fill: var(--gauge-label); font-size: 13px; font-weight: 600; }
+:root[data-gauge] .gauge .g-unit { fill: var(--gauge-label); font-size: 11px; text-anchor: middle; letter-spacing: .5px; opacity: .85; }
+:root[data-gauge] .gauge .g-needle { fill: var(--gauge-needle); filter: drop-shadow(0 1px 1px rgba(0,0,0,.45)); }
+:root[data-gauge] .gauge .g-hub { fill: var(--gauge-hub); stroke: rgba(0,0,0,.4); stroke-width: 1; }
+:root[data-gauge] .gauge .g-value { fill: var(--gauge-value); font-size: 20px; font-weight: 600; }
+:root[data-gauge] .gauge .g-sub { fill: var(--gauge-sub); }

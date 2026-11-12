@@ -9,7 +9,13 @@ function polar(r, deg) {
   return [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
 }
 
-export function createGauge({ title, min, max, majorStep, minorStep, redFrom = null, digits = 1, labelEvery = majorStep }) {
+let gaugeNo = 0;
+// Stil der Anzeigen (Einstellungen → Darstellung): „black“/„white“ wie die Manometer der Maschine, „app“ wie bisher
+export const gaugeStyle = () => document.documentElement.dataset.gauge || 'app';
+
+export function createGauge({ title, min, max, majorStep, minorStep, redFrom = null, digits = 1, labelEvery = majorStep, unit = '' }) {
+  const mano = gaugeStyle() !== 'app';
+  const gid = `gb${++gaugeNo}`;
   const ticks = [];
   for (let v = min; v <= max + 1e-9; v += minorStep) {
     const major = Math.abs((v - min) / majorStep - Math.round((v - min) / majorStep)) < 1e-6;
@@ -24,16 +30,22 @@ export function createGauge({ title, min, max, majorStep, minorStep, redFrom = n
       ticks.push(h('text', { x: lx, y: ly + 3, class: 'g-label' }, String(Math.round(v))));
     }
   }
-  const needle = h('polygon', { class: 'g-needle', points: '100,96 100,104 168,100' });
-  const value = h('text', { x: 100, y: 156, class: 'g-value' }, '–');
-  const sub = h('text', { x: 100, y: 174, class: 'g-sub' }, '');
+  // Manometer: schlanker Zeiger mit kurzem Gegengewicht, verchromter Rand, Einheit auf dem Zifferblatt
+  const needle = h('polygon', { class: 'g-needle', points: mano ? '78,98.6 100,97.6 176,100 100,102.4 78,101.4' : '100,96 100,104 168,100' });
+  const value = h('text', { x: 100, y: mano ? 150 : 156, class: 'g-value' }, '–');
+  const sub = h('text', { x: 100, y: mano ? 166 : 174, class: 'g-sub' }, '');
   const svg = h('svg', { viewBox: '0 0 200 200', role: 'img', 'aria-label': title },
-    h('circle', { cx: 100, cy: 100, r: 92, class: 'g-face' }),
+    mano ? h('defs', {}, h('linearGradient', { id: gid, x1: 0, y1: 0, x2: 1, y2: 1 },
+      h('stop', { offset: '0', 'stop-color': '#fafafa' }), h('stop', { offset: '.35', 'stop-color': '#a9acb0' }),
+      h('stop', { offset: '.6', 'stop-color': '#eef0f2' }), h('stop', { offset: '1', 'stop-color': '#7b7f84' }))) : null,
+    mano ? h('circle', { cx: 100, cy: 100, r: 98, class: 'g-bezel', fill: `url(#${gid})` }) : null,
+    h('circle', { cx: 100, cy: 100, r: mano ? 89 : 92, class: 'g-face' }),
     ...ticks,
-    needle,
-    h('circle', { cx: 100, cy: 100, r: 7, class: 'g-hub' }),
+    mano && unit ? h('text', { x: 100, y: 76, class: 'g-unit' }, unit) : null,
     value,
     sub,
+    needle,
+    h('circle', { cx: 100, cy: 100, r: mano ? 6 : 7, class: 'g-hub' }),
   );
   const el = h('div', { class: 'gauge' }, h('div', { class: 'gauge-title' }, title), svg);
   el.update = (v, subText) => {
@@ -42,7 +54,7 @@ export function createGauge({ title, min, max, majorStep, minorStep, redFrom = n
     const deg = START + ((clamped - min) / (max - min)) * SWEEP;
     needle.style.setProperty('transform', `rotate(${deg}deg)`);
     value.textContent = Number.isFinite(n) ? fmt(n, digits) : '–';
-    sub.textContent = subText || '';
+    sub.textContent = mano && unit && subText === unit ? '' : (subText || ''); // Einheit steht schon auf dem Zifferblatt
     svg.setAttribute('aria-label', `${title}: ${value.textContent} ${subText || ''}`);
   };
   return el;
