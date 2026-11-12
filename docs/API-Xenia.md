@@ -454,7 +454,7 @@ Die Dokumentation oben gilt für die **aktuelle** Firmware (Brew-by-Sync, `machi
 | Wochen-Timer, Uhr, Paddle, `/info` | vorhanden | nicht über die API; Eco/Aus-Timer über `POST /api/v2/machine` |
 | Tastenbelegung | vier Taster (oben/unten, links/rechts) | zwei Kippschalter, je nach links und rechts (kurz/lang) |
 
-Tastenbelegung der DBL: Dieselben drei belegbaren Positionen wie oben (`SWITCH_SET_LEFT_LEFT_*`, `SWITCH_SET_RIGHT_LEFT_*`, `SWITCH_SET_RIGHT_RIGHT_*`, `_0` kurz, `_1` lang; so auch in [xenia-home](https://github.com/Knoedelauflauf/xenia-home)). Der linke Schalter nach links ist fest Ein/Aus und hat keinen API-Schlüssel. Xenios zeigt die belegbare Seite des linken Schalters deshalb als „Links ▶“ (`LEFT_LEFT`), den rechten Schalter als „Rechts ◀“ (`RIGHT_LEFT`) und „Rechts ▶“ (`RIGHT_RIGHT`). Diese Zuordnung ist noch an der Maschine zu prüfen.
+Tastenbelegung der DBL: Dieselben drei belegbaren Positionen wie oben (`SWITCH_SET_LEFT_LEFT_*`, `SWITCH_SET_RIGHT_LEFT_*`, `SWITCH_SET_RIGHT_RIGHT_*`, `_0` kurz, `_1` lang; so auch in [xenia-home](https://github.com/Knoedelauflauf/xenia-home)). An der Maschine (Front unter der Tassenablage): ① linker Schalter nach links = `LEFT_LEFT`, ② linker Schalter nach rechts (am Ein/Aus-Symbol) = fest Ein/Aus (`LEFT_RIGHT`, nicht belegbar), ③ rechter Schalter nach links (am Tassen-Symbol) = `RIGHT_LEFT`, ④ rechter Schalter nach rechts = `RIGHT_RIGHT`.
 
 Maschine ein/aus/Eco und Dampf (alte API, laut [API-Beispiel](https://www.xenia-espresso.de/api-beispiel/)):
 
