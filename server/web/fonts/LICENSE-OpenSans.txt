@@ -1,0 +1,3 @@
+Open Sans (latin, 300/400/600) – aus @fontsource/open-sans 5.0.28.
+Copyright 2020 The Open Sans Project Authors (https://github.com/googlefonts/opensans)
+Lizenz: SIL Open Font License 1.1 – https://openfontlicense.org

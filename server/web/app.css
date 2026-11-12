@@ -1,3 +1,6 @@
+@font-face { font-family: 'Open Sans'; font-style: normal; font-weight: 300; font-display: swap; src: url(/fonts/open-sans-latin-300-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Open Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/open-sans-latin-400-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Open Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url(/fonts/open-sans-latin-600-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
 /* Xenia – Material 3 Design (an die Xenia-App angelehnt: Lavendel-Flächen, Indigo-Akzent, Rot für Stopp) */
 :root {
   --primary: #4a5891;
@@ -834,11 +837,11 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
   --secondary-container: #ececec; --on-secondary-container: #2b2b2b;
   --surface: #ffffff; --surface-dim: #e9e9e9; --surface-container-lowest: #ffffff; --surface-container-low: #fafafa;
   --surface-container: #f3f3f3; --surface-container-high: #ffffff; --surface-container-highest: #e6e6e6;
-  --on-surface: #2b2b2b; --on-surface-variant: #666a70; --outline: #9a9da3; --outline-variant: #dcdde0;
+  --on-surface: #212529; --on-surface-variant: #666666; --outline: #9a9da3; --outline-variant: #dcdde0;
   --danger: #d0312d; --danger-container: #fbe3e2; --warning: #e07a1f; --success: #4f9a1c;
   --gauge-face: #ffffff; --gauge-ring: #dcdde0; --gauge-tick: #55585e; --gauge-needle: #d0312d;
   --active: #f5862f; --on-active: #ffffff;
-  --chrome: #3b3e47; --on-chrome: #e4e5e8; --chrome-active: #5e616a;
+  --chrome: #383c44; --on-chrome: #ffffff; --chrome-active: #666666; --chrome-title: #b9a397;
   --radius-s: 2px; --radius-m: 3px; --radius-l: 4px; --radius-xl: 6px;
   --shadow: 0 1px 3px rgba(0,0,0,.18);
 }
@@ -851,7 +854,7 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
     --on-surface: #e6e7ea; --on-surface-variant: #a9acb3; --outline: #7d8088; --outline-variant: #3a3d45;
     --danger: #ef5350; --danger-container: #5c1a17; --warning: #ffa04d; --success: #7cc242;
     --gauge-face: #24262c; --gauge-ring: #3a3d45; --gauge-tick: #b9bcc4; --gauge-needle: #ef5350;
-    --chrome: #2b2d34; --on-chrome: #e4e5e8; --chrome-active: #474a53;
+    --chrome: #2b2d34; --on-chrome: #ffffff; --chrome-active: #555a63; --chrome-title: #b9a397;
   }
 }
 :root[data-style="xenia"][data-theme="dark"] {
@@ -862,13 +865,18 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
   --on-surface: #e6e7ea; --on-surface-variant: #a9acb3; --outline: #7d8088; --outline-variant: #3a3d45;
   --danger: #ef5350; --danger-container: #5c1a17; --warning: #ffa04d; --success: #7cc242;
   --gauge-face: #24262c; --gauge-ring: #3a3d45; --gauge-tick: #b9bcc4; --gauge-needle: #ef5350;
-  --chrome: #2b2d34; --on-chrome: #e4e5e8; --chrome-active: #474a53;
+  --chrome: #2b2d34; --on-chrome: #ffffff; --chrome-active: #555a63; --chrome-title: #b9a397;
   color-scheme: dark;
 }
-[data-style="xenia"] body { font-family: "Helvetica Neue", Arial, Roboto, "Segoe UI", system-ui, sans-serif; }
+/* Schrift und Textfarben wie die Original-Seite: Open Sans, Text #212529, Nebentext #666,
+   Leisten #383c44 mit weißer, dünner Schrift, Überschriften der Leisten in Beigegrau #b9a397 */
+[data-style="xenia"] body, [data-style="xenia"] button, [data-style="xenia"] input, [data-style="xenia"] select, [data-style="xenia"] textarea { font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+[data-style="xenia"] .topbar-title { color: var(--chrome-title); font-weight: 300; letter-spacing: 1.25px; }
+[data-style="xenia"] .nav-item, [data-style="xenia"] .nav-item[aria-current="page"] { font-weight: 300; }
+[data-style="xenia"] .card h2, [data-style="xenia"] .card h3, [data-style="xenia"] .section-title { font-weight: 400; color: var(--on-surface); }
 /* Kopfleiste über die ganze Breite */
 [data-style="xenia"] .topbar { background: var(--chrome); color: var(--on-chrome); box-shadow: 0 0 0 100vmax var(--chrome); clip-path: inset(0 -100vmax); }
-[data-style="xenia"] .topbar-title { font-weight: 400; font-size: 20px; letter-spacing: .3px; }
+[data-style="xenia"] .topbar-title { font-size: 20px; }
 [data-style="xenia"] .topbar .icon-btn { color: var(--on-chrome); }
 [data-style="xenia"] .tabs { background: var(--surface); }
 /* Karten: weiß mit dünnem Rahmen, kaum gerundet */
@@ -898,7 +906,7 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
   :root[data-style="xenia"] { --nav-h: 0px; }
   [data-style="xenia"] body { padding-left: 230px; }
   [data-style="xenia"] .navbar { top: 0; right: auto; width: 230px; flex-direction: column; justify-content: flex-start; padding: 0 0 16px; overflow-y: auto; }
-  [data-style="xenia"] .navbar::before { content: "Navigation"; display: block; height: 64px; line-height: 64px; padding: 0 14px; font-size: 22px; letter-spacing: .3px; color: var(--on-chrome); opacity: .85; flex: none; }
+  [data-style="xenia"] .navbar::before { content: "Navigation"; display: block; height: 64px; line-height: 64px; padding: 0 14px; font-size: 22px; font-weight: 300; letter-spacing: 1.25px; color: var(--chrome-title); flex: none; }
   [data-style="xenia"] .navbar-inner, [data-style="xenia"] .navbar-inner.lots { flex-direction: column; max-width: none; overflow: visible; }
   [data-style="xenia"] .nav-item, [data-style="xenia"] .navbar-inner.many .nav-item, [data-style="xenia"] .navbar-inner.lots .nav-item { flex: none; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 9px 12px; font-size: 15px; font-weight: 400; letter-spacing: 0; }
   [data-style="xenia"] .nav-item .pill { width: 22px; height: 22px; overflow: visible; }
