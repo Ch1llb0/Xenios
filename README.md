@@ -73,6 +73,8 @@ Bei jedem Push prüfen die Workflows die Server-Tests, einen Probelauf des Docke
 cd server
 npm run mock      # simulierte Xenia (:8091) und Mühle (:8092, Owner-Passwort "mockpass")
 npm run dev       # Server auf http://127.0.0.1:8180 gegen die Simulation (Einrichtungscode im Terminal)
+npm run mock:classic   # dasselbe als alte Xenia DBL (alte API)
+npm run dev:classic    # Server dazu (machine.api = classic)
 npm test          # Einheit + Ende-zu-Ende gegen die Simulation
 ```
 
