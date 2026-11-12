@@ -33,14 +33,15 @@ const BUTTONS = [
   { key: 'RIGHT_LEFT', label: 'Unten rechts', cx: 268, cy: 132, glyph: 'cup2' },
 ];
 
-// Alte Xenia (DBL): zwei Kippschalter, jeder lässt sich nach links und nach rechts drücken (kurz/lang).
-// Linker Schalter nach links ist fest Ein/Aus und lässt sich nicht belegen. Die API kennt dieselben drei
-// belegbaren Positionen (SWITCH_SET_LEFT_LEFT/RIGHT_LEFT/RIGHT_RIGHT); die vierte (fest) fehlt dort.
+// Alte Xenia (DBL): zwei kleine Kippschalter, jeder lässt sich nach links und nach rechts drücken (kurz/lang).
+// Nummern wie auf dem Foto der Maschine: ① links◀, ② links▶ (am Ein/Aus-Symbol, fest Ein/Aus, gesperrt),
+// ③ rechts◀ (am Tassen-Symbol), ④ rechts▶. Die API kennt die drei belegbaren Positionen
+// SWITCH_SET_LEFT_LEFT/RIGHT_LEFT/RIGHT_RIGHT; LEFT_RIGHT fehlt dort, weil fest Ein/Aus.
 const DBL_BUTTONS = [
-  { key: 'POWER', label: 'Links ◀', lever: 'left', dir: -1, fixed: { short: 'Ein/Aus', long: 'Ein ohne Dampfkessel' } },
-  { key: 'LEFT_LEFT', label: 'Links ▶', lever: 'left', dir: 1 },
-  { key: 'RIGHT_LEFT', label: 'Rechts ◀', lever: 'right', dir: -1 },
-  { key: 'RIGHT_RIGHT', label: 'Rechts ▶', lever: 'right', dir: 1 },
+  { key: 'LEFT_LEFT', no: 1, label: 'Links ◀', lever: 'left', dir: -1 },
+  { key: 'POWER', no: 2, label: 'Links ▶', lever: 'left', dir: 1, fixed: { short: 'Ein/Aus', long: 'Ein ohne Dampfkessel' } },
+  { key: 'RIGHT_LEFT', no: 3, label: 'Rechts ◀', lever: 'right', dir: -1 },
+  { key: 'RIGHT_RIGHT', no: 4, label: 'Rechts ▶', lever: 'right', dir: 1 },
 ];
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -121,34 +122,79 @@ function machineSvg(onPick) {
 }
 
 // Schema der Xenia DBL von vorn: zwei Kippschalter (Paddel) unter der Brühgruppe, jede Seite antippbar.
+// Frontansicht der Xenia DBL nach Foto: weiße Front unter der Tassenablage, zwei kleine Kippschalter von vorn
+// (Sechskantmutter, Hebelkopf zeigt zum Betrachter), rechts vom linken Schalter das Ein/Aus-Symbol, links vom rechten
+// das Tassen-Symbol; darunter die Brühgruppe und die beiden Holzknöpfe. Die Positionen ①–④ sind antippbar; die
+// gewählte Seite kippt den Hebel sichtbar. ② (links nach rechts) ist fest Ein/Aus und gesperrt.
 function dblSvg(onPick) {
-  const lever = (cx, side) => {
+  const tips = {};
+  const toggle = (cx, cy, side) => {
+    const tip = s('g', { class: 'tg-tip' },
+      s('line', { class: 'tg-stem', x1: cx, y1: cy, x2: cx, y2: cy }),
+      s('circle', { class: 'tg-head', cx, cy, r: 5.2 }));
+    tips[side] = { tip, cx, cy };
     const halves = DBL_BUTTONS.filter((b) => b.lever === side).map((b) => {
       const x = b.dir < 0 ? cx - 34 : cx;
-      const arrow = b.dir < 0 ? `M${cx - 23} 98 l10 -8 v16 z` : `M${cx + 23} 98 l-10 -8 v16 z`; // Spitze zeigt nach außen
-      const g = s('g', { class: `mbtn lever${b.fixed ? ' fixed' : ''}`, 'data-key': b.key, role: 'button', tabindex: 0, 'aria-label': `Schalter ${b.label}` },
-        s('rect', { class: 'halo', x: x - 4, y: 70, width: 42, height: 56, rx: 12 }),
-        s('rect', { class: 'cap', x, y: 76, width: 34, height: 44, rx: 10 }),
-        s('path', { class: 'glyph arrow', d: arrow }),
-        b.fixed ? s('g', { class: 'glyph', transform: `translate(${cx - 17} 112) scale(.7)` }, s('path', { d: 'M-3.2 -3.6 A4.6 4.6 0 1 0 3.2 -3.6 M0 -5.4 V-0.6' })) : null);
+      const nx = cx + b.dir * 17; // Nummer schräg über dem Schalter, wie auf dem Foto
+      const g = s('g', { class: `mbtn lever-side${b.fixed ? ' fixed' : ''}`, 'data-key': b.key, role: 'button', tabindex: 0, 'aria-label': `Schalter ${b.no} ${b.label}` },
+        s('rect', { class: 'halo', x: b.dir < 0 ? cx - 21 : cx + 1, y: cy - 15, width: 20, height: 30, rx: 9 }),
+        s('circle', { class: 'pos-ring', cx: nx, cy: cy - 28, r: 9 }),
+        s('text', { class: 'pos-no', x: nx, y: cy - 24.5, 'text-anchor': 'middle' }, String(b.no)),
+        s('rect', { class: 'hit', x: b.dir < 0 ? cx - 40 : cx, y: cy - 40, width: 40, height: 58 }));
       g.addEventListener('click', () => onPick(b.key));
       g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(b.key); } });
       return g;
     });
-    return s('g', {}, s('rect', { class: 'chrome-plate', x: cx - 44, y: 64, width: 88, height: 68, rx: 16 }), ...halves,
-      s('line', { class: 'lever-split', x1: cx, y1: 78, x2: cx, y2: 118 }));
+    return s('g', { class: 'toggle' },
+      s('polygon', { class: 'tg-nut', points: hexPoints(cx, cy, 12) }),
+      s('circle', { class: 'tg-ring', cx, cy, r: 8.5 }),
+      s('circle', { class: 'tg-hole', cx, cy, r: 6 }),
+      tip,
+      ...halves);
   };
-  return s('svg', { class: 'machine-svg dbl', viewBox: '0 0 320 170', role: 'img', 'aria-label': 'Xenia DBL von vorn mit den zwei Kippschaltern' },
+  // Holzknopf (Dampf/Wasser) mit Chromhals
+  const knob = (cx, dir) => s('g', {},
+    s('rect', { class: 'kn-neck', x: cx - 14, y: 186, width: 28, height: 16, rx: 5 }),
+    s('ellipse', { class: 'kn-wood', cx: cx - dir * 6, cy: 222, rx: 30, ry: 26 }),
+    s('path', { class: 'kn-grain', d: `M${cx - dir * 6 - 22} 214 q22 -8 44 0 M${cx - dir * 6 - 24} 226 q24 -7 48 0 M${cx - dir * 6 - 18} 238 q18 -5 36 0` }));
+  const svg = s('svg', { class: 'machine-svg dbl', viewBox: '0 0 320 250', role: 'img', 'aria-label': 'Xenia DBL von vorn mit den zwei Kippschaltern' },
     s('defs', {},
       s('linearGradient', { id: 'mChrome', x1: 0, y1: 0, x2: 1, y2: 0 },
         s('stop', { offset: '0', 'stop-color': '#7d8186' }), s('stop', { offset: '.45', 'stop-color': '#f4f6f8' }), s('stop', { offset: '1', 'stop-color': '#8a8e93' })),
-      s('linearGradient', { id: 'mBody', x1: 0, y1: 0, x2: 0, y2: 1 },
-        s('stop', { offset: '0', 'stop-color': '#2a2b2f' }), s('stop', { offset: '1', 'stop-color': '#17181b' }))),
-    s('rect', { class: 'body', x: 16, y: 20, width: 288, height: 140, rx: 8 }),
-    s('path', { class: 'group-top', d: 'M138 28 H182 L176 58 H144 Z' }),
-    s('text', { class: 'lever-label', x: 80, y: 152, 'text-anchor': 'middle' }, 'Linker Schalter'),
-    s('text', { class: 'lever-label', x: 240, y: 152, 'text-anchor': 'middle' }, 'Rechter Schalter'),
-    lever(80, 'left'), lever(240, 'right'));
+      s('linearGradient', { id: 'mFront', x1: 0, y1: 0, x2: 0, y2: 1 },
+        s('stop', { offset: '0', 'stop-color': '#f7f7f6' }), s('stop', { offset: '1', 'stop-color': '#e3e3e1' })),
+      s('radialGradient', { id: 'mWood', cx: '.4', cy: '.35', r: '.75' },
+        s('stop', { offset: '0', 'stop-color': '#b98a5c' }), s('stop', { offset: '.6', 'stop-color': '#94673f' }), s('stop', { offset: '1', 'stop-color': '#6c4728' }))),
+    // Tassenablage (Reling) und weiße Front
+    s('path', { class: 'rail', d: 'M14 30 V8 M306 30 V8' }),
+    s('rect', { class: 'front', x: 8, y: 28, width: 304, height: 214, rx: 4 }),
+    s('line', { class: 'front-edge', x1: 8, y1: 34, x2: 312, y2: 34 }),
+    // Symbole wie an der Maschine
+    s('path', { class: 'sym', d: 'M121.5 77 A8 8 0 1 0 130.5 77 M126 72 V81' }),
+    s('path', { class: 'sym', d: 'M188 75 H200 V83 A4 4 0 0 1 196 87 H192 A4 4 0 0 1 188 83 Z M200 77.5 H202.5 A2.5 2.5 0 0 1 202.5 82.5 H200' }),
+    // Brühgruppe
+    s('path', { fill: 'url(#mChrome)', d: 'M118 132 H202 L196 242 H124 Z' }),
+    s('path', { class: 'grp-shade', d: 'M134 150 H186 L182 242 H138 Z' }),
+    knob(54, 1), knob(266, -1),
+    toggle(100, 80, 'left'), toggle(220, 80, 'right'));
+  // Hebelkopf zur gewählten Seite kippen (wie beim Drücken an der Maschine)
+  svg.tilt = (key) => {
+    const b = DBL_BUTTONS.find((x) => x.key === key);
+    for (const [side, t] of Object.entries(tips)) {
+      const dx = b && b.lever === side ? b.dir * 9 : 0;
+      t.tip.querySelector('.tg-head').setAttribute('cx', String(t.cx + dx));
+      t.tip.querySelector('.tg-stem').setAttribute('x2', String(t.cx + dx));
+      t.tip.classList.toggle('tilted', Boolean(dx));
+    }
+  };
+  return svg;
+}
+
+function hexPoints(cx, cy, r) {
+  return Array.from({ length: 6 }, (_, i) => {
+    const a = (Math.PI / 3) * i + Math.PI / 6;
+    return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+  }).join(' ');
 }
 
 function switchesTab(root) {
@@ -188,6 +234,7 @@ function switchesTab(root) {
       function pick(key) {
         selected = selected === key ? null : key;
         for (const g of svg.querySelectorAll('.mbtn')) g.classList.toggle('sel', g.dataset.key === selected);
+        svg.tilt?.(selected);
         for (const [k, c] of Object.entries(cards)) c.classList.toggle('sel', k === selected);
         if (selected) cards[selected].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
@@ -205,7 +252,7 @@ function switchesTab(root) {
       };
       const grid = h('div', { class: 'btn-assign' }, BTNS.map((b) => {
         const c = h('div', { class: 'assign-card', onclick: (e) => { if (e.target.tagName !== 'SELECT') pick(b.key); } },
-          h('div', { class: 'ttl' }, classic ? `Schalter ${b.label}` : b.label, b.fixed ? h('span', { class: 'badge' }, 'gesperrt') : null),
+          h('div', { class: 'ttl' }, classic ? `${'①②③④'[b.no - 1]} Schalter ${b.label}` : b.label, b.fixed ? h('span', { class: 'badge' }, 'gesperrt') : null),
           b.fixed
             ? [h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Kurz'), h('span', { class: 'v' }, b.fixed.short)),
               h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Lang'), h('span', { class: 'v' }, b.fixed.long))]
@@ -221,7 +268,7 @@ function switchesTab(root) {
         h('div', { class: 'card' },
           h('h3', {}, 'Tastenbelegung'),
           h('p', { class: 'muted small' }, classic
-            ? 'Alte Xenia (DBL): Tippe auf eine Seite eines Kippschalters und wähle, was kurzes bzw. langes Drücken startet. Der linke Schalter nach links ist fest Ein/Aus und lässt sich nicht ändern.'
+            ? 'Alte Xenia (DBL): Tippe auf eine Position ①–④ und wähle, was kurzes bzw. langes Drücken startet. ② (linker Schalter nach rechts, am Ein/Aus-Symbol) ist fest Ein/Aus und lässt sich nicht ändern.'
             : 'Tippe auf einen Taster und wähle, was kurzes bzw. langes Drücken startet. Eigene Abläufe legst du unter „Skripte“ an.'),
           h('div', { class: 'machine-wrap' }, svg),
           grid,
