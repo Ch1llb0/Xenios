@@ -1,4 +1,5 @@
 // Server-API, Live-Zustand (Server-Sent Events) und einfacher Store.
+import { isHidden } from './prefs.js';
 
 const listeners = new Set();
 export const store = {
@@ -9,7 +10,8 @@ export const store = {
   lastUpdate: 0,
 };
 
-export const hasGrinder = () => Boolean(store.server?.grinder?.enabled);
+// Mühle eingerichtet und auf diesem Gerät nicht ausgeblendet (Einstellungen → Darstellung → Komponenten)
+export const hasGrinder = () => Boolean(store.server?.grinder?.enabled) && !isHidden('grinder');
 export const isClassic = () => (store.server?.machine?.api || store.machine?.api) === 'classic';
 
 export function subscribe(fn) {

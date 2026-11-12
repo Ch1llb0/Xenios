@@ -4,11 +4,11 @@
     <string name="widget_power">Kaffeemaschine Ein/Aus</string>
     <string name="widget_status">Kaffeemaschine</string>
     <string name="widget_wide">Kaffeemaschine schmal</string>
-    <string name="widget_wide_desc">Status, Temperatur und Ein/Eco/Aus in einer Zeile</string>
+    <string name="widget_wide_desc">Status, Temperatur und Ein/ohne Dampf/Eco/Aus in einer Zeile</string>
     <string name="widget_large">Kaffeemaschine groß</string>
-    <string name="widget_large_desc">Status, Temperaturen, Dampf, nächstes Einschalten und Ein/Eco/Aus</string>
+    <string name="widget_large_desc">Status, Temperaturen, Dampf, nächstes Einschalten und Ein/ohne Dampf/Eco/Aus</string>
     <string name="widget_power_desc">Maschine mit einem Tipp ein- oder ausschalten</string>
-    <string name="widget_status_desc">Status, Temperatur und Ein/Eco/Aus</string>
+    <string name="widget_status_desc">Status, Temperatur und Ein/ohne Dampf/Eco/Aus</string>
     <string name="tile_label">Kaffeemaschine</string>
     <string name="sc_on_short">Einschalten</string>
     <string name="sc_on_long">Maschine einschalten</string>

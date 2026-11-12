@@ -203,9 +203,17 @@ object DirectMachine {
 
     /** Wie die Original-Oberfläche: Maschine schalten und den Dampfkessel passend mitschalten. */
     fun power(context: Context, mode: String) {
-        val action = when (mode) { "off" -> "0"; "on" -> "1"; "eco" -> "2"; else -> throw Api.ApiException(400, "Ungültiger Modus") }
+        val classic = Prefs(context).machineApi == "classic"
+        val action = when (mode) {
+            "off" -> "0"
+            "on" -> "1"
+            "eco" -> "2"
+            // Alte Xenia: eigene Aktion „an ohne Dampfkessel“; neue: einschalten und Dampfkessel aus
+            Api.MODE_ON_NO_STEAM -> if (classic) "5" else "1"
+            else -> throw Api.ApiException(400, "Ungültiger Modus")
+        }
         post(context, "/api/v2/machine/control", JSONObject().put("action", action))
-        if (Prefs(context).machineApi == "classic") return
+        if (classic) return
         val steam = when (mode) {
             "on" -> if (get(context, "/api/v2/general").num("MA_BOILER_START_MODE")?.toInt() == 2) 0 else 1
             else -> 0

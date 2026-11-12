@@ -1,7 +1,8 @@
 // Einstellungen: Maschinenwerte, Benachrichtigungen, Infos, Darstellung, Konto.
 import { h, icon, fmt, fmtInt, snackbar, switchEl, sliderRow, ago } from '../ui.js';
 import { api, store, isClassic } from '../api.js';
-import { logout, applyTheme, localStorageGet, localStorageSet, inAndroidApp, navigate } from '../app.js';
+import { logout, applyTheme, localStorageGet, localStorageSet, inAndroidApp, navigate, navChoices } from '../app.js';
+import { hiddenTabs, setTabHidden, COMPONENTS, isHidden, setComponentHidden, noSteamOn, setNoSteamOn, onPrefs } from '../prefs.js';
 
 const listButton = (ic, title, sub, onclick) => h('button', { class: 'list-item clickable as-button', onclick },
   h('span', { class: 'lead' }, icon(ic)),
@@ -9,6 +10,7 @@ const listButton = (ic, title, sub, onclick) => h('button', { class: 'list-item 
   icon('right', 's20 muted'));
 
 export function settingsView(root) {
+  const unsubs = [];
   const features = store.server?.features || {};
   const direct = store.server?.mode === 'direct';
   const machineBox = h('div', {}, h('div', { class: 'empty' }, 'Lade Einstellungen …'));
@@ -18,10 +20,17 @@ export function settingsView(root) {
   root.append(
     h('div', { class: 'section-title' }, 'Maschine'),
     machineBox,
+    powerPrefCard(),
+    h('div', { class: 'section-title' }, 'Bezüge'),
+    shotFilterCard(),
     h('div', { class: 'section-title' }, 'Benachrichtigungen'),
     pushBox,
     h('div', { class: 'section-title' }, 'Darstellung'),
     themeCard(),
+    h('div', { class: 'section-title' }, 'Untere Leiste'),
+    navCard(unsubs),
+    h('div', { class: 'section-title' }, 'Komponenten'),
+    componentsCard(),
     h('div', { class: 'section-title' }, 'Info'),
     infoBox,
     h('div', { class: 'section-title' }, 'Konto & Server'),
@@ -130,9 +139,72 @@ export function settingsView(root) {
     }
   })();
 
-  return () => {};
+  return () => unsubs.forEach((u) => u());
 }
 
+const prefRow = (ic, title, sub, sw) => h('div', { class: 'list-item' }, h('span', { class: 'lead' }, icon(ic)),
+  h('div', { class: 'grow' }, h('div', { class: 'title' }, title), sub ? h('div', { class: 'sub' }, sub) : null), sw);
+
+// Einschalten ohne Dampfkessel: gilt auf diesem Gerät für Startseite, Dashboard und den App-Shortcut „Ein“
+function powerPrefCard() {
+  return h('div', { class: 'list', style: { 'margin-top': '12px' } },
+    prefRow('cloud', 'Ohne Dampf einschalten', '„Ein“ schaltet nur den Brühkessel ein (Startseite, Dashboard, Shortcut). Dampf lässt sich jederzeit dazuschalten.',
+      switchEl({ checked: noSteamOn(), label: 'Ohne Dampf einschalten', onChange: (on) => setNoSteamOn(on) })));
+}
+
+// Tabs der unteren Leiste ein- und ausblenden (mindestens einer bleibt)
+function navCard(unsubs) {
+  const list = h('div', { class: 'list' });
+  const paint = () => {
+    const hidden = hiddenTabs();
+    const all = navChoices();
+    const shownCount = all.filter((r) => !hidden.has(r.path)).length;
+    list.replaceChildren(all.map((r) => {
+      const shown = !hidden.has(r.path);
+      return prefRow(r.icon, r.label, null, switchEl({ checked: shown, disabled: shown && shownCount <= 1, label: `${r.label} in der Leiste`, onChange: (on) => { setTabHidden(r.path, !on); paint(); } }));
+    }));
+  };
+  paint();
+  unsubs.push(onPrefs((k) => { if (k === 'hiddenComponents') paint(); }));
+  return h('div', {}, h('p', { class: 'muted small' }, 'Welche Seiten unten in der Leiste stehen (gilt für dieses Gerät). Ausgeblendete Seiten bleiben über Links erreichbar, Einstellungen über das Zahnrad.'), list);
+}
+
+// Komponenten komplett ausblenden (z. B. die Mühle, wenn keine im Einsatz ist)
+function componentsCard() {
+  return h('div', {}, h('p', { class: 'muted small' }, 'Ausgeblendete Komponenten verschwinden aus Leiste, Startseite, Dashboard und Bezügen (gilt für dieses Gerät).'),
+    h('div', { class: 'list' }, COMPONENTS.map((c) => prefRow(c.id === 'grinder' ? 'grinder' : c.id === 'scale' ? 'scale' : 'check', c.title, c.sub,
+      switchEl({ checked: !isHidden(c.id), label: `${c.title} anzeigen`, onChange: (on) => setComponentHidden(c.id, !on) })))));
+}
+
+// Bezüge unter einer Mindestdauer aussortieren (Backflush, Spülen, Fehlbezüge); gilt auf dem Server bzw. in der App
+function shotFilterCard() {
+  const box = h('div', { class: 'card' }, h('div', { class: 'muted small' }, 'Lade …'));
+  (async () => {
+    try {
+      const st = await api('/api/shots/settings');
+      let value = st.minShotS;
+      const save = h('button', { class: 'btn filled wide', disabled: true, onclick: async () => {
+        save.disabled = true;
+        try {
+          const r = await api('/api/shots/settings', { method: 'PUT', body: { minShotS: value } });
+          value = r.minShotS;
+          snackbar(value ? `Bezüge unter ${value} s werden aussortiert` : 'Alle Bezüge werden gelistet');
+        } catch (e) {
+          snackbar(e.message);
+          save.disabled = false;
+        }
+      } }, 'Speichern');
+      box.replaceChildren(
+        h('h3', {}, 'Kurze Bezüge aussortieren'),
+        h('p', { class: 'muted small' }, `Pumpvorgänge kürzer als die Mindestdauer (Backflush, Spülen, Fehler) werden nicht protokolliert und nicht gelistet. Bewertete Bezüge bleiben sichtbar. Standard: ${st.defaultMinShotS} s.`),
+        sliderRow({ label: 'Mindestdauer', min: st.limits.min, max: st.limits.max, step: 1, value, unit: 's', digits: 0, onInput: (v) => { value = v; save.disabled = false; } }),
+        save);
+    } catch (e) {
+      box.replaceChildren(h('div', { class: 'muted small' }, e.message));
+    }
+  })();
+  return box;
+}
 
 function themeCard() {
   const current = localStorageGet('theme') || 'system';

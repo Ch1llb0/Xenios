@@ -1,12 +1,14 @@
 // Startseite: Instrumente, Status, Ein/Aus/Eco/Dampf, Zieltemperatur, laufender/letzter Bezug, Mühle.
 import { h, icon, fmt, switchEl, snackbar, ago, promptNumber } from '../ui.js';
-import { api, store, subscribe, machineOn } from '../api.js';
+import { api, store, subscribe, machineOn, hasGrinder } from '../api.js';
+import { isHidden, noSteamOn, setNoSteamOn, powerOnBody, onPrefs } from '../prefs.js';
 import { createGauge, sparkline, ring, liveChart } from '../gauge.js';
 import { navigate } from '../app.js';
 
 export function homeView(root) {
   const pressure = createGauge({ title: 'Druck', min: 0, max: 12, majorStep: 2, minorStep: 0.5, redFrom: 11, digits: 1 });
-  const temp = createGauge({ title: 'Brühtemperatur', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20 });
+  const temp = createGauge({ title: 'Brühgruppe', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20 });
+  const boiler = createGauge({ title: 'Brühkessel', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20 });
   const statusLine = h('div', { class: 'status-line' });
   const offline = h('div', { class: 'offline-banner', hidden: true }, icon('warn', 's20'), h('span', {}));
 
@@ -26,15 +28,19 @@ export function homeView(root) {
   const rowMachine = powerRow('power', 'Maschine', 'machine');
   const rowEco = powerRow('eco', 'Eco-Modus', 'eco');
   const rowSteam = powerRow('cloud', 'Dampfkessel', 'steam');
+  // Gilt geräteweit (auch im Dashboard und beim Shortcut „Ein“): Einschalten nur mit Brühkessel
+  const noSteamSw = switchEl({ checked: noSteamOn(), label: 'Ohne Dampf einschalten', onChange: (on) => setNoSteamOn(on) });
+  const rowNoSteam = h('div', { class: 'list-item' }, h('span', { class: 'lead' }, icon('power')),
+    h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Ohne Dampf einschalten'), h('div', { class: 'sub' }, '„Maschine an“ heizt nur den Brühkessel')), noSteamSw);
 
   async function act(key, on, input) {
     if (busy) return;
     busy = true;
     try {
-      if (key === 'machine') await api('/api/machine/power', { method: 'POST', body: { mode: on ? 'on' : 'off' } });
-      if (key === 'eco') await api('/api/machine/power', { method: 'POST', body: { mode: on ? 'eco' : 'on' } });
+      if (key === 'machine') await api('/api/machine/power', { method: 'POST', body: on ? powerOnBody() : { mode: 'off' } });
+      if (key === 'eco') await api('/api/machine/power', { method: 'POST', body: on ? { mode: 'eco' } : powerOnBody() });
       if (key === 'steam') await api('/api/machine/steam', { method: 'POST', body: { on } });
-      snackbar(key === 'machine' ? (on ? 'Xenia wird eingeschaltet' : 'Xenia ausgeschaltet') : key === 'eco' ? (on ? 'Eco-Modus an' : 'Eco-Modus aus') : on ? 'Dampfkessel an' : 'Dampfkessel aus');
+      snackbar(key === 'machine' ? (on ? (noSteamOn() ? 'Xenia wird ohne Dampf eingeschaltet' : 'Xenia wird eingeschaltet') : 'Xenia ausgeschaltet') : key === 'eco' ? (on ? 'Eco-Modus an' : 'Eco-Modus aus') : on ? 'Dampfkessel an' : 'Dampfkessel aus');
     } catch (e) {
       input.checked = !on;
       snackbar(e.message);
@@ -111,7 +117,7 @@ export function homeView(root) {
       ...row('Dampfkessel', m.steamOn ? `${fmt(m.pressure.steam, 2)} bar (Ziel ${fmt(m.pressure.steamSet)})` : `aus (Ziel ${fmt(m.pressure.steamSet)} bar)`),
       ...row('Heizleistung Gruppe / Kessel', `${fmt(m.power.group, 0)} % / ${fmt(m.power.boiler, 0)} %`),
       ...row('Pumpenleistung', `${fmt(m.power.pump, 0)} %`),
-      ...row('Waage', `${fmt(m.scale.weight)} g · ${fmt(m.scale.rate)} g/s`),
+      ...(isHidden('scale') ? [] : row('Waage', `${fmt(m.scale.weight)} g · ${fmt(m.scale.rate)} g/s`)),
       ...row('Durchfluss', `${fmt(m.flow.ml ?? m.flow.volume, 0)} ml · ${fmt(m.flow.rate)} ml/s`),
       ...row('Wassertank', m.tankOk === false ? 'leer' : m.tankOk ? 'ok' : '–'));
   }
@@ -124,11 +130,11 @@ export function homeView(root) {
 
   root.append(
     offline,
-    h('div', { class: 'gauges' }, pressure, temp),
+    h('div', { class: 'gauges three' }, pressure, temp, boiler),
     statusLine,
     shotCard,
     h('div', { class: 'section-title' }, 'Power'),
-    h('div', { class: 'list' }, rowMachine, rowEco, rowSteam),
+    h('div', { class: 'list' }, rowMachine, rowEco, rowSteam, rowNoSteam),
     h('div', { class: 'section-title' }, 'Temperatur'),
     tempCard,
     lastShotCard,
@@ -144,7 +150,8 @@ export function homeView(root) {
     offline.hidden = m.online;
     offline.lastChild.textContent = m.online ? '' : `Maschine nicht erreichbar${m.error ? ` (${m.error})` : ''}. Letzter Kontakt: ${ago(m.lastSeen)}`;
     pressure.update(m.pressure.pump, m.steamOn ? `Dampf ${fmt(m.pressure.steam, 1)} bar` : 'Dampfkessel aus');
-    temp.update(m.temp.group, `Kessel ${fmt(m.temp.boiler, 1)}`);
+    temp.update(m.temp.group, m.temp.groupSet ? `Ziel ${fmt(m.temp.groupSet, 1)}` : '°C');
+    boiler.update(m.temp.boiler, m.temp.boilerSet ? `Ziel ${fmt(m.temp.boilerSet, 1)}` : '°C');
 
     const on = ['on', 'brewing', 'draining', 'paddle'].includes(m.statusKey);
     const eco = m.statusKey === 'eco';
@@ -178,7 +185,7 @@ export function homeView(root) {
           ring(secs / 30, `${fmt(secs, 0)} s`),
           h('div', { class: 'kpis' },
             kpi('Druck', `${fmt(m.pressure.pump)}`, 'bar'),
-            kpi('Gewicht', `${fmt(m.scale.weight)}`, 'g'),
+            isHidden('scale') ? null : kpi('Gewicht', `${fmt(m.scale.weight)}`, 'g'),
             kpi('Fluss', `${fmt(m.scale.rate || m.flow.rate)}`, 'g/s'))),
         sparkline(m.shot.curve),
         h('button', { class: 'btn danger wide', onclick: stopScript }, icon('stop', 's18'), 'Bezug stoppen'));
@@ -197,7 +204,7 @@ export function homeView(root) {
 
   function updateGrinder() {
     const g = store.grinder;
-    if (!g || !g.enabled) {
+    if (!g || !g.enabled || !hasGrinder()) {
       millTitle.hidden = true;
       grinderCard.hidden = true;
       return;
@@ -235,7 +242,12 @@ export function homeView(root) {
     }
     if (part === 'grinder' || part === 'all') updateGrinder();
   });
-  return () => un();
+  const unPrefs = onPrefs((k) => {
+    if (k === 'powerNoSteam') noSteamSw.querySelector('input').checked = noSteamOn();
+    updateGrinder();
+    paintLive();
+  });
+  return () => { un(); unPrefs(); };
 }
 
 // Verlauf der letzten Minuten; sammelt auch, während andere Seiten offen sind.

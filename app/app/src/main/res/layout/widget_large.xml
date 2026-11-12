@@ -95,6 +95,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/k_boiler"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Brühkessel"
@@ -160,6 +161,21 @@
             android:text="Ein"
             android:textColor="@color/widget_text"
             android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_on_ns"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="6dp"
+            android:contentDescription="Ein ohne Dampf"
+            android:layout_weight="1"
+            android:background="@drawable/widget_btn"
+            android:gravity="center"
+            android:text="Ein&#10;ohne D"
+            android:textColor="@color/widget_text"
+            android:textSize="11sp"
+            android:lineSpacingMultiplier="0.9"
             android:textStyle="bold" />
 
         <TextView

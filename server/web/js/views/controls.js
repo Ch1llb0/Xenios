@@ -2,6 +2,7 @@
 import { h, icon, fmt, snackbar, confirmDialog, switchEl } from '../ui.js';
 import { api, store, subscribe, machineOn, isClassic } from '../api.js';
 import { setTabs } from '../app.js';
+import { isHidden } from '../prefs.js';
 
 const TABS = [{ id: 'switches', label: 'Schalter' }, { id: 'paddle', label: 'Paddle' }];
 let lastTab = 'switches';
@@ -30,6 +31,16 @@ const BUTTONS = [
   { key: 'RIGHT_RIGHT', label: 'Oben rechts', cx: 268, cy: 96, glyph: 'cup1' },
   { key: 'LEFT_LEFT', label: 'Unten links', cx: 52, cy: 132, glyph: 'crown' },
   { key: 'RIGHT_LEFT', label: 'Unten rechts', cx: 268, cy: 132, glyph: 'cup2' },
+];
+
+// Alte Xenia (DBL): zwei Kippschalter, jeder lässt sich nach links und nach rechts drücken (kurz/lang).
+// Linker Schalter nach links ist fest Ein/Aus und lässt sich nicht belegen. Die API kennt dieselben drei
+// belegbaren Positionen (SWITCH_SET_LEFT_LEFT/RIGHT_LEFT/RIGHT_RIGHT); die vierte (fest) fehlt dort.
+const DBL_BUTTONS = [
+  { key: 'POWER', label: 'Links ◀', lever: 'left', dir: -1, fixed: { short: 'Ein/Aus', long: 'Ein ohne Dampfkessel' } },
+  { key: 'LEFT_LEFT', label: 'Links ▶', lever: 'left', dir: 1 },
+  { key: 'RIGHT_LEFT', label: 'Rechts ◀', lever: 'right', dir: -1 },
+  { key: 'RIGHT_RIGHT', label: 'Rechts ▶', lever: 'right', dir: 1 },
 ];
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -109,8 +120,41 @@ function machineSvg(onPick) {
     ...buttons);
 }
 
+// Schema der Xenia DBL von vorn: zwei Kippschalter (Paddel) unter der Brühgruppe, jede Seite antippbar.
+function dblSvg(onPick) {
+  const lever = (cx, side) => {
+    const halves = DBL_BUTTONS.filter((b) => b.lever === side).map((b) => {
+      const x = b.dir < 0 ? cx - 34 : cx;
+      const arrow = b.dir < 0 ? `M${cx - 23} 98 l10 -8 v16 z` : `M${cx + 23} 98 l-10 -8 v16 z`; // Spitze zeigt nach außen
+      const g = s('g', { class: `mbtn lever${b.fixed ? ' fixed' : ''}`, 'data-key': b.key, role: 'button', tabindex: 0, 'aria-label': `Schalter ${b.label}` },
+        s('rect', { class: 'halo', x: x - 4, y: 70, width: 42, height: 56, rx: 12 }),
+        s('rect', { class: 'cap', x, y: 76, width: 34, height: 44, rx: 10 }),
+        s('path', { class: 'glyph arrow', d: arrow }),
+        b.fixed ? s('g', { class: 'glyph', transform: `translate(${cx - 17} 112) scale(.7)` }, s('path', { d: 'M-3.2 -3.6 A4.6 4.6 0 1 0 3.2 -3.6 M0 -5.4 V-0.6' })) : null);
+      g.addEventListener('click', () => onPick(b.key));
+      g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(b.key); } });
+      return g;
+    });
+    return s('g', {}, s('rect', { class: 'chrome-plate', x: cx - 44, y: 64, width: 88, height: 68, rx: 16 }), ...halves,
+      s('line', { class: 'lever-split', x1: cx, y1: 78, x2: cx, y2: 118 }));
+  };
+  return s('svg', { class: 'machine-svg dbl', viewBox: '0 0 320 170', role: 'img', 'aria-label': 'Xenia DBL von vorn mit den zwei Kippschaltern' },
+    s('defs', {},
+      s('linearGradient', { id: 'mChrome', x1: 0, y1: 0, x2: 1, y2: 0 },
+        s('stop', { offset: '0', 'stop-color': '#7d8186' }), s('stop', { offset: '.45', 'stop-color': '#f4f6f8' }), s('stop', { offset: '1', 'stop-color': '#8a8e93' })),
+      s('linearGradient', { id: 'mBody', x1: 0, y1: 0, x2: 0, y2: 1 },
+        s('stop', { offset: '0', 'stop-color': '#2a2b2f' }), s('stop', { offset: '1', 'stop-color': '#17181b' }))),
+    s('rect', { class: 'body', x: 16, y: 20, width: 288, height: 140, rx: 8 }),
+    s('path', { class: 'group-top', d: 'M138 28 H182 L176 58 H144 Z' }),
+    s('text', { class: 'lever-label', x: 80, y: 152, 'text-anchor': 'middle' }, 'Linker Schalter'),
+    s('text', { class: 'lever-label', x: 240, y: 152, 'text-anchor': 'middle' }, 'Rechter Schalter'),
+    lever(80, 'left'), lever(240, 'right'));
+}
+
 function switchesTab(root) {
   const features = store.server?.features || {};
+  const classic = isClassic();
+  const BTNS = classic ? DBL_BUTTONS : BUTTONS;
   const box = h('div', {}, h('div', { class: 'empty' }, 'Lade Belegung …'));
   root.append(box);
   (async () => {
@@ -122,7 +166,7 @@ function switchesTab(root) {
       ];
       const nm = (id) => options.find((o) => o.id === id)?.title || (id ? `Skript ${id}` : 'Keine');
       const assign = {};
-      for (const b of BUTTONS) if (!b.fixed) assign[b.key] = { short: sw.buttons[b.key]?.short ?? 0, long: sw.buttons[b.key]?.long ?? 0 };
+      for (const b of BTNS) if (!b.fixed) assign[b.key] = { short: sw.buttons[b.key]?.short ?? 0, long: sw.buttons[b.key]?.long ?? 0 };
       const changed = {};
       const editable = Boolean(features.settings);
 
@@ -140,7 +184,7 @@ function switchesTab(root) {
 
       const cards = {};
       let selected = null;
-      const svg = machineSvg((key) => pick(key));
+      const svg = classic ? dblSvg((key) => pick(key)) : machineSvg((key) => pick(key));
       function pick(key) {
         selected = selected === key ? null : key;
         for (const g of svg.querySelectorAll('.mbtn')) g.classList.toggle('sel', g.dataset.key === selected);
@@ -159,9 +203,9 @@ function switchesTab(root) {
         el.addEventListener('focus', () => { if (selected !== b.key) pick(b.key); });
         return el;
       };
-      const grid = h('div', { class: 'btn-assign' }, BUTTONS.map((b) => {
+      const grid = h('div', { class: 'btn-assign' }, BTNS.map((b) => {
         const c = h('div', { class: 'assign-card', onclick: (e) => { if (e.target.tagName !== 'SELECT') pick(b.key); } },
-          h('div', { class: 'ttl' }, b.label, b.fixed ? h('span', { class: 'badge' }, 'fest') : null),
+          h('div', { class: 'ttl' }, classic ? `Schalter ${b.label}` : b.label, b.fixed ? h('span', { class: 'badge' }, 'gesperrt') : null),
           b.fixed
             ? [h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Kurz'), h('span', { class: 'v' }, b.fixed.short)),
               h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Lang'), h('span', { class: 'v' }, b.fixed.long))]
@@ -176,11 +220,13 @@ function switchesTab(root) {
       box.replaceChildren(
         h('div', { class: 'card' },
           h('h3', {}, 'Tastenbelegung'),
-          h('p', { class: 'muted small' }, 'Tippe auf einen Taster und wähle, was kurzes bzw. langes Drücken startet. Eigene Abläufe legst du unter „Skripte“ an.'),
+          h('p', { class: 'muted small' }, classic
+            ? 'Alte Xenia (DBL): Tippe auf eine Seite eines Kippschalters und wähle, was kurzes bzw. langes Drücken startet. Der linke Schalter nach links ist fest Ein/Aus und lässt sich nicht ändern.'
+            : 'Tippe auf einen Taster und wähle, was kurzes bzw. langes Drücken startet. Eigene Abläufe legst du unter „Skripte“ an.'),
           h('div', { class: 'machine-wrap' }, svg),
           grid,
           editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')),
-        h('div', { class: 'card' },
+        isHidden('scale') ? null : h('div', { class: 'card' },
           h('h3', {}, 'Bezugsgewicht (interne Waage)'),
           h('div', { class: 'row' },
             h('label', { class: 'field grow' }, h('span', {}, 'Einfache Dosis (g)'), single),
