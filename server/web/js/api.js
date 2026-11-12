@@ -13,6 +13,9 @@ export const store = {
 // Mühle eingerichtet und auf diesem Gerät nicht ausgeblendet (Einstellungen → Darstellung → Komponenten)
 export const hasGrinder = () => Boolean(store.server?.grinder?.enabled) && !isHidden('grinder');
 export const isClassic = () => (store.server?.machine?.api || store.machine?.api) === 'classic';
+// Alte Xenia mit Seiten-API (DBL, Firmware 4.1xx): Paddle und erweiterte Einstellungen wie in der Original-Oberfläche
+export const classicPages = () => isClassic() && Boolean(store.machine?.info?.caps?.pages);
+export const hasPaddle = () => !isClassic() || Boolean(store.machine?.info?.caps?.paddle);
 
 export function subscribe(fn) {
   listeners.add(fn);

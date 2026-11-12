@@ -1,26 +1,19 @@
-// Steuerung: Tastenbelegung an der Maschine (mit Frontansicht) und Paddle (Pumpe direkt).
+// Schalter: Tastenbelegung an der Maschine (mit Frontansicht). Paddle (Pumpe direkt) als eigener Tab.
 import { h, icon, fmt, snackbar, confirmDialog, switchEl } from '../ui.js';
-import { api, store, subscribe, machineOn, isClassic } from '../api.js';
-import { setTabs } from '../app.js';
-import { isHidden } from '../prefs.js';
-
-const TABS = [{ id: 'switches', label: 'Schalter' }, { id: 'paddle', label: 'Paddle' }];
-let lastTab = 'switches';
+import { api, store, subscribe, machineOn, isClassic, hasPaddle } from '../api.js';
 
 export function controlsView(root) {
-  let dispose = null;
-  const tabs = isClassic() ? TABS.filter((t) => t.id !== 'paddle') : TABS;
-  const show = (tab) => {
-    lastTab = tab;
-    dispose?.();
-    dispose = null;
-    root.replaceChildren();
-    setTabs(tabs.length > 1 ? tabs : null, tab, show);
-    if (tab === 'switches') dispose = switchesTab(root);
-    if (tab === 'paddle' && !isClassic()) dispose = paddleTab(root);
-  };
-  show(tabs.some((t) => t.id === lastTab) ? lastTab : 'switches');
-  return () => dispose?.();
+  return switchesTab(root);
+}
+
+// Eigener Tab „Paddle“: Pumpe direkt steuern
+export function paddleView(root) {
+  if (!hasPaddle()) {
+    root.append(h('div', { class: 'card low' }, h('h3', {}, 'Paddle'),
+      h('p', { class: 'muted' }, store.machine?.info ? 'Diese Xenia bietet die Paddle-Steuerung nicht über die API an (ältere Firmware).' : 'Maschine noch nicht erreicht – Paddle ist verfügbar, sobald die Firmware erkannt ist.')));
+    return () => {};
+  }
+  return paddleTab(root);
 }
 
 // --- Schalter ------------------------------------------------------------------------
@@ -152,30 +145,15 @@ function dblSvg(onPick) {
       tip,
       ...halves);
   };
-  // Holzknopf (Dampf/Wasser) mit Chromhals
-  const knob = (cx, dir) => s('g', {},
-    s('rect', { class: 'kn-neck', x: cx - 14, y: 186, width: 28, height: 16, rx: 5 }),
-    s('ellipse', { class: 'kn-wood', cx: cx - dir * 6, cy: 222, rx: 30, ry: 26 }),
-    s('path', { class: 'kn-grain', d: `M${cx - dir * 6 - 22} 214 q22 -8 44 0 M${cx - dir * 6 - 24} 226 q24 -7 48 0 M${cx - dir * 6 - 18} 238 q18 -5 36 0` }));
-  const svg = s('svg', { class: 'machine-svg dbl', viewBox: '0 0 320 250', role: 'img', 'aria-label': 'Xenia DBL von vorn mit den zwei Kippschaltern' },
+  // Nur der Schalterstreifen der Front (ohne Brühgruppe und Drehknöpfe)
+  const svg = s('svg', { class: 'machine-svg dbl', viewBox: '30 32 260 82', role: 'img', 'aria-label': 'Xenia DBL: die zwei Kippschalter an der Front' },
     s('defs', {},
-      s('linearGradient', { id: 'mChrome', x1: 0, y1: 0, x2: 1, y2: 0 },
-        s('stop', { offset: '0', 'stop-color': '#7d8186' }), s('stop', { offset: '.45', 'stop-color': '#f4f6f8' }), s('stop', { offset: '1', 'stop-color': '#8a8e93' })),
       s('linearGradient', { id: 'mFront', x1: 0, y1: 0, x2: 0, y2: 1 },
-        s('stop', { offset: '0', 'stop-color': '#f7f7f6' }), s('stop', { offset: '1', 'stop-color': '#e3e3e1' })),
-      s('radialGradient', { id: 'mWood', cx: '.4', cy: '.35', r: '.75' },
-        s('stop', { offset: '0', 'stop-color': '#b98a5c' }), s('stop', { offset: '.6', 'stop-color': '#94673f' }), s('stop', { offset: '1', 'stop-color': '#6c4728' }))),
-    // Tassenablage (Reling) und weiße Front
-    s('path', { class: 'rail', d: 'M14 30 V8 M306 30 V8' }),
-    s('rect', { class: 'front', x: 8, y: 28, width: 304, height: 214, rx: 4 }),
-    s('line', { class: 'front-edge', x1: 8, y1: 34, x2: 312, y2: 34 }),
+        s('stop', { offset: '0', 'stop-color': '#f7f7f6' }), s('stop', { offset: '1', 'stop-color': '#e3e3e1' }))),
+    s('rect', { class: 'front', x: 30.5, y: 32.5, width: 259, height: 81, rx: 6 }),
     // Symbole wie an der Maschine
     s('path', { class: 'sym', d: 'M121.5 77 A8 8 0 1 0 130.5 77 M126 72 V81' }),
     s('path', { class: 'sym', d: 'M188 75 H200 V83 A4 4 0 0 1 196 87 H192 A4 4 0 0 1 188 83 Z M200 77.5 H202.5 A2.5 2.5 0 0 1 202.5 82.5 H200' }),
-    // Brühgruppe
-    s('path', { fill: 'url(#mChrome)', d: 'M118 132 H202 L196 242 H124 Z' }),
-    s('path', { class: 'grp-shade', d: 'M134 150 H186 L182 242 H138 Z' }),
-    knob(54, 1), knob(266, -1),
     toggle(100, 80, 'left'), toggle(220, 80, 'right'));
   // Hebelkopf zur gewählten Seite kippen (wie beim Drücken an der Maschine)
   svg.tilt = (key) => {
@@ -207,7 +185,7 @@ function switchesTab(root) {
     try {
       const [sw, sc] = await Promise.all([api('/api/machine/switches'), api('/api/machine/scripts')]);
       const options = [
-        ...Object.entries(sc.builtin).map(([id, title]) => ({ id: Number(id), title })),
+        ...Object.entries(sc.builtin).map(([id, title]) => ({ id: Number(id), title: classic && id === '7' && sw.singleDoseG ? `${title} ${sw.singleDoseG} g/ml` : classic && id === '8' && sw.doubleDoseG ? `${title} ${sw.doubleDoseG} g/ml` : title })),
         ...sc.scripts.filter((x) => x.id > 9).map((x) => ({ id: x.id, title: x.title })),
       ];
       const nm = (id) => options.find((o) => o.id === id)?.title || (id ? `Skript ${id}` : 'Keine');
@@ -262,8 +240,6 @@ function switchesTab(root) {
         return c;
       }));
 
-      const single = h('input', { class: 'text', type: 'number', min: 1, max: 199, step: 0.5, value: sw.singleDoseG ?? '' });
-      const double = h('input', { class: 'text', type: 'number', min: 1, max: 199, step: 0.5, value: sw.doubleDoseG ?? '' });
       box.replaceChildren(
         h('div', { class: 'card' },
           h('h3', {}, 'Tastenbelegung'),
@@ -272,19 +248,7 @@ function switchesTab(root) {
             : 'Tippe auf einen Taster und wähle, was kurzes bzw. langes Drücken startet. Eigene Abläufe legst du unter „Skripte“ an.'),
           h('div', { class: 'machine-wrap' }, svg),
           grid,
-          editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')),
-        isHidden('scale') ? null : h('div', { class: 'card' },
-          h('h3', {}, 'Bezugsgewicht (interne Waage)'),
-          h('div', { class: 'row' },
-            h('label', { class: 'field grow' }, h('span', {}, 'Einfache Dosis (g)'), single),
-            h('label', { class: 'field grow' }, h('span', {}, 'Doppelte Dosis (g)'), double)),
-          h('div', { style: { height: '12px' } }),
-          h('button', { class: 'btn filled wide', disabled: !editable, onclick: async () => {
-            try {
-              await api('/api/machine/switches', { method: 'PUT', body: { singleDoseG: Number(single.value), doubleDoseG: Number(double.value) } });
-              snackbar('Gewichte gespeichert');
-            } catch (e) { snackbar(e.message); }
-          } }, 'Speichern')));
+          editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')));
     } catch (e) {
       box.replaceChildren(h('div', { class: 'empty' }, e.message));
     }

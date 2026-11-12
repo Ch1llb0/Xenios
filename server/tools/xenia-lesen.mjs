@@ -22,6 +22,8 @@ const READ_ONLY = [
   'status', 'overview', 'overview_single', 'diagram/get', 'machine', 'info', 'general', 'switches', 'timer2',
   'language', 'scripts/list', 'scriptslist', 'scripts/edit', 'brewgroup/pid', 'brewboiler/pid', 'pump/pid',
   'steamboiler/pid', 'mahlkonig/get', 'upload/status',
+  // Alte Xenia (DBL, Firmware 4.1xx): Lesezugriffe, die die Original-Seiten beim Öffnen machen
+  'boilerandbrewgroup', 'pump', 'machine/type', 'overview/single', 'timer', 'timer/timeanddate',
 ].map((p) => `/api/v2/${p}`);
 const SECRET = /^(MA_SN|MSN|MA_MAC|WIFI_.*|.*PASS.*|BT_SCALE_NAME)$/i;
 
