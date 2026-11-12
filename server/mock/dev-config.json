@@ -1,20 +1,8 @@
 {
-  "http": {
-    "port": 8180
-  },
-  "https": {
-    "enabled": false
-  },
-  "machine": {
-    "url": "http://127.0.0.1:8091"
-  },
-  "grinder": {
-    "url": "https://127.0.0.1:8092"
-  },
+  "http": { "port": 8180 },
+  "https": { "enabled": false },
+  "machine": { "url": "http://127.0.0.1:8091" },
+  "grinder": { "url": "https://127.0.0.1:8092" },
   "timezone": "Europe/Berlin",
-  "dataDir": "../data-dev",
-  "push": {
-    "publicKey": "BJQyTQ8jSRjFsnp6TbM3MJZ1pYBmsk4EsPQ0nFptrBgoU3aAoWSBjRXz7XQLm5kXAIR5JfWs4cVjXDfuE4sKrI0",
-    "privateKey": "enc:v1:iTUrWScNayAVHg1h:icOSl49fs50VOkhkpwk9yg:UyaGjgomfzbCH05BhbawoB-z9qD_L216mIIRC2SrjL0bcPm36tiy6WAMqw"
-  }
+  "dataDir": "../data-dev"
 }
