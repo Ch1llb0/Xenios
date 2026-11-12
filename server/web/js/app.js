@@ -57,7 +57,7 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
   } : null);
   setColor('--active', '--on-active', localStorageGet('activeColor'));
   const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  const bar = style === 'xenia' ? (dark ? '#2b2d34' : '#3b3e47') : (dark ? '#121318' : '#fbf8ff');
+  const bar = style === 'xenia' ? (dark ? '#2b2d34' : '#383c44') : (dark ? '#121318' : '#fbf8ff');
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', bar));
 }
 // Schrift auf einer Farbfläche: schwarz oder weiß, je nach Helligkeit
