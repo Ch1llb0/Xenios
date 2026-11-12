@@ -33,13 +33,17 @@ let current = null;      // { route, dispose }
 
 // --- Darstellung --------------------------------------------------------------
 // Stil „xenia“ (Standard, wie die Web-Oberfläche der Maschine) oder „material“; dazu optional eigene Akzent- und Aktiv-Farbe.
-export const THEME_DEFAULTS = { style: 'xenia', accent: { xenia: '#4f9a1c', material: '#4a5891' }, active: { xenia: '#f5862f', material: '#4a5891' } };
+export const THEME_DEFAULTS = { style: 'xenia', gauge: 'black', accent: { xenia: '#4f9a1c', material: '#4a5891' }, active: { xenia: '#f5862f', material: '#4a5891' } };
 export function applyTheme(theme = localStorageGet('theme') || 'system') {
   const root = document.documentElement;
   if (theme === 'system') delete root.dataset.theme;
   else root.dataset.theme = theme;
   const style = localStorageGet('uiStyle') || THEME_DEFAULTS.style;
   root.dataset.style = style;
+  // Anzeigen: wie die Manometer der Maschine (schwarz/weiß) oder flach („app“)
+  const gauge = localStorageGet('gaugeStyle') || THEME_DEFAULTS.gauge;
+  if (gauge === 'app') delete root.dataset.gauge;
+  else root.dataset.gauge = gauge;
   const setColor = (name, onName, value, extra) => {
     if (!value) {
       for (const n of [name, onName, ...Object.keys(extra || {})]) root.style.removeProperty(n);
