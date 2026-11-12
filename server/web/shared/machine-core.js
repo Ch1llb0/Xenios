@@ -1282,6 +1282,7 @@ export class Machine extends Emitter {
   }
 
   async timers() {
+    if (!this.api.weeklyTimers && (await this.classicCaps().catch(() => ({}))).pages) return this._dblTimers();
     if (!this.api.weeklyTimers) {
       let eco = null, off = null, type = this.state.info?.type ?? null;
       try {
@@ -1312,7 +1313,60 @@ export class Machine extends Emitter {
     };
   }
 
+  // Xenia DBL (Seiten-API): GET/POST /api/v2/timer. Je Tag zwei EINSCHALTzeiten (ON1, ON2) mit eigener
+  // Kesselwahl (TI_<Tag>_ON<n>_BOILER: 1 Brühkessel, 2 Dampf, 3 beide); ausgeschaltet wird über den Abschalt-Timer.
+  async _dblTimers() {
+    const d = await this.client.get('/api/v2/timer');
+    let m = {};
+    try { m = await this.client.get('/api/v2/machine'); } catch { /* optional */ }
+    const days = DAYS.map((day) => ({
+      day,
+      starts: [1, 2].map((n) => {
+        const on = timerToMinutes(d[`TI_${day}_ON${n}`]);
+        const boilers = num(d[`TI_${day}_ON${n}_BOILER`]) || 0;
+        return { on, brew: Boolean(boilers & 1), steam: Boolean(boilers & 2), enabled: boilers !== 0 && on !== null };
+      }),
+    }));
+    return {
+      days, ecoAfterMin: num(m.MA_SET_TIMER_ECO_MA), offAfterMin: num(m.MA_SET_TIMER_POWERDOWN),
+      machineType: num(d.MA_TYPE ?? m.MA_TYPE), clock: null, weekly: 'starts',
+    };
+  }
+
+  async _saveDblTimers({ days, ecoAfterMin, offAfterMin }) {
+    if (days !== undefined) {
+      if (!Array.isArray(days) || days.length !== 7) throw httpError(400, '7 Tage erwartet');
+      const msg = {};
+      days.forEach((d, i) => {
+        const key = DAYS[i];
+        const starts = Array.isArray(d.starts) ? d.starts : [];
+        [1, 2].forEach((n) => {
+          const st = starts[n - 1] || {};
+          const on = st.enabled && st.on !== null && st.on !== undefined ? Math.max(0, Math.min(1439, Math.round(Number(st.on)))) : null;
+          if (st.enabled && (on === null || !Number.isFinite(on))) throw httpError(400, `${key}: Einschaltzeit ${n} fehlt`);
+          msg[`TI_${key}_ON${n}_STATUS`] = on === null ? 0 : ((st.brew ? 1 : 0) | (st.steam ? 2 : 0)) || 1;
+          msg[`TI_${key}_ON${n}`] = on === null ? 0 : on * 60;
+        });
+      });
+      await this.client.post('/api/v2/timer', msg);
+    }
+    const ch = {};
+    if (ecoAfterMin !== undefined && ecoAfterMin !== null) ch.MA_SET_TIMER_ECO_MA = Number(ecoAfterMin);
+    if (offAfterMin !== undefined && offAfterMin !== null) ch.MA_SET_TIMER_POWERDOWN = Number(offAfterMin);
+    if (Object.keys(ch).length) {
+      const cur = await this.client.get('/api/v2/machine');
+      const eco = ch.MA_SET_TIMER_ECO_MA ?? num(cur.MA_SET_TIMER_ECO_MA);
+      const off = ch.MA_SET_TIMER_POWERDOWN ?? num(cur.MA_SET_TIMER_POWERDOWN);
+      // wie die Original-Oberfläche: Abschalten muss später kommen als Eco
+      if (eco !== null && off !== null && off <= eco) throw httpError(400, '„Ausschalten nach“ muss länger sein als „Eco-Modus nach“');
+      await this._updateClassicPages(ch);
+    }
+    return { ok: true };
+  }
+
   async saveTimers({ days, ecoAfterMin, offAfterMin }) {
+    if (!this.features.settings) throw httpError(403, 'Einstellungen ändern ist deaktiviert');
+    if (!this.api.weeklyTimers && (await this.classicCaps()).pages) return this._saveDblTimers({ days, ecoAfterMin, offAfterMin });
     if (!this.api.weeklyTimers) {
       const cur = await this.client.get('/api/v2/machine');
       await this.client.post('/api/v2/machine', {

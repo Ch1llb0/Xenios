@@ -33,6 +33,7 @@ export function createMockXenia({ speed = 1, api = 'bbs', pages = false } = {}) 
     tz: 322, view: 1, extractions: 350, energy: 0.729577, tank: 1,
     scripts: { 12: { title: 'Blooming Espresso', content: '1;13;3 40 2000;12 4000;4 9000 25000;6;7;' }, 17: { title: '6 Bar', content: '1;13;4 6000 30000;6;7;' } },
     editId: 'none', paddle: false, brewing: null, log: [],
+    dbl: { TI_MONDAY_ON1: (6 << 16) | (30 << 8), TI_MONDAY_ON1_BOILER: 1, TI_SATURDAY_ON1: (8 << 16), TI_SATURDAY_ON1_BOILER: 3, TI_SATURDAY_ON2: (14 << 16), TI_SATURDAY_ON2_BOILER: 1 }, // Timer der DBL-Firmware
   };
   for (const d of DAYS) {
     s.timers[`TI_${d}_ON1`] = 0; s.timers[`TI_${d}_ON2`] = 0;
@@ -135,6 +136,18 @@ export function createMockXenia({ speed = 1, api = 'bbs', pages = false } = {}) 
           case 'POST /api/v2/brewboiler': return setFrom(['BB_SET_TEMP', 'BB_SET_ECO_TEMP', 'BB_SET_TEMP_HYST', 'BB_MODE', 'BB_SET_POWER']);
           case 'POST /api/v2/steamboiler': return setFrom(['SB_SET_PRESS', 'SB_SET_ECO_PRESS', 'SB_SET_PRESS_HYST', 'SB_SET_POWER']);
           case 'GET /api/v2/machine/type': return json({ ma_type: 4 });
+          case 'GET /api/v2/timer': {
+            const t = { MA_TYPE: 3 };
+            for (const d of DAYS) for (const n of [1, 2]) { t[`TI_${d}_ON${n}`] = s.dbl[`TI_${d}_ON${n}`] || 0; t[`TI_${d}_ON${n}_BOILER`] = s.dbl[`TI_${d}_ON${n}_BOILER`] || 0; }
+            return json(t);
+          }
+          case 'POST /api/v2/timer':
+            for (const d of DAYS) for (const n of [1, 2]) {
+              const sec = Number(j[`TI_${d}_ON${n}`]) || 0;
+              s.dbl[`TI_${d}_ON${n}`] = sec ? (Math.floor(sec / 3600) << 16) | (Math.floor((sec % 3600) / 60) << 8) : 0;
+              s.dbl[`TI_${d}_ON${n}_BOILER`] = Number(j[`TI_${d}_ON${n}_STATUS`]) || 0;
+            }
+            return ok();
           case 'GET /api/v2/pump': return json(pick(['PU_SET_BREW_TIMER_1', 'PU_SET_MAX_TIMER', 'PU_MODE']));
           case 'POST /api/v2/pump': return setFrom(['PU_SET_BREW_TIMER_1', 'PU_SET_MAX_TIMER', 'PU_MODE']);
           case 'GET /api/v2/machine': return json({ MA_TYPE: 3, MA_SUBTYPE: 0, MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 2440, MA_EXTRACTIONS_START: 0, ...pick(['MA_FIX_WATER_SUPPLY', 'MA_HEATUP_FLUSH_DURATION', 'MA_BOILER_START_MODE', 'MA_EXTENDED_THERMAL_STABILITY', 'MA_SET_TIMER_ECO_MA', 'MA_SET_TIMER_POWERDOWN', 'MA_MAX_AMPERE', 'PU_SET_BREW_TIMER_1']), MA_ENERGY_TOTAL_KWH: s.energy, FW_VERSION_MAJOR: 4, FW_VERSION_MINOR: 159, PU_SET_QUANTITY_MEASUREMENT: 2, ESP_FW_MAJOR: 3, ESP_FW_MINOR: 63, BLE: 0, MA_DELAY: 0, BT_SCALE_NAME: '', MA_SN: 'none' });

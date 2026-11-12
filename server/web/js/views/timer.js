@@ -97,8 +97,48 @@ export function timerView(root) {
     return card;
   }
 
+  // Xenia DBL: zwei Einschaltzeiten je Tag (wie „Start timer 1/2“ der Original-Seite), je mit Kesselwahl
+  function dblDayCard(d) {
+    const card = h('div', { class: 'card timer-card' });
+    const paint = () => {
+      const any = d.starts.some((st) => st.enabled);
+      card.className = `card timer-card ${any ? '' : 'off'}`;
+      const row = (st, n) => {
+        const timeBtn = h('button', { class: 'time', onclick: () => pickTime(st.on, (m) => {
+          st.on = m;
+          st.enabled = m !== null;
+          if (st.enabled && !st.brew && !st.steam) { st.brew = true; st.steam = true; }
+          markDirty(); paint();
+        }, true) }, st.enabled && st.on !== null ? hhmm(st.on) : 'Nicht geplant');
+        const sw = switchEl({ checked: st.enabled, label: `${DAY_DE[d.day]} Einschaltzeit ${n}`, onChange: (on) => {
+          st.enabled = on;
+          if (on && st.on === null) st.on = n === 1 ? 7 * 60 : 13 * 60;
+          if (on && !st.brew && !st.steam) { st.brew = true; st.steam = true; }
+          markDirty(); paint();
+        } });
+        const chip = (label, ic, key) => h('button', { class: 'chip', 'aria-pressed': String(st[key]), disabled: !st.enabled, onclick: () => {
+          st[key] = !st[key];
+          if (!st.brew && !st.steam) st[key === 'brew' ? 'steam' : 'brew'] = true;
+          markDirty(); paint();
+        } }, icon(ic, 's18'), label);
+        return h('div', { class: 'dbl-start' },
+          h('div', { class: 'row between' }, h('div', {}, h('div', { class: 'small muted' }, `Einschalten ${n}`), timeBtn), sw),
+          st.enabled ? h('div', { class: 'chips', style: { 'margin-top': '4px' } }, data.machineType === 1 ? null : chip('Brühkessel', 'drop', 'brew'), chip('Dampfkessel', 'cloud', 'steam')) : null);
+      };
+      card.replaceChildren(h('div', { class: 'day' }, DAY_DE[d.day]), ...d.starts.map((st, i) => row(st, i + 1)));
+    };
+    paint();
+    return card;
+  }
+
   function sysCard() {
     const row = (label, key, hint) => {
+      if (data.weekly === 'starts') {
+        // DBL: beide Timer sind immer aktiv (1–240 min), Abschalten muss nach Eco kommen
+        const num = h('input', { class: 'text', type: 'number', min: 1, max: 240, value: data[key] ?? 10, style: { width: '96px' } });
+        num.addEventListener('input', () => { data[key] = Math.max(1, Math.min(240, Number(num.value) || 1)); markDirty(); });
+        return h('div', { class: 'row', style: { padding: '6px 0' } }, h('div', { class: 'grow' }, h('div', {}, label), h('div', { class: 'small muted' }, hint)), num, h('span', { class: 'muted small' }, 'min'));
+      }
       const val = data[key] || 0;
       const num = h('input', { class: 'text', type: 'number', min: 1, max: 240, value: val || 20, disabled: !val, style: { width: '96px' } });
       num.addEventListener('input', () => { data[key] = Math.max(1, Math.min(240, Number(num.value) || 1)); markDirty(); });
@@ -112,16 +152,18 @@ export function timerView(root) {
   }
 
   function paintAll() {
-    const weekly = data.weekly !== false && !isClassic();
+    const dbl = data.weekly === 'starts';
+    const weekly = dbl || (data.weekly !== false && !isClassic());
     box.replaceChildren(
-      weekly ? clockCard() : h('div', { class: 'card low muted small' }, 'Die alte Xenia hat keinen Wochenplan über die API. Eco- und Ausschalt-Timer unten, zusätzliche Zeiten über den Server.'),
+      dbl ? h('div', { class: 'card low muted small' }, 'Xenia DBL: Je Tag gibt es zwei Einschaltzeiten mit eigener Kesselwahl. Ausgeschaltet wird über „Ausschalten nach“ unten (ohne Bezug).')
+        : weekly ? clockCard() : h('div', { class: 'card low muted small' }, 'Diese Xenia hat keinen Wochenplan über die API. Eco- und Ausschalt-Timer unten, zusätzliche Zeiten über den Server.'),
       weekly ? h('div', { class: 'section-title' }, 'Wochenplan (Maschine)') : null,
-      ...(weekly ? data.days.map(dayCard) : []),
+      ...(weekly ? data.days.map(dbl ? dblDayCard : dayCard) : []),
       ...(direct ? [h('div', { class: 'section-title' }, 'Weitere Schaltzeiten & Wecker'), h('div', { class: 'card low muted small' }, 'Zusätzliche Schaltzeiten und das Einschalten vor dem Wecker übernimmt der Server. Im Direkt-Modus der App gibt es nur den Wochenplan der Maschine.')]
         : [h('div', { class: 'section-title' }, 'Weitere Schaltzeiten (Server)'), scheduleBox, h('div', { class: 'section-title' }, 'Wecker'), wakeBox]),
       h('div', { class: 'section-title' }, 'System-Timer'),
       sysCard(),
-      weekly ? h('p', { class: 'muted small' }, 'Hinweis: Eine Ausschaltzeit gilt nur an aktiven Tagen. „Brühen“ heizt den Brühkessel, „Dampf“ den Dampfkessel.') : null);
+      weekly && !dbl ? h('p', { class: 'muted small' }, 'Hinweis: Eine Ausschaltzeit gilt nur an aktiven Tagen. „Brühen“ heizt den Brühkessel, „Dampf“ den Dampfkessel.') : null);
   }
 
   async function load() {
