@@ -335,8 +335,9 @@ export function createMockGrinder({ password = 'mockpass' } = {}) {
 
 // Direkt gestartet: beide Geräte simulieren
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const x = createMockXenia();
-  x.server.listen(8091, '127.0.0.1', () => console.log('Mock-Xenia:  http://127.0.0.1:8091'));
+  const api = process.argv.includes('classic') ? 'classic' : 'bbs'; // npm run mock -- classic → alte Xenia DBL
+  const x = createMockXenia({ api });
+  x.server.listen(8091, '127.0.0.1', () => console.log(`Mock-Xenia:  http://127.0.0.1:8091  (${api === 'classic' ? 'Xenia DBL, alte API' : 'BbS-API'})`));
   const m = createMockGrinder();
   m.server.listen(8092, '127.0.0.1', () => console.log('Mock-Mühle:  https://127.0.0.1:8092  (Passwort: mockpass)'));
 }
