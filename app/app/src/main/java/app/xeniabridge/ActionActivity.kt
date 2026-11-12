@@ -6,12 +6,12 @@ import android.os.Bundle
 import android.widget.Toast
 import kotlin.concurrent.thread
 
-/** Führt einen App-Shortcut (Ein/Eco/Aus) aus, ohne die App zu öffnen. */
+/** Führt einen App-Shortcut (Ein/Ein ohne Dampf/Eco/Aus) aus, ohne die App zu öffnen. */
 class ActionActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val mode = intent.getStringExtra("mode")
-        if (!Prefs(this).configured || mode !in setOf("on", "off", "eco")) {
+        if (!Prefs(this).configured || mode !in setOf("on", "off", "eco", Api.MODE_ON_NO_STEAM)) {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
             return
@@ -22,6 +22,7 @@ class ActionActivity : Activity() {
                 Api.power(app, mode!!)
                 when (mode) {
                     "on" -> "Xenia wird eingeschaltet"
+                    Api.MODE_ON_NO_STEAM -> "Xenia wird ohne Dampf eingeschaltet"
                     "eco" -> "Eco-Modus aktiv"
                     else -> "Xenia ausgeschaltet"
                 }

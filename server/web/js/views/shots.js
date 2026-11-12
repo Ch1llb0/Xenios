@@ -2,7 +2,8 @@
 // Ein Bezug öffnet die Analyse (Kurve mit Vergleich, Kennzahlen, Bewertung).
 import { h, icon, fmt, fmtInt, snackbar, sheet, confirmDialog } from '../ui.js';
 import { api, subscribe } from '../api.js';
-import { setTopActions } from '../app.js';
+import { setTopActions, navigate } from '../app.js';
+import { isHidden } from '../prefs.js';
 import { shotMetrics, dialIn } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
 import { openShot, quickRate, adviceNote } from './shot-detail.js';
@@ -23,7 +24,7 @@ export function shotsView(root) {
   async function load() {
     try {
       const r = await api('/api/shots');
-      data = { shots: r.shots, total: r.total ?? r.shots.length, beans: r.beans || [] };
+      data = { shots: r.shots, total: r.total ?? r.shots.length, beans: r.beans || [], minShotS: r.minShotS ?? null };
       paint();
       paintDial();
     } catch (e) {
@@ -34,6 +35,7 @@ export function shotsView(root) {
 
   // Pflege: Backflush-Erinnerung
   async function loadCare() {
+    if (isHidden('care')) return care.replaceChildren();
     let m;
     try { m = (await api('/api/maintenance')).backflush; } catch { return care.replaceChildren(); }
     const intervalSel = h('select', { class: 'text small-select', 'aria-label': 'Erinnerung alle' },
@@ -118,7 +120,8 @@ export function shotsView(root) {
         h('div', { class: 'kpis' },
           kpi('Heute', fmtInt(today)), kpi('7 Tage', fmtInt(week)), kpi('Gesamt', fmtInt(total)),
           kpi('Ø Zeit', avgTime ? `${fmt(avgTime / 1000)} s` : '–'), kpi('Ø Verhältnis', avgRatio ? `1:${fmt(avgRatio)}` : '–')),
-        h('p', { class: 'muted small' }, 'Einen Bezug antippen für Kurve, Vergleich, Kennzahlen und Bewertung. Die Dosis kommt automatisch von der Mühle, wenn kurz vorher gemahlen wurde.')),
+        h('p', { class: 'muted small' }, 'Einen Bezug antippen für Kurve, Vergleich, Kennzahlen und Bewertung. Die Dosis kommt automatisch von der Mühle, wenn kurz vorher gemahlen wurde.'),
+        data.minShotS ? h('button', { class: 'btn text', onclick: () => navigate('/einstellungen') }, icon('tune', 's18'), `Bezüge unter ${fmtInt(data.minShotS)} s ausgeblendet`) : null),
       h('div', { class: 'row filter-row' }, h('div', { class: 'chips grow' }, chip('all', 'Alle'), chip('rated', 'Bewertet'), chip('ref', 'Referenzen')), beanSel),
       visible.length ? null : h('div', { class: 'empty' }, 'Keine Bezüge für diesen Filter.'),
       ...groups.flatMap((g) => [

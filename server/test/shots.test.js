@@ -109,3 +109,30 @@ test('Alte zu kurze Einträge ohne Notizen werden aufgeräumt', () => {
   ]);
   assert.deepEqual(m.history.data.shots.map((s) => s.id), ['b', 'c']);
 });
+
+test('Mindestdauer einstellbar: kürzere Bezüge werden weder protokolliert noch gelistet', () => {
+  const m = machine([
+    { id: 'kurz', endedAt: '2026-11-01T08:00:00.000Z', timeMs: 16000 },
+    { id: 'lang', endedAt: '2026-11-01T07:00:00.000Z', timeMs: 28000 },
+    { id: 'notiert', endedAt: '2026-11-01T06:00:00.000Z', timeMs: 17000, notes: { rating: 4 } },
+  ]);
+  assert.equal(m.shotSettings().minShotS, 15);
+  assert.equal(m.shots(10).length, 3);
+  m.setShotSettings({ minShotS: 20 });
+  assert.deepEqual(m.shots(10).map((s) => s.id), ['lang', 'notiert'], 'zu kurz ausgeblendet, bewertete bleiben');
+  assert.equal(m.history.data.shots.length, 3, 'nichts gelöscht');
+  assert.equal(m.state.lastShot.id, 'lang');
+  // Neuer Bezug mit 18 s: unter 20 s → nicht protokolliert
+  m._checkCounter(1);
+  m.state.counters = { extractions: 1 };
+  m._applyLive(diag(1));
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 18000));
+  assert.equal(m.history.data.shots.length, 3);
+  // Mindestdauer 10 s: ein 12-s-Bezug kommt ins Protokoll
+  m.setShotSettings({ minShotS: 10 });
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 12000));
+  assert.equal(m.history.data.shots.length, 4);
+  assert.throws(() => m.setShotSettings({ minShotS: 99 }), /zwischen/);
+});

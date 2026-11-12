@@ -12,15 +12,16 @@ import { settingsView } from './views/settings.js';
 import { serverView } from './views/server.js';
 import { showSetup } from './setup.js';
 import { quickRate } from './views/shot-detail.js';
+import { hiddenTabs, onPrefs, powerOnBody } from './prefs.js';
 
 const ROUTES = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', view: dashboardView, title: 'Dashboard', wide: true },
   { path: '/', label: 'Home', icon: 'home', view: homeView, title: 'Xenios' },
+  { path: '/bezuege', label: 'Bezüge', icon: 'coffee', view: shotsView, title: 'Bezüge' },
   { path: '/skripte', label: 'Skripte', icon: 'list', view: scriptsView, title: 'Skripte' },
   { path: '/steuerung', label: 'Steuerung', icon: 'tune', view: controlsView, title: 'Steuerung' },
   { path: '/timer', label: 'Timer', icon: 'event', view: timerView, title: 'Timer' },
   { path: '/muehle', label: 'Mühle', icon: 'grinder', view: grinderView, title: 'Mühle' },
-  { path: '/bezuege', label: 'Bezüge', icon: 'coffee', view: shotsView, title: 'Bezüge', nav: false },
   // Einstellungen über das Zahnrad oben rechts, nicht in der unteren Leiste
   { path: '/einstellungen', label: 'Einstellungen', icon: 'settings', view: settingsView, title: 'Einstellungen', nav: false },
   { path: '/server', label: 'Server', icon: 'shield', view: serverView, title: 'Server & Sicherheit', nav: false, back: '/einstellungen' },
@@ -45,17 +46,27 @@ export function localStorageSet(k, v) {
 applyTheme();
 
 // --- Navigation ---------------------------------------------------------------
-function navRoutes() {
+// Alle Seiten, die in die untere Leiste können (die Mühle nur, wenn eingerichtet und nicht ausgeblendet)
+export function navChoices() {
   return ROUTES.filter((r) => r.nav !== false && (r.path !== '/muehle' || hasGrinder()));
+}
+
+// Sichtbare Tabs: ohne die in den Einstellungen ausgeblendeten; mindestens einer bleibt immer stehen
+function navRoutes() {
+  const all = navChoices();
+  const hidden = hiddenTabs();
+  const shown = all.filter((r) => !hidden.has(r.path));
+  return shown.length ? shown : all.slice(0, 1);
 }
 
 function buildNav() {
   $('settings-btn').replaceChildren(icon('settings'));
   $('back-btn').replaceChildren(icon('left'));
   $('settings-btn').onclick = () => navigate('/einstellungen');
-  const inner = h('div', { class: 'navbar-inner' }, navRoutes().map((r) =>
+  const routes = navRoutes();
+  const inner = h('div', { class: `navbar-inner${routes.length > 5 ? ' many' : ''}` }, routes.map((r) =>
     h('button', { class: 'nav-item', dataset: { path: r.path }, onclick: () => navigate(r.path) },
-      h('span', { class: 'pill' }, icon(r.icon)), r.label)));
+      h('span', { class: 'pill' }, icon(r.icon)), h('span', { class: 'nav-label' }, r.label))));
   $('navbar').replaceChildren(inner);
 }
 
@@ -105,6 +116,11 @@ window.addEventListener('popstate', render);
 
 subscribe((part) => {
   if (part === 'server' || part === 'all') buildNav();
+});
+onPrefs(() => {
+  if (!window.__authed) return;
+  buildNav();
+  document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === location.pathname ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
 });
 
 // Verbindungspunkt oben rechts
@@ -198,8 +214,12 @@ async function handleShortcut() {
   history.replaceState({}, '', location.pathname);
   try {
     if (action === 'on') {
-      await api('/api/machine/power', { method: 'POST', body: { mode: 'on' } });
-      snackbar('Xenia wird eingeschaltet …');
+      const body = powerOnBody();
+      await api('/api/machine/power', { method: 'POST', body });
+      snackbar(body.steam === false ? 'Xenia wird ohne Dampf eingeschaltet …' : 'Xenia wird eingeschaltet …');
+    } else if (action === 'on-nosteam') {
+      await api('/api/machine/power', { method: 'POST', body: { mode: 'on', steam: false } });
+      snackbar('Xenia wird ohne Dampf eingeschaltet …');
     } else if (action === 'off') {
       await api('/api/machine/power', { method: 'POST', body: { mode: 'off' } });
       snackbar('Xenia ausgeschaltet');

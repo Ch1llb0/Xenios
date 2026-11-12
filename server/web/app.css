@@ -423,6 +423,13 @@ details.adv > summary::-webkit-details-marker { display: none; }
 .machine-svg .mbtn .glyph path { fill: none; stroke: #33363b; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
 .machine-svg .mbtn:hover .halo, .machine-svg .mbtn:focus-visible .halo { opacity: .35; }
 .machine-svg .mbtn.sel .halo { opacity: .75; }
+.machine-svg.dbl { max-width: 360px; }
+.machine-svg .chrome-plate { fill: #3a3b40; stroke: #000; }
+.machine-svg .lever-split { stroke: #1b1c1f; stroke-width: 2; }
+.machine-svg .lever-label { fill: #c7cbd0; font-size: 11px; }
+.machine-svg .mbtn .glyph.arrow { fill: #33363b; stroke: none; }
+.machine-svg .mbtn.fixed .cap { opacity: .55; }
+.machine-svg .mbtn.fixed { cursor: default; }
 .btn-assign { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .assign-card { box-sizing: border-box; cursor: pointer; padding: 10px 12px; border-radius: var(--radius-m); background: var(--surface-container-high); border: 2px solid transparent; display: grid; gap: 6px; min-width: 0; }
 .assign-card.sel { border-color: var(--primary); }
@@ -615,10 +622,32 @@ code.fp { font: 11px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywh
 /* Dashboard (nur Anzeige): 1 Spalte am Handy, 2 am Tablet hochkant, 3 quer */
 .app.wide { max-width: 1280px; }
 .nav-item { min-width: 0; white-space: nowrap; }
+.navbar-inner.many { max-width: 680px; }
+.nav-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.navbar-inner.many .nav-item { font-size: 11px; }
+@media (max-width: 420px) { .navbar-inner.many .nav-item { font-size: 10px; letter-spacing: -.3px; } }
 @media (max-width: 380px) { .nav-item { font-size: 11px; letter-spacing: -.2px; } }
-.dash { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); grid-auto-rows: 8px; column-gap: 12px; align-items: start; grid-auto-flow: dense; }
-.dash > .tile { margin-bottom: 12px; }   /* Zeilenabstand: die Kacheln spannen per Skript über passend viele 8-px-Zeilen */
-.dash > .tile { background: var(--surface-container-high); border-radius: var(--radius-l); padding: 14px 16px 16px; min-width: 0; }
+.dash { --cell: 150px; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: minmax(var(--cell), auto); gap: 12px; align-items: stretch; grid-auto-flow: row dense; }
+/* Raster wie Android-Widgets: Breite in Spalten, Höhe in Zellen; alle Kacheln einer Zeile werden gleich hoch */
+.dash > .tile { background: var(--surface-container-high); border-radius: var(--radius-l); padding: 14px 16px 16px; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; }
+.dash > .tile[hidden] { display: none; }
+.dash > .tile > .tile-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.dash > .tile > .tile-body > .chart-box, .dash > .tile > .tile-body > div:only-child { flex: 1; }
+.dash > .empty { grid-column: 1 / -1; }
+.dash-cfg-ctl { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.dash-cfg-ctl .small-select { padding: 4px 6px; font-size: 12px; max-width: 112px; }
+.dash-control { display: grid; gap: 10px; align-content: start; }
+.dash-control .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; border-radius: 22px; border: 1px solid var(--outline-variant, rgba(127,127,127,.4)); background: transparent; color: var(--on-surface); font: inherit; font-weight: 600; cursor: pointer; position: relative; overflow: hidden; }
+.seg-btn[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.seg-btn:disabled:not([aria-pressed="true"]) { opacity: .45; cursor: default; }
+.seg-btn:disabled[aria-pressed="true"] { cursor: default; }
+.dash-control .ctl-row { display: flex; align-items: center; gap: 10px; }
+.dash-control .ctl-row > svg { color: var(--on-surface-variant); flex: none; }
+.dash > .tile > .tile-body { container-type: inline-size; }
+.gauges.four { grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0; }
+.gauges.four .gauge-title { font-size: 12px; }
+@container (max-width: 300px) { .gauges.four { grid-template-columns: repeat(2, 1fr); } }
 .tile.wide { grid-column: 1 / -1; }
 .tile.clickable { cursor: pointer; }
 .tile.t-shot { order: -1; background: var(--primary-container); color: var(--on-primary-container); }
@@ -774,3 +803,4 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
 .quick-rate .note.advice { margin-top: 4px; }
 .quick-actions { margin-top: 12px; }
 .card.rate-card .big-chips { margin-top: 10px; }
+.dash-cfg-row { flex-wrap: wrap; }

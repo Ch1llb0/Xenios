@@ -53,6 +53,19 @@
         android:textStyle="bold" />
 
     <TextView
+        android:id="@+id/btn_on_ns"
+        android:layout_width="44dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="4dp"
+        android:contentDescription="Ein ohne Dampf"
+        android:background="@drawable/widget_btn"
+        android:gravity="center"
+        android:text="o.D."
+        android:textColor="@color/widget_text"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <TextView
         android:id="@+id/btn_eco"
         android:layout_width="44dp"
         android:layout_height="36dp"

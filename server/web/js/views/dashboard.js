@@ -1,7 +1,9 @@
-// Dashboard: anpassbare Übersicht nur zum Ansehen (Handy, Tablet hochkant und quer). Bedient nichts an den Geräten.
-// Auswahl, Reihenfolge und Breite der Kacheln speichert jedes Gerät für sich (localStorage).
-import { h, icon, fmt, fmtInt, ago, sheet, switchEl } from '../ui.js';
-import { api, store, subscribe, hasGrinder } from '../api.js';
+// Dashboard: anpassbare Übersicht (Handy, Tablet hochkant und quer). Bedienen lässt sich nur die Kachel „Schalter“
+// (Ein/Eco/Aus, Dampf). Auswahl, Reihenfolge, Breite und Höhe der Kacheln speichert jedes Gerät für sich (localStorage).
+// Raster wie bei Android-Widgets: Breite in Spalten (oder ganze Breite), Höhe in Zellen; Kacheln einer Zeile sind gleich hoch.
+import { h, icon, fmt, fmtInt, ago, sheet, switchEl, snackbar } from '../ui.js';
+import { api, store, subscribe, hasGrinder, machineOn } from '../api.js';
+import { isHidden, noSteamOn, setNoSteamOn, powerOnBody, onPrefs } from '../prefs.js';
 import { createGauge, ring, shotChart, barChart, targetBar, liveChart } from '../gauge.js';
 import { navigate, setTopActions, localStorageGet, localStorageSet } from '../app.js';
 import { liveHistory, SERIES } from './home.js';
@@ -9,30 +11,49 @@ import { TYPE_DE, TRIGGER_DE } from './grinder.js';
 import { ALERT_TEXT } from '../../shared/grinder-core.js';
 import { shotMetrics } from '../../shared/shot-analysis.js';
 
+// w: Spalten (0 = ganze Breite), h: Höhe in Zellen
 const TILES = {
-  shot: { title: 'Live-Bezug', icon: 'coffee', wide: true, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
-  status: { title: 'Status', icon: 'power', wide: false, build: statusTile },
-  gauges: { title: 'Instrumente', icon: 'thermo', wide: false, build: gaugesTile },
-  lastShot: { title: 'Letzter Bezug', icon: 'coffee', wide: false, build: lastShotTile, link: '/bezuege' },
-  lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', wide: false, build: lastGrindTile, link: '/muehle' },
-  week: { title: 'Bezüge pro Tag', icon: 'event', wide: false, build: weekTile, link: '/bezuege' },
-  shotTimes: { title: 'Bezugszeiten', icon: 'timer', wide: false, build: shotTimesTile, link: '/bezuege' },
-  grinds: { title: 'Mahlgewichte', icon: 'scale', wide: false, build: grindsTile, link: '/muehle' },
-  grinder: { title: 'Mühle heute', icon: 'grinder', wide: false, build: grinderTile, link: '/muehle' },
-  care: { title: 'Pflege', icon: 'check', wide: false, build: careTile, link: '/bezuege' },
-  live: { title: 'Verlauf (10 min)', icon: 'history', wide: true, build: liveTile },
+  shot: { title: 'Live-Bezug', icon: 'coffee', w: 0, h: 2, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
+  control: { title: 'Schalter', icon: 'power', w: 1, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
+  status: { title: 'Status', icon: 'power', w: 1, h: 1, build: statusTile },
+  gauges: { title: 'Instrumente', icon: 'thermo', w: 1, h: 1, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
+  lastShot: { title: 'Letzter Bezug', icon: 'coffee', w: 1, h: 1, build: lastShotTile, link: '/bezuege' },
+  lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', w: 1, h: 1, build: lastGrindTile, link: '/muehle' },
+  week: { title: 'Bezüge pro Tag', icon: 'event', w: 1, h: 1, build: weekTile, link: '/bezuege' },
+  shotTimes: { title: 'Bezugszeiten', icon: 'timer', w: 1, h: 1, build: shotTimesTile, link: '/bezuege' },
+  grinds: { title: 'Mahlgewichte', icon: 'scale', w: 1, h: 1, build: grindsTile, link: '/muehle' },
+  grinder: { title: 'Mühle heute', icon: 'grinder', w: 1, h: 1, build: grinderTile, link: '/muehle' },
+  care: { title: 'Pflege', icon: 'check', w: 1, h: 1, build: careTile, link: '/bezuege' },
+  live: { title: 'Verlauf (10 min)', icon: 'history', w: 0, h: 1, build: liveTile },
 };
 const GRINDER_TILES = new Set(['lastGrind', 'grinds', 'grinder']);
 const KEY = 'dashboard';
-const LAYOUT_VERSION = 2; // 2: breite Kacheln nur noch oben (Live-Bezug) und unten (Verlauf), sonst entstehen Lücken
+const LAYOUT_VERSION = 3; // 3: Breite in Spalten und Höhe in Zellen statt nur „breit“
 const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende stehen
+const MIN_COL = 280;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl
+const GAP = 12;
+const WIDTHS = [[1, '1 Spalte'], [2, '2 Spalten'], [3, '3 Spalten'], [0, 'Ganze Breite']];
+const HEIGHTS = [[1, 'Höhe 1'], [2, 'Höhe 2'], [3, 'Höhe 3'], [4, 'Höhe 4']];
+const clampW = (v, d) => ([0, 1, 2, 3].includes(Number(v)) ? Number(v) : d);
+const clampH = (v, d) => ([1, 2, 3, 4].includes(Number(v)) ? Number(v) : d);
+
+function tileVisible(id) {
+  if (GRINDER_TILES.has(id) && !hasGrinder()) return false;
+  if (id === 'care' && isHidden('care')) return false;
+  return true;
+}
 
 function loadLayout() {
   let saved = null;
   try { saved = JSON.parse(localStorageGet(KEY) || 'null'); } catch { /* kaputt → Standard */ }
-  const current = saved?.v === LAYOUT_VERSION;
-  const tiles = (Array.isArray(saved?.tiles) ? saved.tiles : []).filter((t) => TILES[t?.id]).map((t) => ({ id: t.id, on: t.on !== false, wide: current ? Boolean(t.wide) : TILES[t.id].wide }));
-  for (const id of Object.keys(TILES)) if (!tiles.some((t) => t.id === id)) tiles.push({ id, on: true, wide: TILES[id].wide });
+  const v3 = saved?.v === LAYOUT_VERSION;
+  const tiles = (Array.isArray(saved?.tiles) ? saved.tiles : []).filter((t) => TILES[t?.id]).map((t) => {
+    const def = TILES[t.id];
+    // Ältere Layouts: „breit“ wird zur ganzen Breite, die Höhe kommt aus dem Standard
+    const w = v3 ? clampW(t.w, def.w) : t.wide ? 0 : def.w;
+    return { id: t.id, on: t.on !== false, w, h: v3 ? clampH(t.h, def.h) : def.h };
+  });
+  for (const id of Object.keys(TILES)) if (!tiles.some((t) => t.id === id)) tiles.push({ id, on: true, w: TILES[id].w, h: TILES[id].h });
   return { tiles, keepAwake: Boolean(saved?.keepAwake) };
 }
 const saveLayout = (l) => localStorageSet(KEY, JSON.stringify({ ...l, v: LAYOUT_VERSION }));
@@ -42,39 +63,52 @@ export function dashboardView(root) {
   let shots = [];
   let built = [];
   const grid = h('div', { class: 'dash stagger' });
-  // Lückenlos stapeln: feine Rasterzeilen, jede Kachel belegt so viele, wie ihr Inhalt hoch ist (auch nach Live-Updates)
-  const ROW = 8;
-  const GAP = 12;
-  const fit = (el) => { if (!el.hidden) el.style.setProperty('grid-row-end', `span ${Math.ceil((el.getBoundingClientRect().height + GAP) / ROW)}`); };
-  const sizes = new ResizeObserver((entries) => entries.forEach((e) => fit(e.target)));
+  // Spaltenzahl aus der verfügbaren Breite; Kacheln spannen über w Spalten (höchstens alle) und h Zellen
+  let cols = 1;
+  const place = () => {
+    for (const b of built) {
+      const span = b.w === 0 ? cols : Math.min(b.w, cols);
+      b.el.style.setProperty('grid-column', span >= cols ? '1 / -1' : `span ${span}`);
+      b.el.style.setProperty('grid-row', `span ${b.h}`);
+    }
+  };
+  const sizes = new ResizeObserver(() => {
+    const width = grid.getBoundingClientRect().width;
+    const n = Math.max(1, Math.min(4, Math.floor((width + GAP) / (MIN_COL + GAP))));
+    if (n !== cols) {
+      cols = n;
+      grid.style.setProperty('--cols', String(cols));
+      place();
+    }
+  });
   root.append(grid);
   setTopActions(h('button', { class: 'icon-btn', 'aria-label': 'Dashboard anpassen', title: 'Dashboard anpassen', onclick: customize }, icon('tune')));
 
   function build() {
-    built = layout.tiles.filter((t) => t.on && (hasGrinder() || !GRINDER_TILES.has(t.id))).map((t) => {
+    built = layout.tiles.filter((t) => t.on && tileVisible(t.id)).map((t) => {
       const def = TILES[t.id];
-      const t0 = def.build({ wide: t.wide });
+      const t0 = def.build({ wide: t.w !== 1, h: t.h });
       const extra = h('span', { class: 'extra' });
       const open = def.link ? () => navigate(def.link) : null;
       const el = h('section', {
-        class: `tile${t.wide ? ' wide' : ''}${def.link ? ' clickable' : ''} t-${t.id}`,
+        class: `tile${t.w !== 1 ? ' wide' : ''}${def.link ? ' clickable' : ''} t-${t.id}`,
+        dataset: { h: String(t.h) },
         role: def.link ? 'link' : null,
         tabindex: def.link ? '0' : null,
         'aria-label': def.title,
         onclick: open,
         onkeydown: open ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : null,
       },
-        h('header', { class: 'tile-head' }, icon(def.icon), h('span', {}, def.title), extra), t0.body);
-      return { id: t.id, el, extra, update: t0.update };
+        h('header', { class: 'tile-head' }, icon(def.icon), h('span', {}, def.title), extra), h('div', { class: 'tile-body' }, t0.body));
+      return { id: t.id, el, extra, update: t0.update, w: t.w, h: t.h };
     });
     grid.replaceChildren(built.length ? built.map((b) => b.el) : h('div', { class: 'empty' }, 'Keine Kachel ausgewählt. Oben rechts lässt sich das Dashboard anpassen.'));
-    sizes.disconnect();
-    built.forEach((b) => sizes.observe(b.el));
+    place();
     update();
   }
 
   function update() {
-    const ctx = { m: store.machine, g: store.grinder?.enabled ? store.grinder : null, shots, maint };
+    const ctx = { m: store.machine, g: store.grinder?.enabled && hasGrinder() ? store.grinder : null, shots, maint };
     for (const b of built) {
       try {
         const r = b.update(ctx) || {};
@@ -115,7 +149,7 @@ export function dashboardView(root) {
 
   function customize() {
     const list = h('div', { class: 'list dash-cfg' });
-    const visible = () => layout.tiles.filter((t) => hasGrinder() || !GRINDER_TILES.has(t.id));
+    const visible = () => layout.tiles.filter((t) => tileVisible(t.id));
     const paint = () => list.replaceChildren(visible().map((t, i, vis) => {
       const def = TILES[t.id];
       const move = (d) => {
@@ -129,10 +163,12 @@ export function dashboardView(root) {
       return h('div', { class: 'list-item dash-cfg-row' },
         switchEl({ checked: t.on, label: def.title, onChange: (on) => { t.on = on; changed(); } }),
         h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), def.note ? h('div', { class: 'sub' }, def.note) : null),
-        t.id === 'shot' ? null : [
-          h('button', { class: 'chip', 'aria-pressed': String(t.wide), title: 'Über die ganze Breite', onclick: () => { t.wide = !t.wide; changed(); } }, 'Breit'),
-          h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach oben`, disabled: i === 0, onclick: () => move(-1) }, icon('less')),
-          h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]);
+        h('div', { class: 'dash-cfg-ctl' },
+          sizeSelect(WIDTHS, t.w, `${def.title}: Breite`, (v) => { t.w = v; changed(); }),
+          sizeSelect(HEIGHTS, t.h, `${def.title}: Höhe`, (v) => { t.h = v; changed(); }),
+          t.id === 'shot' ? null : [
+            h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach oben`, disabled: i === 0, onclick: () => move(-1) }, icon('less')),
+            h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]));
     }));
     const changed = () => {
       saveLayout(layout);
@@ -144,7 +180,7 @@ export function dashboardView(root) {
     // Wake Lock gibt es im Browser nur über HTTPS (bzw. localhost); in der Android-App immer
     const canWake = typeof window.XeniaApp?.keepScreenOn === 'function' || ('wakeLock' in navigator && window.isSecureContext);
     sheet('Dashboard anpassen', h('div', {},
-      h('p', { class: 'muted small' }, 'Nur zum Ansehen: Im Dashboard lässt sich an Maschine und Mühle nichts verstellen. Die Auswahl gilt für dieses Gerät.'),
+      h('p', { class: 'muted small' }, 'Breite in Spalten, Höhe in Zellen (wie Android-Widgets); Kacheln einer Zeile sind gleich hoch. Bedienen lässt sich nur die Kachel „Schalter“. Die Auswahl gilt für dieses Gerät.'),
       list,
       h('div', { class: 'section-title' }, 'Dieses Gerät'),
       h('div', { class: 'list' },
@@ -173,14 +209,17 @@ export function dashboardView(root) {
   });
   // Uhrzeit-Angaben („vor 3 min“) und das Ausblenden des fertigen Bezugs auch ohne neue Daten
   const tick = setInterval(update, 5000);
+  const unPrefs = onPrefs((k) => { if (k === 'hiddenComponents') build(); else update(); });
 
   build();
+  sizes.observe(grid);
   loadShots();
   if (layout.keepAwake) setAwake(true);
   return () => {
     disposed = true;
     sizes.disconnect();
     un();
+    unPrefs();
     clearInterval(tick);
     document.removeEventListener('visibilitychange', onVisible);
     setAwake(false);
@@ -188,13 +227,23 @@ export function dashboardView(root) {
 }
 
 function loadLayoutDefaults(keepAwake) {
-  return { tiles: Object.keys(TILES).map((id) => ({ id, on: true, wide: TILES[id].wide })), keepAwake };
+  return { tiles: Object.keys(TILES).map((id) => ({ id, on: true, w: TILES[id].w, h: TILES[id].h })), keepAwake };
+}
+
+function sizeSelect(options, value, label, onChange) {
+  const el = h('select', { class: 'text small-select', 'aria-label': label, title: label },
+    options.map(([v, t]) => h('option', { value: v, selected: v === value }, t)));
+  el.addEventListener('change', () => onChange(Number(el.value)));
+  return el;
 }
 
 // --- Kacheln -----------------------------------------------------------------------
-// Jede Kachel: build({wide}) → { body, update(ctx) → {hidden?, extra?} }; ctx = { m: Maschine, g: Mühle|null, shots }
+// Jede Kachel: build({wide, h}) → { body, update(ctx) → {hidden?, extra?} }; ctx = { m: Maschine, g: Mühle|null, shots }
 
-function shotTile({ wide }) {
+// Zusätzliche Höhe für Diagramme in höheren Kacheln (eine Zelle ≈ 150 px)
+const extraH = (h) => (Math.max(1, h || 1) - 1) * 150;
+
+function shotTile({ wide, h: rows }) {
   const chart = h('div', { class: 'chart-box' });
   const side = h('div', { class: 'live-side' });
   const body = h('div', { class: 'live-shot-grid' }, chart, side);
@@ -208,7 +257,7 @@ function shotTile({ wide }) {
       if (!running && !recent) return { hidden: true };
       const curve = running ? m.shot.curve : ls.curve;
       const secs = running ? (m.shot.timeMs || 0) / 1000 : (ls.timeMs || 0) / 1000;
-      chart.replaceChildren(shotChart(curve, { live: running, width: wide ? 560 : 320, height: wide ? 220 : 160 }));
+      chart.replaceChildren(shotChart(curve, { live: running, width: wide ? 560 : 320, height: Math.max(140, (wide ? 220 : 160) + extraH(rows) - 150) }));
       const p = running ? m.pressure.pump : ls.maxPressure;
       const w = running ? m.scale.weight : ls.weight;
       const flow = running ? (m.scale.rate || m.flow.rate) : null;
@@ -219,6 +268,74 @@ function shotTile({ wide }) {
           kpi('Gewicht', w ? fmt(w) : running ? fmt(0) : '–', 'g', 'w'),
           running ? kpi('Fluss', fmt(flow), 'g/s') : kpi('Menge', ls.volumeMl ? fmt(ls.volumeMl, 0) : '–', 'ml')));
       return { extra: running ? h('span', { class: 'badge ok pulse' }, 'Bezug läuft') : h('span', { class: 'badge' }, 'Fertig') };
+    },
+  };
+}
+
+// Schalter: Ein/Eco/Aus als Segmente, Dampfkessel und „Ohne Dampf einschalten“ (gilt geräteweit, wie auf der Startseite)
+function controlTile() {
+  let busy = false;
+  const seg = (mode, label, ic) => h('button', { class: 'seg-btn', type: 'button', dataset: { mode }, onclick: (e) => { e.stopPropagation(); setMode(mode); } }, icon(ic, 's18'), label);
+  const btnOn = seg('on', 'Ein', 'power');
+  const btnEco = seg('eco', 'Eco', 'eco');
+  const btnOff = seg('off', 'Aus', 'close');
+  const steamSw = switchEl({ label: 'Dampfkessel', onChange: (on, input) => setSteam(on, input) });
+  const steamState = h('span', { class: 'muted small' });
+  const noSteamSw = switchEl({ checked: noSteamOn(), label: 'Ohne Dampf einschalten', onChange: (on) => setNoSteamOn(on) });
+  const body = h('div', { class: 'dash-control' },
+    h('div', { class: 'seg' }, btnOn, btnEco, btnOff),
+    h('div', { class: 'ctl-row' }, icon('cloud', 's20'), h('span', { class: 'grow' }, 'Dampfkessel ', steamState), steamSw),
+    h('div', { class: 'ctl-row' }, icon('power', 's20'), h('span', { class: 'grow' }, 'Ohne Dampf einschalten'), noSteamSw));
+
+  async function run(fn, msg) {
+    if (busy) return;
+    busy = true;
+    try {
+      await fn();
+      snackbar(msg);
+    } catch (e) {
+      snackbar(e.message);
+    } finally {
+      busy = false;
+    }
+  }
+  function setMode(mode) {
+    const m = store.machine;
+    if (!m?.online) return snackbar('Maschine nicht erreichbar');
+    if (mode === 'on') {
+      const b = powerOnBody();
+      return run(() => api('/api/machine/power', { method: 'POST', body: b }), b.steam === false ? 'Xenia wird ohne Dampf eingeschaltet' : 'Xenia wird eingeschaltet');
+    }
+    if (mode === 'eco') return run(() => api('/api/machine/power', { method: 'POST', body: { mode: 'eco' } }), 'Eco-Modus an');
+    return run(() => api('/api/machine/power', { method: 'POST', body: { mode: 'off' } }), 'Xenia ausgeschaltet');
+  }
+  function setSteam(on, input) {
+    run(async () => {
+      try { await api('/api/machine/steam', { method: 'POST', body: { on } }); } catch (e) { input.checked = !on; throw e; }
+    }, on ? 'Dampfkessel an' : 'Dampfkessel aus');
+  }
+  // Schalter selbst lösen keine Navigation aus
+  body.addEventListener('click', (e) => e.stopPropagation());
+  return {
+    body,
+    update({ m }) {
+      const online = Boolean(m?.online);
+      const key = m?.statusKey;
+      const on = ['on', 'brewing', 'draining', 'paddle'].includes(key);
+      const eco = key === 'eco';
+      const off = key === 'off';
+      const brewing = key === 'brewing';
+      for (const [b, active] of [[btnOn, on], [btnEco, eco], [btnOff, off]]) {
+        b.setAttribute('aria-pressed', String(Boolean(online && active)));
+        b.disabled = !online || brewing || (active && online);
+      }
+      btnEco.disabled ||= off;
+      const sIn = steamSw.querySelector('input');
+      sIn.checked = Boolean(m?.steamOn);
+      sIn.disabled = !online || !(on || eco) || !machineOn(m);
+      steamState.textContent = !online ? '' : m.steamOn ? (m.steamReady ? `bereit · ${fmt(m.pressure.steam, 1)} bar` : `heizt · ${fmt(m.pressure.steam, 1)} bar`) : 'aus';
+      noSteamSw.querySelector('input').checked = noSteamOn();
+      return { extra: !online ? h('span', { class: 'badge bad' }, 'Offline') : null };
     },
   };
 }
@@ -262,20 +379,22 @@ function statusTile() {
 function gaugesTile() {
   const pressure = createGauge({ title: 'Druck', min: 0, max: 12, majorStep: 2, minorStep: 0.5, redFrom: 11, digits: 1 });
   const temp = createGauge({ title: 'Brühgruppe', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20 });
+  const boiler = createGauge({ title: 'Brühkessel', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20 });
   const steam = createGauge({ title: 'Dampfkessel', min: 0, max: 2.5, majorStep: 0.5, minorStep: 0.1, redFrom: 2, digits: 2, labelEvery: 1 });
   return {
-    body: h('div', { class: 'gauges three' }, pressure, temp, steam),
+    body: h('div', { class: 'gauges four' }, pressure, temp, boiler, steam),
     update({ m }) {
       if (!m) return {};
       pressure.update(m.pressure.pump, 'bar');
       temp.update(m.temp.group, m.temp.groupSet ? `Ziel ${fmt(m.temp.groupSet)} °C` : '°C');
+      boiler.update(m.temp.boiler, m.temp.boilerSet ? `Ziel ${fmt(m.temp.boilerSet)} °C` : '°C');
       steam.update(m.pressure.steam, m.steamOn ? `Ziel ${fmt(m.pressure.steamSet, 1)} bar` : 'aus');
       return {};
     },
   };
 }
 
-function lastShotTile({ wide }) {
+function lastShotTile({ wide, h: rows }) {
   const box = h('div', {});
   return {
     body: box,
@@ -291,7 +410,7 @@ function lastShotTile({ wide }) {
       box.replaceChildren(
         h('div', { class: 'dash-kpis' }, kpi('Zeit', fmt(ls.timeMs / 1000), 's'), kpi('Menge', amount[0], amount[1], 'w'),
           ratio ? kpi('Verhältnis', `1:${fmt(ratio)}`, '') : kpi('Max. Druck', fmt(ls.maxPressure), 'bar', 'pu')),
-        ls.curve?.length > 1 ? shotChart(ls.curve, { width: wide ? 560 : 320, height: wide ? 160 : 130, minSeconds: 20 }) : h('p', { class: 'muted small' }, 'Keine Kurve (Bezug nachträglich erkannt)'));
+        ls.curve?.length > 1 ? shotChart(ls.curve, { width: wide ? 560 : 320, height: (wide ? 160 : 130) + extraH(rows), minSeconds: 20 }) : h('p', { class: 'muted small' }, 'Keine Kurve (Bezug nachträglich erkannt)'));
       return { extra: `${ls.notes?.rating ? `${'★'.repeat(ls.notes.rating)} · ` : ''}${ago(ls.endedAt)}${ls.estimated ? ' · nachträglich' : ''}` };
     },
   };
@@ -424,13 +543,13 @@ function grinderTile() {
   };
 }
 
-function liveTile({ wide }) {
+function liveTile({ wide, h: rows }) {
   const box = h('div', {});
   const legend = h('div', { class: 'legend muted small' }, SERIES.map((s) => [h('span', { class: `sw ${s.cls}` }), s.label]));
   return {
     body: [box, legend],
     update() {
-      box.replaceChildren(liveChart(liveHistory, SERIES, { width: wide ? 640 : 320, height: wide ? 200 : 150, spanMs: 10 * 60e3 }));
+      box.replaceChildren(liveChart(liveHistory, SERIES, { width: wide ? 640 : 320, height: (wide ? 200 : 150) + extraH(rows), spanMs: 10 * 60e3 }));
       return {};
     },
   };

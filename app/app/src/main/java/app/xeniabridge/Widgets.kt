@@ -187,6 +187,7 @@ object Widgets {
                     rv.setTextViewText(R.id.k_group, if (live && s.groupSet != null) "Gruppe · Ziel ${fmt(s.groupSet)}" else "Brühgruppe")
                     rv.setTextViewText(R.id.v_boiler, if (live) "${fmt(s.boiler)} °C" else "–")
                     rv.setTextViewText(R.id.v_steam, if (live && s.steamOn) "${fmt(s.steam)} bar" else "aus")
+                    rv.setTextViewText(R.id.k_boiler, if (live && s.boilerSet != null) "Kessel · Ziel ${fmt(s.boilerSet)}" else "Brühkessel")
                     val next = s.nextAt?.let { "Nächstes Einschalten: ${dateTime(it)}${s.nextReason?.let { r -> " · $r" } ?: ""}" } ?: "Kein Einschalten geplant"
                     rv.setTextViewText(R.id.next, if (!s.tankOk) "Tank leer! · $next" else if (!s.online) "Maschine nicht erreichbar · $next" else next)
                 }
@@ -216,7 +217,10 @@ object Widgets {
             rv.setOnClickPendingIntent(id, if (enabled && !active) broadcast(context, StatusWidget::class.java, ACTION_POWER, mode, req) else null)
         }
         val busy = v is View.Busy
-        button(R.id.btn_on, on, reachable && !busy, "on", 10)
+        // „Ein“ leuchtet mit Dampfkessel, „o. Dampf“ ohne; aus jedem Zustand lässt sich in den anderen wechseln
+        val steamOn = (v as? View.Ok)?.s?.steamOn == true
+        button(R.id.btn_on, on && steamOn, reachable && !busy, "on", 10)
+        button(R.id.btn_on_ns, on && !steamOn, reachable && !busy, Api.MODE_ON_NO_STEAM, 15)
         button(R.id.btn_eco, eco, reachable && !busy && !off, "eco", 11)
         button(R.id.btn_off, off, reachable && !busy && !off, "off", 12)
         rv.setOnClickPendingIntent(R.id.refresh, broadcast(context, StatusWidget::class.java, ACTION_REFRESH, null, 13))

@@ -46,6 +46,8 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | GET | `/api/state` | – | `{machine, grinder, server}` (siehe unten) |
 | GET | `/api/stream` | – | **Server-Sent Events**: `snapshot`, `machine`, `grinder`, `event`, `server` (Funktionen geändert); höchstens 50 gleichzeitig |
 | GET | `/api/shots` | – | Bezugs-Protokoll (bis 500 Einträge, Druckkurven für die neuesten 20), `total`, `beans:[{name,roaster}]` |
+| GET | `/api/shots/settings` | – | `{"minShotS":15,"limits":{"min":0,"max":60},"defaultMinShotS":15}`: Mindestdauer eines Bezugs |
+| PUT | `/api/shots/settings` | `{"minShotS":0..60}` | Mindestdauer setzen. Kürzere Pumpvorgänge (Backflush, Spülen, Fehler) werden nicht protokolliert; ältere kürzere Einträge werden nicht mehr gelistet (bewertete/notierte bleiben sichtbar, gelöscht wird nichts) |
 | GET | `/api/shots/:id` | – | ein Bezug mit Kurve, `compare` (bis 5 frühere: gleiches Skript, gleiche Bohne, sonst die letzten), `reference` (Referenz-Bezug), `beans:[{name,roaster}]`, `advice` (Einstell-Assistent), `lastGrind` (µm vom Mahlvorgang oder zuletzt notiert) |
 | GET / POST / PUT | `/api/beans` | `{"name","roaster"?,"rename"?}` | Bohnenliste. POST legt an, PUT ändert (`rename` = alter Name, zieht Bewertungen mit). DELETE `/api/beans/:name` nimmt nur aus der Liste, Bezüge behalten den Namen. |
 | PUT | `/api/shots/:id/notes` | `{"rating":1..5,"taste":"sour"|"balanced"|"bitter","strength":"weak"|"ok"|"strong","bean","grind","yieldG","doseG","text","reference":bool}` | Bewertung und Notizen (alle Felder optional, `null` löscht). Antwort `{shot, advice}`: `advice` = `{dir:"finer"|"coarser"|"keep"|"longer"|"shorter"|"puck", size:0..2, title, text, anchor, trail}` aus Geschmack, Stärke, Zeit und den bewerteten Bezügen derselben Bohne (14 Tage) |
@@ -56,9 +58,9 @@ Die App spricht **nur** mit dieser API, nie direkt mit Maschine oder Mühle. All
 | POST | `/api/maintenance/backflush` | – | Backflush als erledigt eintragen |
 | POST | `/api/maintenance/backflush/run` | – | Backflush mit Blindsieb über die direkte Pumpensteuerung starten (10 Runden: Druck aufbauen, halten, entlasten); trägt ihn danach als erledigt ein. 409, wenn die Maschine nicht bereit ist oder er schon läuft |
 | POST | `/api/maintenance/backflush/stop` | – | laufenden Backflush abbrechen (Pumpe aus, entlasten) |
-| GET | `/api/shots.csv` | – | gesamtes Protokoll als CSV (Excel, Semikolon) |
+| GET | `/api/shots.csv` | – | Protokoll als CSV (Excel, Semikolon), ohne Bezüge unter der Mindestdauer |
 | GET | `/api/widget` | – | kompakter Zustand für Widgets/Kachel: `{online,status,label,heated,steamOn,steamReady,tankOk,group,groupSet,boiler,boilerSet,steam,steamSet,shot,next:{at,reason}|null,machine:{ip,api}|null}`; `machine` nur bei privater IPv4 (Notbetrieb der App) |
-| POST | `/api/machine/power` | `{"mode":"on"\|"off"\|"eco","steam":bool?}` | `{"ok":true}` |
+| POST | `/api/machine/power` | `{"mode":"on"\|"off"\|"eco","steam":bool?}` | `{"ok":true}`. `{"mode":"on","steam":false}` schaltet ohne Dampfkessel ein (alte Xenia: Aktion 5, neue: `control 1` + `toggle/sb 0`) |
 | POST | `/api/machine/steam` | `{"on":bool}` | `{"ok":true}` |
 | POST | `/api/machine/temperature` | `{"group":93.5,"boiler":93.5?}` | `{"ok":true}` |
 | GET | `/api/machine/settings` | – | Rohwerte `/api/v2/general` |

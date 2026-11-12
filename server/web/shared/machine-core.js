@@ -82,7 +82,9 @@ export const SCRIPT_OPS = {
 export const BUILTIN_SCRIPTS = { 0: 'Keine', 2: 'Dauerbezug', 7: 'Einfache Dosis', 8: 'Doppelte Dosis' };
 
 // Kürzere Pumpvorgänge sind kein Bezug (Spülen, Rückspülen von Hand) und kommen nicht ins Protokoll.
+// Standardwert; einstellbar unter Bezüge → Filter (history.data.settings.minShotS, 0–60 s).
 export const MIN_SHOT_MS = 15000;
+export const MIN_SHOT_LIMITS = { min: 0, max: 60 };
 
 // Rückspülen mit Blindsieb über die direkte Pumpensteuerung (Paddle). Skripte bricht die Xenia mit Blindsieb sofort ab
 // (Status 4, Pumpe aus). Paddle-Pumpe läuft nur, solange laufend Befehle kommen; an der Maschine gemessen (01.11.2026):
@@ -286,7 +288,7 @@ export class Machine extends Emitter {
     this._lastDiag = null;
     this._shotClock = null;   // Fallback, wenn die Firmware keine EXTRACTION_TIME_MS liefert (alte Xenia)
     this._repairHistory();
-    this.state.lastShot = this.history.data.shots?.[0] || null;
+    this.state.lastShot = this.listedShots()[0] || null;
   }
 
   get apiId() {
@@ -515,8 +517,9 @@ export class Machine extends Emitter {
       ...(s.shot.script ? { script: s.shot.script } : {}),
     };
     s.shot = { running: false, timeMs: 0, startedAt: null, curve: [] };
-    s.lastShot = shot;
-    if (timeMs >= MIN_SHOT_MS) {
+    // Zu kurze Pumpvorgänge (Spülen, Backflush, Fehlbezug) erscheinen weder im Protokoll noch als „letzter Bezug“
+    if (timeMs >= this.minShotMs) {
+      s.lastShot = shot;
       shot.no = (s.counters?.extractions ?? null) !== null ? s.counters.extractions + this._liveStarts.length : null;
       this._log(shot);
       const parts = [`${fmt(timeMs / 1000)} s`];
@@ -610,7 +613,8 @@ export class Machine extends Emitter {
         no: count - i,
         estimated: true, // nicht live erfasst: Zeitpunkt = Zeitpunkt der Zählerprüfung
       };
-      if (i === 0) this.state.lastShot = shot;
+      // Zu kurze (Spülen/Backflush) bleiben im Speicher, werden aber nicht gelistet (listedShots)
+      if (i === 0 && !(timeMs && timeMs < this.minShotMs)) this.state.lastShot = shot;
       this._log(shot);
     }
     this.history.save();
@@ -637,7 +641,7 @@ export class Machine extends Emitter {
     // Zu kurze Einträge aus älteren Versionen (Spülen, Rückspülen), solange niemand etwas dazu notiert hat
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i];
-      if (s.timeMs && s.timeMs < MIN_SHOT_MS && !s.notes && !s.dose) {
+      if (s.timeMs && s.timeMs < Math.min(MIN_SHOT_MS, this.minShotMs) && !s.notes && !s.dose) {
         list.splice(i, 1);
         removed++;
       }
@@ -716,8 +720,35 @@ export class Machine extends Emitter {
   }
 
   // Protokoll-Einträge; Druckkurven nur für die ersten `curves` (Datenmenge)
+  // Mindestdauer eines Bezugs (ms). Kürzere werden nicht protokolliert und ältere nicht mehr gelistet.
+  get minShotMs() {
+    const v = Number(this.history.data.settings?.minShotS);
+    return Number.isFinite(v) && v >= MIN_SHOT_LIMITS.min && v <= MIN_SHOT_LIMITS.max ? Math.round(v * 1000) : MIN_SHOT_MS;
+  }
+
+  shotSettings() {
+    return { minShotS: this.minShotMs / 1000, limits: MIN_SHOT_LIMITS, defaultMinShotS: MIN_SHOT_MS / 1000 };
+  }
+
+  setShotSettings({ minShotS }) {
+    const v = Number(minShotS);
+    if (!Number.isFinite(v) || v < MIN_SHOT_LIMITS.min || v > MIN_SHOT_LIMITS.max) throw httpError(400, `Mindestdauer muss zwischen ${MIN_SHOT_LIMITS.min} und ${MIN_SHOT_LIMITS.max} s liegen`);
+    this.history.data.settings = { ...(this.history.data.settings || {}), minShotS: Math.round(v) };
+    this.history.save();
+    const last = this.listedShots()[0] || null;
+    if (!this.state.shot.running) this.state.lastShot = last;
+    this.emit('state');
+    return this.shotSettings();
+  }
+
+  // Bezüge, die gelistet werden: ohne zu kurze (bewertete/notierte bleiben immer sichtbar)
+  listedShots() {
+    const min = this.minShotMs;
+    return this.history.data.shots.filter((s) => !(s.timeMs && s.timeMs < min && !s.notes && !s.dose));
+  }
+
   shots(limit = 30, { curves = limit } = {}) {
-    return this.history.data.shots.slice(0, limit).map((s, i) => (i < curves ? s : { ...s, curve: undefined }));
+    return this.listedShots().slice(0, limit).map((s, i) => (i < curves ? s : { ...s, curve: undefined }));
   }
 
   shotsCsv() {
@@ -725,7 +756,7 @@ export class Machine extends Emitter {
     const text = (v) => (v ? `"${String(v).replace(/"/g, '""').replace(/[\r\n]+/g, ' ')}"` : '');
     const rows = [['Nr', 'Ende', 'Dauer (s)', 'Gewicht (g)', 'Menge (ml)', 'Max. Druck (bar)', 'Brühgruppe (°C)', 'Live erfasst',
       'Dosis (g)', 'Verhältnis 1:', 'Rezept Mühle', 'Skript', 'Bohne', 'Mahlgrad', 'Bewertung', 'Geschmack', 'Stärke', 'Notiz']];
-    for (const s of this.history.data.shots) {
+    for (const s of this.listedShots()) {
       const n = s.notes || {};
       const yieldG = n.yieldG ?? s.weight;
       const ratio = s.dose?.g && yieldG ? Math.round((yieldG / s.dose.g) * 10) / 10 : null;

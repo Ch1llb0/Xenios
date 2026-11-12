@@ -156,11 +156,15 @@ object Api {
         )
     }
 
-    /** mode: "on" | "off" | "eco" */
+    /** mode: "on" | "off" | "eco" | "on_nosteam" (ein, nur Brühkessel – ohne Dampfkessel) */
     fun power(context: Context, mode: String) {
         if (Prefs(context).direct) return DirectMachine.power(context, mode)
-        serverOrDirect(context, { request(context, "POST", "/api/machine/power", JSONObject().put("mode", mode)); Unit }) { DirectMachine.power(context, mode) }
+        val body = if (mode == MODE_ON_NO_STEAM) JSONObject().put("mode", "on").put("steam", false) else JSONObject().put("mode", mode)
+        serverOrDirect(context, { request(context, "POST", "/api/machine/power", body); Unit }) { DirectMachine.power(context, mode) }
     }
+
+    /** Einschalten ohne Dampfkessel (Widget-Knopf „o. Dampf“) */
+    const val MODE_ON_NO_STEAM = "on_nosteam"
 
     /** Server nicht erreichbar (oder Cloudflare meldet ihn als down)? Dann die Maschine direkt im Heimnetz ansprechen. */
     private fun <T> serverOrDirect(context: Context, server: () -> T, direct: () -> T): T = try {

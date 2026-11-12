@@ -452,6 +452,9 @@ Die Dokumentation oben gilt für die **aktuelle** Firmware (Brew-by-Sync, `machi
 | Ein/Aus/Eco | `POST /api/v2/machine/control` + `POST /api/v2/toggle/sb` | dieselben `control`-Aktionen; Dampf über Aktion 3/4/5 |
 | Skriptliste | `GET /api/v2/scriptslist` | `GET /api/v2/scripts/list` |
 | Wochen-Timer, Uhr, Paddle, `/info` | vorhanden | nicht über die API; Eco/Aus-Timer über `POST /api/v2/machine` |
+| Tastenbelegung | vier Taster (oben/unten, links/rechts) | zwei Kippschalter, je nach links und rechts (kurz/lang) |
+
+Tastenbelegung der DBL: Dieselben drei belegbaren Positionen wie oben (`SWITCH_SET_LEFT_LEFT_*`, `SWITCH_SET_RIGHT_LEFT_*`, `SWITCH_SET_RIGHT_RIGHT_*`, `_0` kurz, `_1` lang; so auch in [xenia-home](https://github.com/Knoedelauflauf/xenia-home)). Der linke Schalter nach links ist fest Ein/Aus und hat keinen API-Schlüssel. Xenios zeigt die belegbare Seite des linken Schalters deshalb als „Links ▶“ (`LEFT_LEFT`), den rechten Schalter als „Rechts ◀“ (`RIGHT_LEFT`) und „Rechts ▶“ (`RIGHT_RIGHT`). Diese Zuordnung ist noch an der Maschine zu prüfen.
 
 Maschine ein/aus/Eco und Dampf (alte API, laut [API-Beispiel](https://www.xenia-espresso.de/api-beispiel/)):
 
