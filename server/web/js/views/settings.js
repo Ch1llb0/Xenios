@@ -1,7 +1,9 @@
-// Einstellungen: Maschinenwerte, Benachrichtigungen, Infos, Darstellung, Konto.
+// Einstellungen: eine Liste von oben nach unten, gegliedert wie die Seite der Maschine
+// (Waage, Maschine, Brühgruppe, Brühkessel, Dampfkessel, Pumpe, PID, Timer, Schalter, System, Wi-Fi, Aufzeichnung, Firmware).
+// Maschinenwerte aus allen Abschnitten sammelt eine Speichern-Leiste und sendet sie gemeinsam.
 import { h, icon, fmt, fmtInt, snackbar, switchEl, sliderRow, ago } from '../ui.js';
-import { api, store, isClassic } from '../api.js';
-import { logout, applyTheme, localStorageGet, localStorageSet, inAndroidApp, navigate, navChoices } from '../app.js';
+import { api, store, isClassic, classicPages } from '../api.js';
+import { logout, applyTheme, localStorageGet, localStorageSet, inAndroidApp, navigate, navChoices, THEME_DEFAULTS } from '../app.js';
 import { hiddenTabs, setTabHidden, COMPONENTS, isHidden, setComponentHidden, noSteamOn, setNoSteamOn, onPrefs } from '../prefs.js';
 
 const listButton = (ic, title, sub, onclick) => h('button', { class: 'list-item clickable as-button', onclick },
@@ -9,104 +11,153 @@ const listButton = (ic, title, sub, onclick) => h('button', { class: 'list-item 
   h('span', { class: 'grow' }, h('div', { class: 'title' }, title), sub ? h('div', { class: 'sub' }, sub) : null),
   icon('right', 's20 muted'));
 
+// Abschnitte in der Reihenfolge der Original-Oberfläche
+const SECTIONS = [
+  ['waage', 'Waage', 'scale'], ['maschine', 'Maschine', 'settings'], ['bruehgruppe', 'Brühgruppe', 'thermo'],
+  ['bruehkessel', 'Brühkessel', 'thermo'], ['dampfkessel', 'Dampfkessel', 'cloud'], ['pumpe', 'Pumpe', 'drop'],
+  ['pid', 'PID', 'tune'], ['timer', 'Timer', 'event'], ['schalter', 'Schalter', 'toggle'], ['system', 'System', 'palette'],
+  ['wifi', 'Wi-Fi', 'wifi'], ['aufzeichnung', 'Aufzeichnung', 'record'], ['firmware', 'Firmware', 'info'], ['konto', 'Konto & Server', 'shield'],
+];
+
 export function settingsView(root) {
   const unsubs = [];
   const features = store.server?.features || {};
   const direct = store.server?.mode === 'direct';
-  const machineBox = h('div', {}, h('div', { class: 'empty' }, 'Lade Einstellungen …'));
-  const pushBox = h('div', { class: 'card' });
-  const infoBox = h('div', { class: 'card low' }, h('div', { class: 'muted' }, 'Lade …'));
+  const sec = {};
+  for (const [id, title, ic] of SECTIONS) {
+    sec[id] = h('section', { class: 'set-section', id: `set-${id}` }, h('div', { class: 'section-title' }, icon(ic), title));
+  }
+  const add = (id, ...nodes) => sec[id].append(...nodes.filter(Boolean));
+  const jump = h('nav', { class: 'set-nav', 'aria-label': 'Abschnitte' });
 
-  root.append(
-    h('div', { class: 'section-title' }, 'Maschine'),
-    machineBox,
-    powerPrefCard(),
-    h('div', { class: 'section-title' }, 'Bezüge'),
-    shotFilterCard(),
-    h('div', { class: 'section-title' }, 'Benachrichtigungen'),
-    pushBox,
-    h('div', { class: 'section-title' }, 'Darstellung'),
-    themeCard(),
-    h('div', { class: 'section-title' }, 'Untere Leiste'),
-    navCard(unsubs),
-    h('div', { class: 'section-title' }, 'Komponenten'),
-    componentsCard(),
-    h('div', { class: 'section-title' }, 'Info'),
-    infoBox,
-    h('div', { class: 'section-title' }, 'Konto & Server'),
-    direct ? h('div', { class: 'card low muted small' }, 'Direkt-Modus: Die App spricht Maschine und Mühle ohne Server im Heimnetz an. Eine Anmeldung gibt es dabei nicht. Wechsel des Modus unter „App-Verbindung“.') : null,
-    h('div', { class: 'list' },
-      direct ? null : listButton('shield', 'Server & Sicherheit', 'Geräte-Adressen, Passwort, angemeldete Geräte, Ports, Zertifikat', () => navigate('/server')),
-      inAndroidApp() ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null,
-      listButton('logout', 'Abmelden', null, logout)),
-    h('p', { class: 'muted small', style: { 'text-align': 'center', 'margin-top': '24px' } }, `Xenios ${store.server?.version || ''}`),
-  );
+  // --- Speichern-Leiste für Maschinenwerte ---
+  const changes = {};
+  const saveBtn = h('button', { class: 'btn filled', onclick: save }, icon('check', 's18'), 'Speichern');
+  const savebar = h('div', { class: 'savebar', hidden: true, role: 'region', 'aria-label': 'Ungespeicherte Änderungen' },
+    h('span', { class: 'savebar-text' }, 'Maschinenwerte geändert'),
+    h('button', { class: 'btn text', onclick: () => { for (const k of Object.keys(changes)) delete changes[k]; savebar.hidden = true; loadMachine(); } }, 'Verwerfen'),
+    saveBtn);
+  const set = (k) => (v) => { changes[k] = v; savebar.hidden = false; };
+  async function save() {
+    saveBtn.disabled = true;
+    try {
+      await api('/api/machine/settings', { method: 'POST', body: { changes } });
+      for (const k of Object.keys(changes)) delete changes[k];
+      savebar.hidden = true;
+      snackbar('Einstellungen gespeichert');
+    } catch (e) {
+      snackbar(e.message);
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
 
-  // --- Maschinenwerte -------------------------------------------------------
-  (async () => {
+  root.append(jump, ...SECTIONS.map(([id]) => sec[id]),
+    h('p', { class: 'muted small', style: { 'text-align': 'center', 'margin-top': '24px' } }, `Xenios ${store.server?.version || ''}`), savebar);
+
+  // --- Maschinenwerte (Brühgruppe, Brühkessel, Dampfkessel, Pumpe, Maschine) ---
+  const slots = {
+    maschine: h('div'), bruehgruppe: h('div'), bruehkessel: h('div'), dampfkessel: h('div'), pumpe: h('div'),
+  };
+  for (const [k, el] of Object.entries(slots)) add(k, el);
+  add('maschine', powerPrefCard());
+  slots.maschine.append(h('div', { class: 'empty' }, 'Lade Einstellungen …'));
+
+  async function loadMachine() {
     try {
       const { settings: s } = await api('/api/machine/settings');
-      const changes = {};
-      const set = (k) => (v) => { changes[k] = v; save.disabled = false; };
-      const save = h('button', { class: 'btn filled wide', disabled: true, onclick: async () => {
-        save.disabled = true;
-        try {
-          await api('/api/machine/settings', { method: 'POST', body: { changes } });
-          for (const k of Object.keys(changes)) delete changes[k];
-          snackbar('Einstellungen gespeichert');
-        } catch (e) {
-          snackbar(e.message);
-          save.disabled = false;
-        }
-      } }, 'Einstellungen speichern');
-      const sel = (label, key, options) => {
+      const classic = isClassic();
+      const pages = classic && (s._pages || classicPages());
+      const full = !classic || pages; // Eco, Hysterese, Timer usw. verfügbar
+      const has = (k) => s[k] !== undefined && s[k] !== null;
+      const slider = (label, key, min, max, step, unit, digits = 1) => (has(key) || !classic
+        ? sliderRow({ label, min, max, step, value: s[key] ?? min, unit, digits, onInput: set(key) }) : null);
+      const sel = (label, key, options, onChange) => {
+        if (classic && !has(key)) return null;
         const select = h('select', { class: 'text' }, options.map(([v, t]) => h('option', { value: v, selected: Number(s[key]) === v }, t)));
-        select.addEventListener('change', () => {
-          set(key)(Number(select.value));
-          if (key === 'MA_FAST_HEATUP_TYPE') flushRow.hidden = Number(select.value) !== 1;
-        });
+        select.addEventListener('change', () => { set(key)(Number(select.value)); onChange?.(Number(select.value)); });
         return h('label', { class: 'field', style: { 'margin-top': '8px' } }, h('span', {}, label), select);
       };
-      const flushRow = sliderRow({ label: 'Dauer der Aufheiz-Spülung', min: 1, max: 20, step: 1, value: Math.max(1, s.MA_HEATUP_FLUSH_DURATION || 1), unit: 's', digits: 0, onInput: set('MA_HEATUP_FLUSH_DURATION') });
-      flushRow.hidden = Number(s.MA_FAST_HEATUP_TYPE) !== 1;
-      const disabled = !features.settings;
-      const classic = isClassic();
-      machineBox.replaceChildren(
-        h('div', { class: 'card' },
-          h('h3', {}, 'Brühgruppe & Brühkessel'),
-          sliderRow({ label: 'Brühgruppe', min: 60, max: 96, step: 0.1, value: s.BG_SET_TEMP, unit: '°C', onInput: set('BG_SET_TEMP') }),
-          sliderRow({ label: 'Brühkessel', min: 60, max: 96, step: 0.1, value: s.BB_SET_TEMP, unit: '°C', onInput: set('BB_SET_TEMP') }),
-          classic ? null : h('details', { class: 'adv' }, h('summary', {}, 'Eco & Hysterese', icon('more', 's20')),
-            sliderRow({ label: 'Brühgruppe Eco', min: 40, max: 95, step: 0.1, value: s.BG_SET_ECO_TEMP, unit: '°C', onInput: set('BG_SET_ECO_TEMP') }),
-            sliderRow({ label: 'Brühkessel Eco', min: 40, max: 95, step: 0.1, value: s.BB_SET_ECO_TEMP, unit: '°C', onInput: set('BB_SET_ECO_TEMP') }),
-            sliderRow({ label: 'Hysterese Brühgruppe', min: 2, max: 5, step: 0.1, value: s.BG_SET_TEMP_HYST, unit: 'K', onInput: set('BG_SET_TEMP_HYST') }),
-            sliderRow({ label: 'Hysterese Brühkessel', min: 2, max: 5, step: 0.1, value: s.BB_SET_TEMP_HYST, unit: 'K', onInput: set('BB_SET_TEMP_HYST') }))),
-        h('div', { class: 'card' },
-          h('h3', {}, 'Dampfkessel'),
-          sliderRow({ label: 'Dampfdruck', min: 0, max: 1.8, step: 0.1, value: s.SB_SET_PRESS, unit: 'bar', onInput: set('SB_SET_PRESS') }),
-          classic ? null : h('details', { class: 'adv' }, h('summary', {}, 'Eco & Hysterese', icon('more', 's20')),
-            sliderRow({ label: 'Dampfdruck Eco', min: 0, max: 1, step: 0.1, value: s.SB_SET_ECO_PRESS, unit: 'bar', onInput: set('SB_SET_ECO_PRESS') }),
-            sliderRow({ label: 'Hysterese', min: 0.1, max: 0.3, step: 0.1, value: s.SB_SET_PRESS_HYST, unit: 'bar', onInput: set('SB_SET_PRESS_HYST') }))),
-        classic ? null : h('div', { class: 'card' },
-          h('h3', {}, 'Allgemein'),
-          sliderRow({ label: 'Max. Bezugszeit', min: 30, max: 120, step: 1, value: s.PU_SET_MAX_TIMER, unit: 's', digits: 0, onInput: set('PU_SET_MAX_TIMER') }),
-          sel('Beim Einschalten', 'MA_BOILER_START_MODE', [[1, 'Brühkessel AN & Dampfkessel AN'], [2, 'Brühkessel AN & Dampfkessel AUS']]),
-          sel('Aufheiz-Spülung', 'MA_FAST_HEATUP_TYPE', [[0, 'Keine Spülung'], [1, 'Automatische Spülung']]),
-          flushRow,
-          sel('Bezugszeit startet bei', 'MA_START_EXTRACTIONCOUNTER_EVENT', [[0, 'Pumpenstart'], [1, '1 bar Druck'], [2, 'Erster Tropfen in der Tasse']])),
-        classic ? h('p', { class: 'muted small' }, 'Auf der alten Xenia lassen sich Temperatur und Dampfdruck über die API setzen. Weitere Werte stehen in der Original-Oberfläche.') : null,
-        disabled ? h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.') : save,
-      );
-      if (disabled) machineBox.querySelectorAll('input,select').forEach((el) => { el.disabled = true; });
-    } catch (e) {
-      machineBox.replaceChildren(h('div', { class: 'empty' }, e.message));
-    }
-  })();
+      const card = (...nodes) => (nodes.some(Boolean) ? h('div', { class: 'card' }, ...nodes) : null);
 
-  // --- Push ------------------------------------------------------------------------
+      // Maschine
+      let flushRow = null;
+      if (!classic) {
+        flushRow = sliderRow({ label: 'Dauer der Aufheiz-Spülung', min: 1, max: 20, step: 1, value: Math.max(1, s.MA_HEATUP_FLUSH_DURATION || 1), unit: 's', digits: 0, onInput: set('MA_HEATUP_FLUSH_DURATION') });
+        flushRow.hidden = Number(s.MA_FAST_HEATUP_TYPE) !== 1;
+      }
+      slots.maschine.replaceChildren(...[
+        card(
+          sel('Beim Einschalten', 'MA_BOILER_START_MODE', [[1, 'Brühkessel AN & Dampfkessel AN'], [2, 'Brühkessel AN & Dampfkessel AUS']]),
+          classic ? null : sel('Aufheiz-Spülung', 'MA_FAST_HEATUP_TYPE', [[0, 'Keine Spülung'], [1, 'Automatische Spülung']], (v) => { flushRow.hidden = v !== 1; }),
+          flushRow,
+          pages ? slider('Aufheizphase: automatischer Leerbezug', 'MA_HEATUP_FLUSH_DURATION', 0, 20, 1, 's', 0) : null,
+          pages ? sel('Wasserversorgung', 'MA_FIX_WATER_SUPPLY', [[0, 'Tank'], [1, 'Festwasseranschluss']]) : null,
+          pages ? sel('Thermische Stabilität', 'MA_EXTENDED_THERMAL_STABILITY', [[0, 'normal'], [1, 'optimiert']]) : null,
+          pages ? slider('Eco-Modus nach', 'MA_SET_TIMER_ECO_MA', 1, 240, 1, 'min', 0) : null,
+          pages ? slider('Ausschalten nach', 'MA_SET_TIMER_POWERDOWN', 1, 240, 1, 'min', 0) : null),
+        classic && !pages ? h('p', { class: 'muted small' }, 'Diese Firmware erlaubt über die API nur Temperatur und Dampfdruck. Weitere Werte stehen in der Original-Oberfläche.') : null,
+      ].filter(Boolean));
+
+      // Brühgruppe / Brühkessel / Dampfkessel
+      slots.bruehgruppe.replaceChildren(card(
+        slider('Temperatur', 'BG_SET_TEMP', 60, 96, 0.1, '°C'),
+        full ? slider('Eco-Temperatur', 'BG_SET_ECO_TEMP', 40, 95, 0.1, '°C') : null,
+        full ? slider('Hysterese', 'BG_SET_TEMP_HYST', 2, 5, 0.1, 'K') : null));
+      slots.bruehkessel.replaceChildren(card(
+        slider('Temperatur', 'BB_SET_TEMP', 60, 96, 0.1, '°C'),
+        full ? slider('Eco-Temperatur', 'BB_SET_ECO_TEMP', 40, 95, 0.1, '°C') : null,
+        full ? slider('Hysterese', 'BB_SET_TEMP_HYST', 2, 5, 0.1, 'K') : null));
+      slots.dampfkessel.replaceChildren(card(
+        slider('Druck', 'SB_SET_PRESS', 0, 1.8, 0.1, 'bar'),
+        full ? slider('Eco-Druck', 'SB_SET_ECO_PRESS', 0, 1, 0.1, 'bar') : null,
+        full ? slider('Hysterese', 'SB_SET_PRESS_HYST', 0.1, 0.3, 0.1, 'bar') : null));
+
+      // Pumpe
+      slots.pumpe.replaceChildren(...[card(
+        pages ? slider('Bezugszeit Espresso (Standardbezug)', 'PU_SET_BREW_TIMER_1', 15, 60, 1, 's', 0) : null,
+        pages ? h('p', { class: 'muted small' }, 'Wie lange die Pumpe beim Skript „Espresso“ läuft (z. B. auf einem Schalter).') : null,
+        full ? slider('Max. Bezugszeit', 'PU_SET_MAX_TIMER', 30, 120, 1, 's', 0) : null,
+        classic ? null : sel('Bezugszeit startet bei', 'MA_START_EXTRACTIONCOUNTER_EVENT', [[0, 'Pumpenstart'], [1, '1 bar Druck'], [2, 'Erster Tropfen in der Tasse']])),
+      !full ? h('p', { class: 'muted small' }, 'Pumpenwerte sind bei dieser Firmware nur in der Original-Oberfläche einstellbar.') : null].filter(Boolean));
+
+      if (!features.settings) {
+        for (const el of Object.values(slots)) el.querySelectorAll('input,select').forEach((x) => { x.disabled = true; });
+        slots.maschine.append(h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.'));
+      }
+    } catch (e) {
+      slots.maschine.replaceChildren(h('div', { class: 'empty' }, e.message));
+    }
+  }
+  loadMachine();
+
+  // --- Waage ---
+  if (!isHidden('scale')) add('waage', scaleCard(features));
+  else sec.waage.remove();
+
+  // --- PID (nur lesen) ---
+  add('pid', h('div', { class: 'card low' }, serviceDetails()));
+
+  // --- Timer / Schalter: eigene Tabs ---
+  add('timer', h('div', { class: 'list' }, listButton('event', 'Wochen-Timer & Eco', 'Ein- und Ausschaltzeiten', () => navigate('/timer'))));
+  add('schalter', h('div', { class: 'list' },
+    listButton('toggle', 'Tastenbelegung', 'Was die Schalter an der Maschine starten', () => navigate('/steuerung')),
+    listButton('speed', 'Paddle', 'Pumpe direkt steuern', () => navigate('/paddle'))));
+
+  // --- System: Darstellung, Leiste, Komponenten, Benachrichtigungen ---
+  const pushBox = h('div', { class: 'card' });
+  add('system',
+    h('h3', { class: 'sub-title' }, 'Darstellung'), themeCard(),
+    h('h3', { class: 'sub-title' }, 'Untere Leiste'), navCard(unsubs),
+    h('h3', { class: 'sub-title' }, 'Komponenten'), componentsCard(),
+    h('h3', { class: 'sub-title' }, 'Benachrichtigungen'), pushBox);
   paintPush(pushBox);
 
-  // --- Info ---------------------------------------------------------------------------
+  // --- Wi-Fi / Firmware: aus /api/machine/details ---
+  const wifiBox = h('div', { class: 'card low' }, h('div', { class: 'muted' }, 'Lade …'));
+  const fwBox = h('div', { class: 'card low' }, h('div', { class: 'muted' }, 'Lade …'));
+  add('wifi', wifiBox);
+  add('firmware', fwBox);
   (async () => {
     try {
       const d = await api('/api/machine/details');
@@ -116,30 +167,82 @@ export function settingsView(root) {
       const st = store.machine || {};
       const sig = Number(n.WIFI_SIGNAL_STRENGTH);
       const sigTxt = Number.isFinite(sig) ? `${sig} dBm (${sig > -55 ? 'sehr gut' : sig > -67 ? 'gut' : sig > -75 ? 'schwach' : 'sehr schwach'})` : '–';
-      infoBox.replaceChildren(h('dl', { class: 'kv' },
+      wifiBox.replaceChildren(n.error && !n.WIFI_NAME
+        ? h('div', { class: 'muted small' }, 'Diese Firmware gibt die WLAN-Daten nicht über die API heraus.')
+        : h('dl', { class: 'kv' },
+          h('dt', {}, 'Signal'), h('dd', {}, sigTxt),
+          h('dt', {}, 'WLAN-Name'), h('dd', {}, n.WIFI_NAME || '–'),
+          h('dt', {}, 'IP-Adresse'), h('dd', {}, n.WIFI_AP_IP || '–'),
+          h('dt', {}, 'Verschlüsselung'), h('dd', {}, n.WIFI_ENCRYPTION || '–'),
+          h('dt', {}, 'Eigener Access Point'), h('dd', {}, n.WIFI_SOFT_AP || '–'),
+          h('dt', {}, 'Letzter Kontakt'), h('dd', {}, ago(st.lastSeen))));
+      fwBox.replaceChildren(h('dl', { class: 'kv' },
         h('dt', {}, 'Modell'), h('dd', {}, st.info?.typeName || `Typ ${m.MA_TYPE}`),
         h('dt', {}, 'Firmware (Steuerung / WLAN)'), h('dd', {}, `${m.FW_VERSION_MAJOR}.${m.FW_VERSION_MINOR} / ${m.ESP_FW_MAJOR}.${m.ESP_FW_MINOR}`),
+        h('dt', {}, 'Schnittstelle'), h('dd', {}, isClassic() ? (classicPages() ? 'alte API mit Seiten-API' : 'alte API') : 'Brew-by-Sync'),
         h('dt', {}, 'Seriennummer'), h('dd', {}, m.MA_SN || '–'),
         h('dt', {}, 'Bezüge gesamt'), h('dd', {}, fmtInt(m.MA_EXTRACTIONS)),
         h('dt', {}, 'Betriebsstunden'), h('dd', {}, fmtInt(m.MA_OPERATING_HOURS)),
         h('dt', {}, 'Energie gesamt'), h('dd', {}, `${fmt(m.MA_ENERGY_TOTAL_KWH, 2)} kWh`),
         h('dt', {}, 'Max. Strom'), h('dd', {}, `${fmtInt(m.MA_MAX_AMPERE)} A`),
-        h('dt', {}, 'WLAN'), h('dd', {}, sigTxt),
-        h('dt', {}, 'Erweiterte thermische Stabilität'), h('dd', {}, m.MA_EXTENDED_THERMAL_STABILITY === undefined ? '–' : Number(m.MA_EXTENDED_THERMAL_STABILITY) ? 'an' : 'aus'),
-        h('dt', {}, 'Festwasseranschluss'), h('dd', {}, m.MA_FIX_WATER_SUPPLY === undefined ? '–' : Number(m.MA_FIX_WATER_SUPPLY) ? 'ja' : 'nein (Tank)'),
-        h('dt', {}, 'WLAN-Name'), h('dd', {}, n.WIFI_NAME || '–'),
-        h('dt', {}, 'IP-Adresse'), h('dd', {}, n.WIFI_AP_IP || '–'),
-        h('dt', {}, 'Verschlüsselung'), h('dd', {}, n.WIFI_ENCRYPTION || '–'),
-        h('dt', {}, 'Eigener Access Point'), h('dd', {}, n.WIFI_SOFT_AP || '–'),
-        h('dt', {}, 'Letzter Kontakt'), h('dd', {}, ago(st.lastSeen)),
-        h('dt', {}, 'Zeitzone (Index)'), h('dd', {}, String(i.TZ_IND ?? '–'))),
-      isClassic() ? null : serviceDetails());
+        i.TZ_IND !== undefined ? h('dt', {}, 'Zeitzone (Index)') : null, i.TZ_IND !== undefined ? h('dd', {}, String(i.TZ_IND)) : null),
+      h('p', { class: 'muted small' }, 'Firmware-Updates nur über die Original-Oberfläche der Maschine.'));
     } catch (e) {
-      infoBox.replaceChildren(h('div', { class: 'muted' }, e.message));
+      wifiBox.replaceChildren(h('div', { class: 'muted' }, e.message));
+      fwBox.replaceChildren(h('div', { class: 'muted' }, e.message));
     }
   })();
 
-  return () => unsubs.forEach((u) => u());
+  // --- Aufzeichnung ---
+  add('aufzeichnung', shotFilterCard());
+
+  // --- Konto & Server ---
+  add('konto',
+    direct ? h('div', { class: 'card low muted small' }, 'Direkt-Modus: Die App spricht Maschine und Mühle ohne Server im Heimnetz an. Eine Anmeldung gibt es dabei nicht. Wechsel des Modus unter „App-Verbindung“.') : null,
+    h('div', { class: 'list' },
+      direct ? null : listButton('shield', 'Server & Sicherheit', 'Geräte-Adressen, Passwort, angemeldete Geräte, Ports, Zertifikat', () => navigate('/server')),
+      inAndroidApp() ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null,
+      listButton('logout', 'Abmelden', null, logout)));
+
+  // Sprungmarken oben
+  jump.replaceChildren(...SECTIONS.filter(([id]) => sec[id].isConnected).map(([id, title]) =>
+    h('button', { class: 'chip', onclick: () => sec[id].scrollIntoView({ behavior: 'smooth', block: 'start' }) }, title)));
+
+  return () => { unsubs.forEach((u) => u()); savebar.remove(); };
+}
+
+// Waage: Zielgewicht der Standardbezüge (Skripte 7/8). Die DBL-Oberfläche kennt sie nur als feste Werte.
+function scaleCard(features) {
+  const box = h('div', { class: 'card' }, h('div', { class: 'muted small' }, 'Lade …'));
+  (async () => {
+    try {
+      const sw = await api('/api/machine/switches');
+      if (isClassic()) {
+        box.replaceChildren(h('dl', { class: 'kv' },
+          h('dt', {}, 'Single (Skript 7)'), h('dd', {}, sw.singleDoseG ? `${fmtInt(sw.singleDoseG)} g/ml` : '–'),
+          h('dt', {}, 'Double (Skript 8)'), h('dd', {}, sw.doubleDoseG ? `${fmtInt(sw.doubleDoseG)} g/ml` : '–')),
+        h('p', { class: 'muted small' }, 'Bei der Xenia DBL sind diese Mengen fest. Die Original-Oberfläche bietet keine Einstellung dafür, deshalb ändert Xenios sie auch nicht.'));
+        return;
+      }
+      const single = h('input', { class: 'text', type: 'number', min: 1, max: 199, step: 0.5, value: sw.singleDoseG ?? '' });
+      const double = h('input', { class: 'text', type: 'number', min: 1, max: 199, step: 0.5, value: sw.doubleDoseG ?? '' });
+      box.replaceChildren(
+        h('h3', {}, 'Bezugsgewicht (interne Waage)'),
+        h('div', { class: 'row' },
+          h('label', { class: 'field grow' }, h('span', {}, 'Einfache Dosis (g)'), single),
+          h('label', { class: 'field grow' }, h('span', {}, 'Doppelte Dosis (g)'), double)),
+        h('div', { style: { height: '12px' } }),
+        h('button', { class: 'btn filled wide', disabled: !features.settings, onclick: async () => {
+          try {
+            await api('/api/machine/switches', { method: 'PUT', body: { singleDoseG: Number(single.value), doubleDoseG: Number(double.value) } });
+            snackbar('Gewichte gespeichert');
+          } catch (e) { snackbar(e.message); }
+        } }, 'Speichern'));
+    } catch (e) {
+      box.replaceChildren(h('div', { class: 'muted small' }, e.message));
+    }
+  })();
+  return box;
 }
 
 const prefRow = (ic, title, sub, sw) => h('div', { class: 'list-item' }, h('span', { class: 'lead' }, icon(ic)),
@@ -158,15 +261,14 @@ function navCard(unsubs) {
   const paint = () => {
     const hidden = hiddenTabs();
     const all = navChoices();
-    const shownCount = all.filter((r) => !hidden.has(r.path)).length;
     list.replaceChildren(all.map((r) => {
-      const shown = !hidden.has(r.path);
-      return prefRow(r.icon, r.label, null, switchEl({ checked: shown, disabled: shown && shownCount <= 1, label: `${r.label} in der Leiste`, onChange: (on) => { setTabHidden(r.path, !on); paint(); } }));
+      const shown = r.fixed || !hidden.has(r.path);
+      return prefRow(r.icon, r.label, r.fixed ? 'immer sichtbar' : null, switchEl({ checked: shown, disabled: Boolean(r.fixed), label: `${r.label} in der Leiste`, onChange: (on) => { setTabHidden(r.path, !on); paint(); } }));
     }));
   };
   paint();
   unsubs.push(onPrefs((k) => { if (k === 'hiddenComponents') paint(); }));
-  return h('div', {}, h('p', { class: 'muted small' }, 'Welche Seiten unten in der Leiste stehen (gilt für dieses Gerät). Ausgeblendete Seiten bleiben über Links erreichbar, Einstellungen über das Zahnrad.'), list);
+  return h('div', {}, h('p', { class: 'muted small' }, 'Welche Seiten in der Leiste stehen (gilt für dieses Gerät). Ausgeblendete Seiten bleiben über Links erreichbar. „Einstellungen“ bleibt immer sichtbar.'), list);
 }
 
 // Komponenten komplett ausblenden (z. B. die Mühle, wenn keine im Einsatz ist)
@@ -207,13 +309,30 @@ function shotFilterCard() {
 }
 
 function themeCard() {
-  const current = localStorageGet('theme') || 'system';
-  const chip = (v, label) => h('button', { class: 'chip', 'aria-pressed': String(current === v), onclick: (e) => {
-    localStorageSet('theme', v);
-    applyTheme(v);
-    e.currentTarget.parentElement.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget)));
-  } }, label);
-  return h('div', { class: 'card low' }, h('div', { class: 'chips' }, chip('system', 'System'), chip('light', 'Hell'), chip('dark', 'Dunkel')));
+  const box = h('div', { class: 'card' });
+  const paint = () => {
+    const theme = localStorageGet('theme') || 'system';
+    const style = localStorageGet('uiStyle') || THEME_DEFAULTS.style;
+    const chips = (current, list, onPick) => h('div', { class: 'chips' }, list.map(([v, label]) =>
+      h('button', { class: 'chip', 'aria-pressed': String(current === v), onclick: () => { onPick(v); applyTheme(); paint(); } }, label)));
+    const color = (key, label, fallback) => {
+      const value = localStorageGet(key) || fallback;
+      const input = h('input', { type: 'color', value, 'aria-label': label });
+      input.addEventListener('input', () => { localStorageSet(key, input.value); applyTheme(); });
+      return h('div', { class: 'color-row' }, input, h('span', { class: 'grow' }, label),
+        localStorageGet(key) ? h('button', { class: 'btn text', onclick: () => { try { localStorage.removeItem(key); } catch { /* privat */ } applyTheme(); paint(); } }, 'Standard') : null);
+    };
+    box.replaceChildren(
+      h('div', { class: 'muted small' }, 'Stil'),
+      chips(style, [['xenia', 'Xenia'], ['material', 'Material']], (v) => localStorageSet('uiStyle', v)),
+      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
+      chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
+      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Farben (gilt für dieses Gerät)'),
+      color('accent', 'Akzent (Schaltflächen, Regler, Anzeigen)', THEME_DEFAULTS.accent[style]),
+      color('activeColor', 'Aktiv (gewählter Zustand, z. B. „Ein“)', THEME_DEFAULTS.active[style]));
+  };
+  paint();
+  return box;
 }
 
 // --- Push-Benachrichtigungen -------------------------------------------------------------
@@ -222,7 +341,7 @@ function b64ToBytes(b64) {
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
 }
 
-// Werte der Seite „Factory“ der Original-Oberfläche – nur lesend; Ändern bleibt dort (Regelverhalten/Kalibrierung).
+// PID- und Sensorwerte der Original-Oberfläche – nur lesend; Ändern bleibt dort (Regelverhalten/Kalibrierung).
 const SERVICE = [
   ['Brühgruppe (PID/Sensor)', 'brewgroup/pid'],
   ['Brühkessel (PID/Sensor)', 'brewboiler/pid'],
@@ -232,7 +351,7 @@ const SERVICE = [
 ];
 function serviceDetails() {
   const body = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
-  const det = h('details', { class: 'adv' }, h('summary', {}, 'Service-Werte (nur lesen)', icon('more', 's20')), body);
+  const det = h('details', { class: 'adv' }, h('summary', {}, 'Regel- und Sensorwerte anzeigen', icon('more', 's20')), body);
   let loaded = false;
   det.addEventListener('toggle', async () => {
     if (!det.open || loaded) return;

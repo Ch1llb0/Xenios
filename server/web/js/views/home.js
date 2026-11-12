@@ -9,6 +9,7 @@ export function homeView(root) {
   const pressure = createGauge({ title: 'Druck', min: 0, max: 12, majorStep: 2, minorStep: 0.5, redFrom: 11, digits: 1 });
   const temp = createGauge({ title: 'Brühgruppe', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20 });
   const boiler = createGauge({ title: 'Brühkessel', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20 });
+  const steam = createGauge({ title: 'Dampfkessel', min: 0, max: 2.5, majorStep: 0.5, minorStep: 0.1, redFrom: 2, digits: 2, labelEvery: 1 });
   const statusLine = h('div', { class: 'status-line' });
   const offline = h('div', { class: 'offline-banner', hidden: true }, icon('warn', 's20'), h('span', {}));
 
@@ -130,7 +131,7 @@ export function homeView(root) {
 
   root.append(
     offline,
-    h('div', { class: 'gauges three' }, pressure, temp, boiler),
+    h('div', { class: 'gauges four' }, pressure, temp, boiler, steam),
     statusLine,
     shotCard,
     h('div', { class: 'section-title' }, 'Power'),
@@ -149,9 +150,10 @@ export function homeView(root) {
     if (!m) return;
     offline.hidden = m.online;
     offline.lastChild.textContent = m.online ? '' : `Maschine nicht erreichbar${m.error ? ` (${m.error})` : ''}. Letzter Kontakt: ${ago(m.lastSeen)}`;
-    pressure.update(m.pressure.pump, m.steamOn ? `Dampf ${fmt(m.pressure.steam, 1)} bar` : 'Dampfkessel aus');
+    pressure.update(m.pressure.pump, 'bar');
     temp.update(m.temp.group, m.temp.groupSet ? `Ziel ${fmt(m.temp.groupSet, 1)}` : '°C');
     boiler.update(m.temp.boiler, m.temp.boilerSet ? `Ziel ${fmt(m.temp.boilerSet, 1)}` : '°C');
+    steam.update(m.pressure?.steam, m.steamOn ? `Ziel ${fmt(m.pressure?.steamSet, 1)}` : 'aus');
 
     const on = ['on', 'brewing', 'draining', 'paddle'].includes(m.statusKey);
     const eco = m.statusKey === 'eco';

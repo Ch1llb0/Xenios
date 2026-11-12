@@ -1,5 +1,5 @@
 // Service Worker: App-Hülle offline verfügbar, Push-Benachrichtigungen, Aktionen aus der Benachrichtigung.
-const VERSION = 'xenios-v2.4.0';
+const VERSION = 'xenios-v2.5.0';
 const SHELL = [
   '/', '/index.html', '/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/api.js', '/js/ui.js', '/js/prefs.js', '/js/gauge.js', '/js/setup.js',

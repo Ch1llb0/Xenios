@@ -14,8 +14,10 @@ import { makeZip } from '../src/backup.js';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THUSRDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
-export function createMockXenia({ speed = 1, api = 'bbs' } = {}) {
+// pages: alte Xenia mit Seiten-API der Original-Oberfläche (DBL, Firmware 4.159): /api/v2/brewgroup, /pump, /paddle …
+export function createMockXenia({ speed = 1, api = 'bbs', pages = false } = {}) {
   const classic = api === 'classic';
+  pages = classic && pages;
   const s = {
     MA_STATUS: 0, SB_STATUS: 1, bg: 24.0, bb: 24.5, sb: 0, pump: 0, pumpPw: 0, extractionMs: 0, scale: 0, flowMl: 0,
     general: {
@@ -24,6 +26,7 @@ export function createMockXenia({ speed = 1, api = 'bbs' } = {}) {
       PU_SET_MAX_TIMER: 90, SB_SET_PRESS: 1.6, SB_SET_ECO_PRESS: 0.5, SB_SET_PRESS_HYST: 0.1, SB_SET_POWER: 1200,
       MA_FIX_WATER_SUPPLY: 0, MA_FAST_HEATUP_TYPE: 0, MA_HEATUP_FLUSH_DURATION: 0, MA_BOILER_START_MODE: 1,
       MA_START_EXTRACTIONCOUNTER_EVENT: 0,
+      BB_MODE: 1, PU_SET_BREW_TIMER_1: 44, PU_MODE: 0, MA_SET_TIMER_ECO_MA: 5, MA_SET_TIMER_POWERDOWN: 10, MA_MAX_AMPERE: 10, MA_EXTENDED_THERMAL_STABILITY: 0,
     },
     switches: { SWITCH_SET_LEFT_LEFT_0: 2, SWITCH_SET_LEFT_LEFT_1: 0, SWITCH_SET_RIGHT_LEFT_0: 8, SWITCH_SET_RIGHT_LEFT_1: 0, SWITCH_SET_RIGHT_RIGHT_0: 7, SWITCH_SET_RIGHT_RIGHT_1: 0, MA_BEVERAGE_WEIGHT_SGL_INT_SCALE: 18, MA_BEVERAGE_WEIGHT_DBL_INT_SCALE: 40 },
     timers: { MA_SET_TIMER_ECO_MA: 20, MA_SET_TIMER_POWERDOWN: 10 },
@@ -121,7 +124,28 @@ export function createMockXenia({ speed = 1, api = 'bbs' } = {}) {
         'GET /api/v2/scriptslist', 'POST /api/v2/scriptsedit', 'GET /api/v2/paddle', 'GET /api/v2/paddle/press',
         'POST /api/v2/paddle/pumppower', 'GET /api/v2/paddle/stop', 'GET /api/v2/mako',
       ]);
-      if (classic && BBS_ONLY.has(key)) return htmlPage();
+      const PAGES_TOO = new Set(['GET /api/v2/scriptslist', 'POST /api/v2/scriptsedit', 'GET /api/v2/paddle', 'GET /api/v2/paddle/press', 'POST /api/v2/paddle/pumppower', 'GET /api/v2/paddle/stop', 'GET /api/v2/diagram/get', 'POST /api/v2/toggle/sb']);
+      if (classic && BBS_ONLY.has(key) && !(pages && PAGES_TOO.has(key))) return htmlPage();
+      const pick = (keys) => Object.fromEntries(keys.map((k) => [k, g[k]]));
+      const setFrom = (keys) => { for (const k of keys) if (k in j) g[k] = Number(j[k]); return ok(); };
+      if (pages) {
+        switch (key) {
+          case 'GET /api/v2/boilerandbrewgroup': return json(pick(['BG_SET_TEMP', 'BG_SET_ECO_TEMP', 'BG_SET_TEMP_HYST', 'BG_SET_POWER', 'BB_SET_TEMP', 'BB_SET_ECO_TEMP', 'BB_SET_TEMP_HYST', 'BB_MODE', 'BB_SET_POWER', 'BB_FILL_LEVEL', 'SB_SET_PRESS', 'SB_SET_ECO_PRESS', 'SB_SET_PRESS_HYST', 'SB_SET_POWER']));
+          case 'POST /api/v2/brewgroup': return setFrom(['BG_SET_TEMP', 'BG_SET_ECO_TEMP', 'BG_SET_TEMP_HYST', 'BG_SET_POWER']);
+          case 'POST /api/v2/brewboiler': return setFrom(['BB_SET_TEMP', 'BB_SET_ECO_TEMP', 'BB_SET_TEMP_HYST', 'BB_MODE', 'BB_SET_POWER']);
+          case 'POST /api/v2/steamboiler': return setFrom(['SB_SET_PRESS', 'SB_SET_ECO_PRESS', 'SB_SET_PRESS_HYST', 'SB_SET_POWER']);
+          case 'GET /api/v2/machine/type': return json({ ma_type: 4 });
+          case 'GET /api/v2/pump': return json(pick(['PU_SET_BREW_TIMER_1', 'PU_SET_MAX_TIMER', 'PU_MODE']));
+          case 'POST /api/v2/pump': return setFrom(['PU_SET_BREW_TIMER_1', 'PU_SET_MAX_TIMER', 'PU_MODE']);
+          case 'GET /api/v2/machine': return json({ MA_TYPE: 3, MA_SUBTYPE: 0, MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 2440, MA_EXTRACTIONS_START: 0, ...pick(['MA_FIX_WATER_SUPPLY', 'MA_HEATUP_FLUSH_DURATION', 'MA_BOILER_START_MODE', 'MA_EXTENDED_THERMAL_STABILITY', 'MA_SET_TIMER_ECO_MA', 'MA_SET_TIMER_POWERDOWN', 'MA_MAX_AMPERE', 'PU_SET_BREW_TIMER_1']), MA_ENERGY_TOTAL_KWH: s.energy, FW_VERSION_MAJOR: 4, FW_VERSION_MINOR: 159, PU_SET_QUANTITY_MEASUREMENT: 2, ESP_FW_MAJOR: 3, ESP_FW_MINOR: 63, BLE: 0, MA_DELAY: 0, BT_SCALE_NAME: '', MA_SN: 'none' });
+          case 'POST /api/v2/machine': return setFrom(['MA_HEATUP_FLUSH_DURATION', 'MA_SET_TIMER_ECO_MA', 'MA_SET_TIMER_POWERDOWN', 'MA_FIX_WATER_SUPPLY', 'MA_MAX_AMPERE', 'MA_BOILER_START_MODE', 'MA_EXTENDED_THERMAL_STABILITY']);
+          case 'POST /api/v2/incdec': return setFrom(['BG_SET_TEMP', 'BB_SET_TEMP']);
+          case 'POST /api/v2/incdecsb': return setFrom(['SB_SET_PRESS']);
+          case 'POST /api/v2/inc_dec': case 'POST /api/v2/inc_dec_sb': res.writeHead(301, { Location: '/' }); return res.end();
+          case 'GET /api/v2/switches': return json({ ...s.switches, MA_BEVERAGE_WEIGHT_SGL_INT_SCALE: 25, MA_BEVERAGE_WEIGHT_DBL_INT_SCALE: 50 });
+          default: break;
+        }
+      }
       switch (key) {
         case 'GET /api/v2/status': return json({ MA_STATUS: s.MA_STATUS });
         case 'GET /api/v2/diagram/get': case 'GET /api/v2/diagram_get': return json(live());
@@ -335,9 +359,11 @@ export function createMockGrinder({ password = 'mockpass' } = {}) {
 
 // Direkt gestartet: beide Geräte simulieren
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const api = process.argv.includes('classic') ? 'classic' : 'bbs'; // npm run mock -- classic → alte Xenia DBL
-  const x = createMockXenia({ api });
-  x.server.listen(8091, '127.0.0.1', () => console.log(`Mock-Xenia:  http://127.0.0.1:8091  (${api === 'classic' ? 'Xenia DBL, alte API' : 'BbS-API'})`));
+  // classic → Xenia DBL mit Firmware 4.159 (Seiten-API wie die Original-Oberfläche), classic-alt → nur die alte API-Doku
+  const api = process.argv.some((a) => a.startsWith('classic')) ? 'classic' : 'bbs';
+  const pages = process.argv.includes('classic');
+  const x = createMockXenia({ api, pages });
+  x.server.listen(8091, '127.0.0.1', () => console.log(`Mock-Xenia:  http://127.0.0.1:8091  (${api === 'classic' ? (pages ? 'Xenia DBL, Firmware 4.159' : 'alte Xenia, nur alte API') : 'BbS-API'})`));
   const m = createMockGrinder();
   m.server.listen(8092, '127.0.0.1', () => console.log('Mock-Mühle:  https://127.0.0.1:8092  (Passwort: mockpass)'));
 }

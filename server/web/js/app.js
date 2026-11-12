@@ -4,7 +4,7 @@ import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, ref
 import { homeView } from './views/home.js';
 import { dashboardView } from './views/dashboard.js';
 import { scriptsView } from './views/scripts.js';
-import { controlsView } from './views/controls.js';
+import { controlsView, paddleView } from './views/controls.js';
 import { shotsView } from './views/shots.js';
 import { timerView } from './views/timer.js';
 import { grinderView } from './views/grinder.js';
@@ -19,11 +19,12 @@ const ROUTES = [
   { path: '/', label: 'Home', icon: 'home', view: homeView, title: 'Xenios' },
   { path: '/bezuege', label: 'Bezüge', icon: 'coffee', view: shotsView, title: 'Bezüge' },
   { path: '/skripte', label: 'Skripte', icon: 'list', view: scriptsView, title: 'Skripte' },
-  { path: '/steuerung', label: 'Steuerung', icon: 'tune', view: controlsView, title: 'Steuerung' },
+  { path: '/steuerung', label: 'Schalter', icon: 'toggle', view: controlsView, title: 'Schalter' },
+  { path: '/paddle', label: 'Paddle', icon: 'speed', view: paddleView, title: 'Paddle' },
   { path: '/timer', label: 'Timer', icon: 'event', view: timerView, title: 'Timer' },
   { path: '/muehle', label: 'Mühle', icon: 'grinder', view: grinderView, title: 'Mühle' },
-  // Einstellungen über das Zahnrad oben rechts, nicht in der unteren Leiste
-  { path: '/einstellungen', label: 'Einstellungen', icon: 'settings', view: settingsView, title: 'Einstellungen', nav: false },
+  // Einstellungen: immer in der Leiste, lässt sich nicht ausblenden
+  { path: '/einstellungen', label: 'Einstellungen', icon: 'settings', view: settingsView, title: 'Einstellungen', fixed: true },
   { path: '/server', label: 'Server', icon: 'shield', view: serverView, title: 'Server & Sicherheit', nav: false, back: '/einstellungen' },
 ];
 
@@ -31,11 +32,42 @@ const $ = (id) => document.getElementById(id);
 let current = null;      // { route, dispose }
 
 // --- Darstellung --------------------------------------------------------------
+// Stil „xenia“ (Standard, wie die Web-Oberfläche der Maschine) oder „material“; dazu optional eigene Akzent- und Aktiv-Farbe.
+export const THEME_DEFAULTS = { style: 'xenia', accent: { xenia: '#4f9a1c', material: '#4a5891' }, active: { xenia: '#f5862f', material: '#4a5891' } };
 export function applyTheme(theme = localStorageGet('theme') || 'system') {
-  if (theme === 'system') delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = theme;
+  const root = document.documentElement;
+  if (theme === 'system') delete root.dataset.theme;
+  else root.dataset.theme = theme;
+  const style = localStorageGet('uiStyle') || THEME_DEFAULTS.style;
+  root.dataset.style = style;
+  const setColor = (name, onName, value, extra) => {
+    if (!value) {
+      for (const n of [name, onName, ...Object.keys(extra || {})]) root.style.removeProperty(n);
+      return;
+    }
+    root.style.setProperty(name, value);
+    root.style.setProperty(onName, contrastOn(value));
+    for (const [n, v] of Object.entries(extra || {})) root.style.setProperty(n, v);
+  };
+  const accent = localStorageGet('accent');
+  setColor('--primary', '--on-primary', accent, accent ? {
+    '--primary-container': `color-mix(in srgb, ${accent} 18%, var(--surface-container-lowest))`,
+    '--on-primary-container': `color-mix(in srgb, ${accent} 70%, var(--on-surface))`,
+    '--success': accent,
+  } : null);
+  setColor('--active', '--on-active', localStorageGet('activeColor'));
   const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', dark ? '#121318' : '#fbf8ff'));
+  const bar = style === 'xenia' ? (dark ? '#2b2d34' : '#3b3e47') : (dark ? '#121318' : '#fbf8ff');
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', bar));
+}
+// Schrift auf einer Farbfläche: schwarz oder weiß, je nach Helligkeit
+export function contrastOn(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+  if (!m) return '#ffffff';
+  const n = parseInt(m[1], 16);
+  const lin = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return L > 0.4 ? '#111111' : '#ffffff';
 }
 export function localStorageGet(k) {
   try { return localStorage.getItem(k); } catch { return null; }
@@ -51,20 +83,16 @@ export function navChoices() {
   return ROUTES.filter((r) => r.nav !== false && (r.path !== '/muehle' || hasGrinder()));
 }
 
-// Sichtbare Tabs: ohne die in den Einstellungen ausgeblendeten; mindestens einer bleibt immer stehen
+// Sichtbare Tabs: ohne die in den Einstellungen ausgeblendeten; „Einstellungen“ bleibt immer stehen
 function navRoutes() {
-  const all = navChoices();
   const hidden = hiddenTabs();
-  const shown = all.filter((r) => !hidden.has(r.path));
-  return shown.length ? shown : all.slice(0, 1);
+  return navChoices().filter((r) => r.fixed || !hidden.has(r.path));
 }
 
 function buildNav() {
-  $('settings-btn').replaceChildren(icon('settings'));
   $('back-btn').replaceChildren(icon('left'));
-  $('settings-btn').onclick = () => navigate('/einstellungen');
   const routes = navRoutes();
-  const inner = h('div', { class: `navbar-inner${routes.length > 5 ? ' many' : ''}` }, routes.map((r) =>
+  const inner = h('div', { class: `navbar-inner${routes.length > 5 ? ' many' : ''}${routes.length > 7 ? ' lots' : ''}` }, routes.map((r) =>
     h('button', { class: 'nav-item', dataset: { path: r.path }, onclick: () => navigate(r.path) },
       h('span', { class: 'pill' }, icon(r.icon)), h('span', { class: 'nav-label' }, r.label))));
   $('navbar').replaceChildren(inner);
@@ -100,8 +128,8 @@ function render() {
   $('back-btn').hidden = !route.back;
   $('back-btn').onclick = () => navigate(route.back);
   document.title = route.title === 'Xenios' ? 'Xenios' : `${route.title} · Xenios`;
-  $('settings-btn').setAttribute('aria-pressed', String(route.path === '/einstellungen' || route.path === '/server'));
-  document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === route.path ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
+  const navPath = route.path === '/server' ? '/einstellungen' : route.path;
+  document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === navPath ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
   const view = $('view');
   view.replaceChildren();
   view.scrollTop = 0;
