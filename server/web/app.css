@@ -948,3 +948,6 @@ svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height
 .gauge-foot { display: flex; flex-direction: column; align-items: center; line-height: 1.25; margin-top: 4px; }
 .gauge-foot .gv { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--on-surface); }
 .gauge-foot .gs { font-size: 11px; color: var(--on-surface-variant); min-height: 1.25em; }
+.dbl-start + .dbl-start { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline-variant); }
+.dbl-start .time { font-size: 30px; } .timer-card.off .dbl-start .time { font-size: 22px; }
+.timer-card > .day { font-size: 14px; font-weight: 600; color: var(--on-surface); margin-bottom: 2px; }

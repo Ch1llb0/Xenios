@@ -481,7 +481,7 @@ Ausgelesen am 11.11.2026 mit `server/tools/xenia-lesen.mjs` an einer „Xenia Du
 | Startseite | `GET /api/v2/overview`, `/overview/single` | `POST /api/v2/incdec {BG_SET_TEMP, BB_SET_TEMP}`, `POST /api/v2/incdecsb {SB_SET_PRESS}` (ohne Unterstrich; `inc_dec` antwortet mit 301) |
 | Schalter | `GET /api/v2/switches`, `/scriptslist` | `POST /api/v2/switches {SWITCH_SET_*}`; feste Abläufe 1 = Espresso (läuft `PU_SET_BREW_TIMER_1`), 2 = Espresso endlos, 7 = Single 25 g/ml, 8 = Double 50 g/ml. `MA_BEVERAGE_WEIGHT_*` wird gelesen, aber nirgends geschrieben. |
 | Paddle | wie neue Firmware (`/paddle`, `/paddle/press`, `/paddle/pumppower`, `/paddle/stop`) | |
-| Timer | `GET/POST /api/v2/timer` (zwei **Einschalt**zeiten je Tag mit Kesselwahl 0–3, Zeiten in Sekunden), `GET /api/v2/timer/timeanddate` | |
+| Timer | `GET /api/v2/timer` → `TI_<Tag>_ON1/ON2` (gepackt `h<<16\|m<<8`) und `TI_<Tag>_ON<n>_BOILER` (0 aus, 1 Brühkessel, 2 Dampf, 3 beide) | `POST /api/v2/timer {TI_<Tag>_ON<n>: Sekunden seit Mitternacht, TI_<Tag>_ON<n>_STATUS: 0–3}` – beide Zeiten sind **Einschalt**zeiten; ausgeschaltet wird über `MA_SET_TIMER_POWERDOWN` (muss größer sein als `MA_SET_TIMER_ECO_MA`) |
 | Modell | `GET /api/v2/machine/type` → `ma_type` 1 = 2K, 2 = DB, 3 = 303, 4 = DB + L, 5 = 2K + L (eigene Nummerierung, `MA_TYPE` aus `/machine` ist hier 3) | |
 
 Heizleistung (`*_SET_POWER`), Pumpenmodus und Stromgrenze sendet Xenios nur unverändert mit. PID, Port, Waagen-Kalibrierung und Firmware-Update bleiben der Original-Oberfläche vorbehalten.

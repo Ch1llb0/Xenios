@@ -57,3 +57,35 @@ test('Ungültige Werte werden abgelehnt, ohne etwas zu senden', async () => {
   await assert.rejects(m.updateSettings({ BG_SET_POWER: 100 }), /Unbekannte Einstellung/);
   assert.equal(xenia.state.log.slice(before).filter((l) => l.startsWith('POST')).length, 0);
 });
+
+test('Wochentimer der DBL: zwei Einschaltzeiten je Tag mit Kesselwahl', async () => {
+  const t = await m.timers();
+  assert.equal(t.weekly, 'starts');
+  assert.equal(t.days[0].starts[0].on, 6 * 60 + 30);
+  assert.deepEqual([t.days[0].starts[0].brew, t.days[0].starts[0].steam], [true, false]);
+  assert.equal(t.days[5].starts[1].on, 14 * 60);
+  t.days[1].starts[0] = { on: 7 * 60 + 15, brew: true, steam: true, enabled: true };
+  t.days[0].starts[0].enabled = false;
+  const before = xenia.state.log.length;
+  await m.saveTimers({ days: t.days });
+  const post = xenia.state.log.slice(before).find((l) => l.startsWith('POST /api/v2/timer'));
+  const body = JSON.parse(post.slice(post.indexOf('{')));
+  assert.equal(body.TI_TUESDAY_ON1, 26100);
+  assert.equal(body.TI_TUESDAY_ON1_STATUS, 3);
+  assert.equal(body.TI_MONDAY_ON1, 0);
+  assert.equal(body.TI_MONDAY_ON1_STATUS, 0);
+  const again = await m.timers();
+  assert.equal(again.days[1].starts[0].on, 7 * 60 + 15);
+  assert.equal(again.days[0].starts[0].enabled, false);
+});
+
+test('Eco-/Abschalt-Timer der DBL: alle Felder der Seite Maschine, Abschalten nach Eco', async () => {
+  await assert.rejects(m.saveTimers({ ecoAfterMin: 30, offAfterMin: 20 }), /länger/);
+  const before = xenia.state.log.length;
+  await m.saveTimers({ ecoAfterMin: 15, offAfterMin: 45 });
+  const post = xenia.state.log.slice(before).find((l) => l.startsWith('POST /api/v2/machine'));
+  const body = JSON.parse(post.slice(post.indexOf('{')));
+  assert.equal(body.MA_SET_TIMER_ECO_MA, '15');
+  assert.equal(body.MA_SET_TIMER_POWERDOWN, '45');
+  assert.ok('MA_BOILER_START_MODE' in body && 'MA_EXTENDED_THERMAL_STABILITY' in body && 'MA_MAX_AMPERE' in body, 'alle Felder mitgesendet');
+});
