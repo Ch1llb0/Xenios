@@ -23,8 +23,9 @@ export const MA_TYPE = {
   0: 'Undefiniert', 1: 'Xenia 2K', 2: 'Xenia Dual Boiler', 3: 'Xenia Brew-by-Sync', 4: 'Xenia 303', 5: 'Xenia 2K + L',
 };
 
-// /api/v2/machine/type der alten Firmware (laut Original-Oberfläche)
-export const CLASSIC_TYPE = { 1: 'Xenia 2K', 2: 'Xenia Dual Boiler', 3: 'Xenia 303', 4: 'Xenia Dual Boiler + L', 5: 'Xenia 2K + L' };
+// MA_TYPE aus /api/v2/machine bei der alten Firmware (so benennt die Startseite der Original-Oberfläche
+// die Modelle; an einer „Xenia DB + L“ mit Firmware 4.159 geprüft: MA_TYPE 3)
+export const CLASSIC_TYPE = { 1: 'Xenia 2K', 2: 'Xenia Dual Boiler', 3: 'Xenia Dual Boiler + L', 4: 'Xenia 303', 5: 'Xenia 2K + L' };
 
 // Grenzen wie in der offiziellen Web-Oberfläche (general.html).
 export const SETTING_LIMITS = {
@@ -405,11 +406,8 @@ export class Machine extends Emitter {
         };
         if (!this.api.general) {
           this.state.info.caps = await this.classicCaps().catch(() => undefined);
-          // Alte Firmware: Modell über /machine/type (eigene Nummerierung der Original-Oberfläche)
-          try {
-            const t = num((await this.client.get('/api/v2/machine/type')).ma_type);
-            if (CLASSIC_TYPE[t]) this.state.info.typeName = CLASSIC_TYPE[t];
-          } catch { /* ältere Firmware */ }
+          // Alte Firmware: eigene Modellnummern (MA_TYPE 3 ist hier die DB + L, nicht die Brew-by-Sync)
+          if (CLASSIC_TYPE[num(machine.MA_TYPE)]) this.state.info.typeName = CLASSIC_TYPE[num(machine.MA_TYPE)];
         }
       } catch (e) {
         log.debug(`Info nicht lesbar: ${e.message}`);
