@@ -955,3 +955,42 @@ svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height
 /* Dashboard: Diagramm füllt die verfügbare Höhe der Kachel (statt aus der Breite zu wachsen), mindestens 60 px */
 .dash > .tile > .tile-body > .chart-fit { flex: 1; min-height: 60px; position: relative; }
 .chart-fit > svg { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; }
+
+/* Farbvorlage „Material“: nur Farben (Lavendel-Flächen, Indigo-Akzent), Layout/Schrift/Icons bleiben wie bei der Xenia */
+:root[data-style="xenia"][data-palette="material"] {
+  --primary: #4a5891; --on-primary: #ffffff; --primary-container: #dde1ff; --on-primary-container: #2f3e74;
+  --secondary-container: #e0e1f6; --on-secondary-container: #42455a;
+  --surface: #fbf8ff; --surface-dim: #dbd9e0; --surface-container-lowest: #ffffff; --surface-container-low: #f5f2fa;
+  --surface-container: #efedf4; --surface-container-high: #ffffff; --surface-container-highest: #e3e1e9;
+  --on-surface: #1b1b21; --on-surface-variant: #46464f; --outline: #767680; --outline-variant: #d6d5e0;
+  --success: #2e9d4f; --warning: #b26a00; --active: #5c6bc0; --on-active: #ffffff;
+  --chrome: #2f3e74; --on-chrome: #ffffff; --chrome-active: #4a5891; --chrome-title: #c3cbff;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style="xenia"][data-palette="material"]:not([data-theme="light"]) {
+    --primary: #b8c4ff; --on-primary: #1e2d61; --primary-container: #364379; --on-primary-container: #dde1ff;
+    --secondary-container: #42455a; --on-secondary-container: #e0e1f6;
+    --surface: #121318; --surface-dim: #121318; --surface-container-lowest: #1b1b21; --surface-container-low: #1b1b21;
+    --surface-container: #1f1f25; --surface-container-high: #1b1b21; --surface-container-highest: #34343a;
+    --on-surface: #e4e1e9; --on-surface-variant: #c6c5d0; --outline: #90909a; --outline-variant: #34343c;
+    --success: #5fd07f; --warning: #ffb74d; --active: #8c9eff; --on-active: #10183a;
+    --chrome: #1b1b21; --on-chrome: #e4e1e9; --chrome-active: #364379; --chrome-title: #b8c4ff;
+  }
+}
+:root[data-style="xenia"][data-palette="material"][data-theme="dark"] {
+  --primary: #b8c4ff; --on-primary: #1e2d61; --primary-container: #364379; --on-primary-container: #dde1ff;
+  --secondary-container: #42455a; --on-secondary-container: #e0e1f6;
+  --surface: #121318; --surface-dim: #121318; --surface-container-lowest: #1b1b21; --surface-container-low: #1b1b21;
+  --surface-container: #1f1f25; --surface-container-high: #1b1b21; --surface-container-highest: #34343a;
+  --on-surface: #e4e1e9; --on-surface-variant: #c6c5d0; --outline: #90909a; --outline-variant: #34343c;
+  --success: #5fd07f; --warning: #ffb74d; --active: #8c9eff; --on-active: #10183a;
+  --chrome: #1b1b21; --on-chrome: #e4e1e9; --chrome-active: #364379; --chrome-title: #b8c4ff;
+  color-scheme: dark;
+}
+/* Kleine Bildschirme: Navigation unten nur mit Symbolen (Beschriftung als Tooltip/Screenreader-Name) */
+@media (max-width: 959px) {
+  [data-style="xenia"] .nav-label { display: none; }
+  [data-style="xenia"] .navbar { padding-top: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  :root[data-style="xenia"] { --nav-h: 56px; }
+  [data-style="xenia"] .navbar-inner.lots .nav-item { flex: 1 0 48px; }
+}
