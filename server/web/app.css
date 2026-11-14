@@ -951,7 +951,6 @@ svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height
 .dbl-start + .dbl-start { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline-variant); }
 .dbl-start .time { font-size: 30px; } .timer-card.off .dbl-start .time { font-size: 22px; }
 .timer-card > .day { font-size: 14px; font-weight: 600; color: var(--on-surface); margin-bottom: 2px; }
-.steam-target { min-width: 64px; text-align: center; font-weight: 600; }
 
 /* Dashboard: Diagramm füllt die verfügbare Höhe der Kachel (statt aus der Breite zu wachsen), mindestens 60 px */
 .dash > .tile > .tile-body > .chart-fit { flex: 1; min-height: 60px; position: relative; }
