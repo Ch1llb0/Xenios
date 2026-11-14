@@ -484,4 +484,6 @@ Ausgelesen am 11.11. und 14.11.2026 mit `server/tools/xenia-lesen.mjs` an einer 
 | Timer | `GET /api/v2/timer` → `TI_<Tag>_ON1/ON2` (gepackt `h<<16\|m<<8`) und `TI_<Tag>_ON<n>_BOILER` (0 aus, 1 Brühkessel, 2 Dampf, 3 beide) | `POST /api/v2/timer {TI_<Tag>_ON<n>: Sekunden seit Mitternacht, TI_<Tag>_ON<n>_STATUS: 0–3}` – beide Zeiten sind **Einschalt**zeiten; ausgeschaltet wird über `MA_SET_TIMER_POWERDOWN` (muss größer sein als `MA_SET_TIMER_ECO_MA`) |
 | Modell | `MA_TYPE` aus `GET /api/v2/machine`: 1 = 2K, 2 = DB, 3 = DB + L, 4 = 303, 5 = 2K + L (Startseite der Original-Oberfläche; bei der alten Firmware ist 3 also **nicht** die Brew-by-Sync). `GET /api/v2/machine/type` liefert dieselbe Zahl als Text; der Kommentar auf der Pumpen-Seite mit anderer Zuordnung ist falsch. | |
 
+Live geprüft am 14.11.2026 mit `server/tools/xenia-pruefen.mjs --schreibtest`: Lesen aller Werte über die Seiten-API stimmt mit den Rohantworten überein; Schreiben über `POST /api/v2/pump` (Bezugszeit 44 → 45 → 44 s) ändert nur das gesendete Feld, die übrigen Pumpen-, Kessel- und Brühgruppenwerte bleiben unverändert.
+
 Heizleistung (`*_SET_POWER`), Pumpenmodus und Stromgrenze sendet Xenios nur unverändert mit. PID, Port, Waagen-Kalibrierung und Firmware-Update bleiben der Original-Oberfläche vorbehalten.
