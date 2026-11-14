@@ -94,6 +94,48 @@ export function homeView(root) {
     }
   }
 
+  // Zieldruck Dampfkessel: nur sichtbar, solange der Dampfkessel an ist (0–1,8 bar wie die Original-Oberfläche)
+  let steamTarget = null;
+  let steamDirty = false;
+  const sValue = h('button', { class: 'temp-value', title: 'Wert eingeben', onclick: editSteam }, '–');
+  const steamApply = h('button', { class: 'btn filled wide', disabled: true, onclick: applySteam }, 'Dampfdruck übernehmen');
+  const stepS = (d) => {
+    if (steamTarget === null) return;
+    steamTarget = Math.round(Math.min(1.8, Math.max(0, steamTarget + d)) * 10) / 10;
+    steamDirty = true;
+    paintSteam();
+  };
+  const steamCard = h('div', { class: 'card temp-card', hidden: true },
+    h('div', { class: 'temp-caption' }, 'Zieldruck Dampfkessel'),
+    h('div', { class: 'temp-row' },
+      h('button', { class: 'icon-btn', 'aria-label': 'Weniger Druck', onclick: () => stepS(-0.1) }, icon('more')),
+      sValue,
+      h('button', { class: 'icon-btn', 'aria-label': 'Mehr Druck', onclick: () => stepS(0.1) }, icon('less'))),
+    steamApply);
+  function paintSteam() {
+    sValue.textContent = steamTarget === null ? '–' : `${fmt(steamTarget)} bar`;
+    steamApply.disabled = !steamDirty;
+  }
+  async function editSteam() {
+    const n = await promptNumber('Zieldruck Dampfkessel', { value: steamTarget, min: 0, max: 1.8, step: 0.1, unit: 'bar' });
+    if (n === null) return;
+    if (Number.isNaN(n)) return snackbar('Bitte einen Wert zwischen 0 und 1,8 bar eingeben');
+    steamTarget = Math.round(n * 10) / 10;
+    steamDirty = true;
+    paintSteam();
+  }
+  async function applySteam() {
+    steamApply.disabled = true;
+    try {
+      await api('/api/machine/settings', { method: 'POST', body: { changes: { SB_SET_PRESS: steamTarget } } });
+      steamDirty = false;
+      snackbar(`Dampfdruck ${fmt(steamTarget)} bar gespeichert`);
+    } catch (e) {
+      snackbar(e.message);
+      steamApply.disabled = false;
+    }
+  }
+
   // Live-Werte und -Diagramm (wie die Seite „General“ der Original-Oberfläche)
   const liveChartBox = h('div', {});
   const liveValues = h('dl', { class: 'kv' });
@@ -138,6 +180,7 @@ export function homeView(root) {
     h('div', { class: 'list' }, rowMachine, rowEco, rowSteam, rowNoSteam),
     h('div', { class: 'section-title' }, 'Temperatur'),
     tempCard,
+    steamCard,
     lastShotCard,
     h('div', { class: 'section-title' }, 'Sensoren'),
     liveCard,
@@ -177,6 +220,9 @@ export function homeView(root) {
 
     if (!targetDirty && m.temp.groupSet !== null) target = m.temp.groupSet;
     paintTarget();
+    steamCard.hidden = !(m.online && machineOn() && m.steamOn);
+    if (!steamDirty && m.pressure?.steamSet !== null && m.pressure?.steamSet !== undefined) steamTarget = m.pressure.steamSet;
+    paintSteam();
 
     // laufender Bezug
     if (m.shot.running) {
