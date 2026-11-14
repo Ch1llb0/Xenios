@@ -180,7 +180,9 @@ object DirectMachine {
         val group = temp(d.num("BG_SENS_TEMP_A"), bgOff)
         val groupSet = single.num("BG_SET_TEMP") ?: general?.num("BG_SET_TEMP")
         val on = status == 1 || status == 3 || status == 4 || status == 5
-        val steamOn = d.num("SB_STATUS")?.toInt() == 2
+        // Neue Firmware: 2 = Dampfkessel an. Alte Firmware wie deren Original-Oberfläche: alles außer 1 (aus) ist an
+        val sb = d.num("SB_STATUS")?.toInt()
+        val steamOn = if (classic) sb != null && sb != 1 else sb == 2
         val steam = d.num("SB_SENS_PRESS")
         val steamSet = single.num("SB_SET_PRESS") ?: general?.num("SB_SET_PRESS")
         return Api.State(

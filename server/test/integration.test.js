@@ -288,7 +288,11 @@ test('Bezugs-Protokoll: nachträglich erkannte Bezüge, CSV, bleibt nach Neustar
   m._checkCounter(counter + 3, '');
   assert.equal(m.history.data.shots.length, before + 2);
   let r = await call('GET', '/api/shots');
-  assert.ok(r.json.total >= before + 2);
+  // Gelistet wird nur der mit Bezugszeit; der zweite (Dauer unbekannt) gilt als zu kurz und bleibt nur gespeichert
+  assert.ok(r.json.total >= before + 1);
+  const unknown = m.history.data.shots[1];
+  assert.equal(unknown.timeMs, null);
+  assert.ok(!m.listedShots().includes(unknown), 'Dauer unbekannt → nicht gelistet');
   r = await fetch(`${base}/api/shots.csv`, { headers: { Cookie: cookie } });
   assert.equal(r.status, 200);
   const csv = await r.text();
