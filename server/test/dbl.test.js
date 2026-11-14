@@ -89,3 +89,9 @@ test('Eco-/Abschalt-Timer der DBL: alle Felder der Seite Maschine, Abschalten na
   assert.equal(body.MA_SET_TIMER_POWERDOWN, '45');
   assert.ok('MA_BOILER_START_MODE' in body && 'MA_EXTENDED_THERMAL_STABILITY' in body && 'MA_MAX_AMPERE' in body, 'alle Felder mitgesendet');
 });
+
+test('Modellname der alten Firmware: MA_TYPE 3 ist die Xenia DB + L', async () => {
+  await m.refreshSlow();
+  assert.equal(m.state.info.typeName, 'Xenia Dual Boiler + L');
+  assert.equal(m.state.info.caps.pages, true);
+});

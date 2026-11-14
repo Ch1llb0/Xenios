@@ -135,7 +135,7 @@ export function createMockXenia({ speed = 1, api = 'bbs', pages = false } = {}) 
           case 'POST /api/v2/brewgroup': return setFrom(['BG_SET_TEMP', 'BG_SET_ECO_TEMP', 'BG_SET_TEMP_HYST', 'BG_SET_POWER']);
           case 'POST /api/v2/brewboiler': return setFrom(['BB_SET_TEMP', 'BB_SET_ECO_TEMP', 'BB_SET_TEMP_HYST', 'BB_MODE', 'BB_SET_POWER']);
           case 'POST /api/v2/steamboiler': return setFrom(['SB_SET_PRESS', 'SB_SET_ECO_PRESS', 'SB_SET_PRESS_HYST', 'SB_SET_POWER']);
-          case 'GET /api/v2/machine/type': return json({ ma_type: 4 });
+          case 'GET /api/v2/machine/type': return json({ ma_type: '3' });
           case 'GET /api/v2/timer': {
             const t = { MA_TYPE: 3 };
             for (const d of DAYS) for (const n of [1, 2]) { t[`TI_${d}_ON${n}`] = s.dbl[`TI_${d}_ON${n}`] || 0; t[`TI_${d}_ON${n}_BOILER`] = s.dbl[`TI_${d}_ON${n}_BOILER`] || 0; }
