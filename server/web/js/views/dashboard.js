@@ -340,29 +340,9 @@ function controlTile() {
   const steamSw = switchEl({ label: 'Dampfkessel', onChange: (on, input) => setSteam(on, input) });
   const steamState = h('span', { class: 'muted small' });
   const noSteamSw = switchEl({ checked: noSteamOn(), label: 'Ohne Dampf einschalten', onChange: (on) => setNoSteamOn(on) });
-  // Zieldruck Dampfkessel (nur bei laufendem Dampfkessel): ±0,1 bar, gespeichert 1,5 s nach dem letzten Tipp
-  let steamTarget = null;
-  let steamTimer = null;
-  const sVal = h('span', { class: 'num steam-target' }, '–');
-  const stepSteam = (d) => {
-    if (steamTarget === null) return;
-    steamTarget = Math.round(Math.min(1.8, Math.max(0, steamTarget + d)) * 10) / 10;
-    sVal.textContent = `${fmt(steamTarget)} bar`;
-    clearTimeout(steamTimer);
-    steamTimer = setTimeout(() => {
-      steamTimer = null;
-      run(() => api('/api/machine/settings', { method: 'POST', body: { changes: { SB_SET_PRESS: steamTarget } } }), `Dampfdruck ${fmt(steamTarget)} bar gespeichert`);
-    }, 1500);
-  };
-  const steamRow = h('div', { class: 'ctl-row', hidden: true },
-    icon('tune', 's20'), h('span', { class: 'grow' }, 'Zieldruck'),
-    h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Weniger Druck', onclick: () => stepSteam(-0.1) }, icon('more', 's20')),
-    sVal,
-    h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Mehr Druck', onclick: () => stepSteam(0.1) }, icon('less', 's20')));
   const body = h('div', { class: 'dash-control' },
     h('div', { class: 'seg' }, btnOn, btnEco, btnOff),
     h('div', { class: 'ctl-row' }, icon('cloud', 's20'), h('span', { class: 'grow' }, 'Dampfkessel ', steamState), steamSw),
-    steamRow,
     h('div', { class: 'ctl-row' }, icon('power', 's20'), h('span', { class: 'grow' }, 'Ohne Dampf einschalten'), noSteamSw));
 
   async function run(fn, msg) {
@@ -413,11 +393,6 @@ function controlTile() {
       sIn.disabled = !online || !(on || eco) || !machineOn(m);
       steamState.textContent = !online ? '' : m.steamOn ? (m.steamReady ? `bereit · ${fmt(m.pressure.steam, 1)} bar` : `heizt · ${fmt(m.pressure.steam, 1)} bar`) : 'aus';
       noSteamSw.querySelector('input').checked = noSteamOn();
-      steamRow.hidden = !(online && m.steamOn && machineOn(m));
-      if (!steamTimer && m?.pressure?.steamSet !== null && m?.pressure?.steamSet !== undefined) {
-        steamTarget = m.pressure.steamSet;
-        sVal.textContent = `${fmt(steamTarget)} bar`;
-      }
       return { extra: !online ? h('span', { class: 'badge bad' }, 'Offline') : null };
     },
   };

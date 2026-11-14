@@ -1,6 +1,6 @@
-// Startseite: Instrumente, Status, Ein/Aus/Eco/Dampf, Zieltemperatur, laufender/letzter Bezug, Mühle.
+// Startseite: Instrumente, Status, Ein/Aus/Eco/Dampf, Sollwerte (Brühgruppe, Brühkessel, Dampfdruck), laufender/letzter Bezug, Mühle.
 import { h, icon, fmt, switchEl, snackbar, ago, promptNumber } from '../ui.js';
-import { api, store, subscribe, machineOn, hasGrinder } from '../api.js';
+import { api, store, subscribe, hasGrinder } from '../api.js';
 import { isHidden, noSteamOn, setNoSteamOn, powerOnBody, onPrefs } from '../prefs.js';
 import { createGauge, sparkline, ring, liveChart } from '../gauge.js';
 import { navigate } from '../app.js';
@@ -50,91 +50,59 @@ export function homeView(root) {
     }
   }
 
-  // Zieltemperatur
-  let target = null;
-  let targetDirty = false;
-  const tValue = h('button', { class: 'temp-value', title: 'Wert eingeben', onclick: editTarget }, '–');
-  const applyBtn = h('button', { class: 'btn filled wide', disabled: true, onclick: applyTarget }, 'Temperatur übernehmen');
-  const colderBtn = h('button', { class: 'icon-btn', 'aria-label': 'Kälter', onclick: () => stepT(-0.5) }, icon('more'));
-  const warmerBtn = h('button', { class: 'icon-btn', 'aria-label': 'Wärmer', onclick: () => stepT(0.5) }, icon('less'));
-  const stepT = (d) => {
-    if (target === null) return;
-    target = Math.round(Math.min(96, Math.max(60, target + d)) * 10) / 10;
-    targetDirty = true;
-    paintTarget();
-  };
-  const tempCard = h('div', { class: 'card temp-card' },
-    h('div', { class: 'temp-caption' }, 'Zieltemperatur Brühgruppe'),
-    h('div', { class: 'temp-row' }, colderBtn, tValue, warmerBtn),
-    applyBtn);
-  function paintTarget() {
-    const off = !machineOn();
-    tValue.textContent = target === null ? '–' : `${fmt(target)} °C`;
-    applyBtn.disabled = !targetDirty || off;
-    tValue.disabled = colderBtn.disabled = warmerBtn.disabled = off;
-    tempCard.classList.toggle('disabled', off);
-  }
-  async function editTarget() {
-    const n = await promptNumber('Zieltemperatur', { value: target, min: 60, max: 96, step: 0.1, unit: '°C' });
-    if (n === null) return;
-    if (Number.isNaN(n)) return snackbar('Bitte einen Wert zwischen 60 und 96 °C eingeben');
-    target = Math.round(n * 10) / 10;
-    targetDirty = true;
-    paintTarget();
-  }
-  async function applyTarget() {
-    applyBtn.disabled = true;
-    try {
-      await api('/api/machine/temperature', { method: 'POST', body: { group: target } });
-      targetDirty = false;
-      snackbar(`Zieltemperatur ${fmt(target)} °C gespeichert`);
-    } catch (e) {
-      snackbar(e.message);
-      applyBtn.disabled = false;
+  // Sollwerte: Brühgruppe, Brühkessel und Dampfdruck, jede Karte immer sichtbar und auch bei ausgeschalteter
+  // Maschine einstellbar (gilt dann beim nächsten Einschalten). Jede Karte ändert nur ihren eigenen Wert.
+  function targetCard({ caption, key, min, max, step, unit, digits = 1, read }) {
+    let value = null;
+    let dirty = false;
+    const val = h('button', { class: 'temp-value', title: 'Wert eingeben', onclick: edit }, '–');
+    const apply = h('button', { class: 'btn filled wide', disabled: true, onclick: save }, 'Übernehmen');
+    const stepBy = (d) => {
+      if (value === null) return;
+      value = Math.round(Math.min(max, Math.max(min, value + d)) * 10) / 10;
+      dirty = true;
+      paint();
+    };
+    const card = h('div', { class: 'card temp-card' },
+      h('div', { class: 'temp-caption' }, caption),
+      h('div', { class: 'temp-row' },
+        h('button', { class: 'icon-btn', 'aria-label': `${caption} verringern`, onclick: () => stepBy(-step) }, icon('more')),
+        val,
+        h('button', { class: 'icon-btn', 'aria-label': `${caption} erhöhen`, onclick: () => stepBy(step) }, icon('less'))),
+      apply);
+    function paint() {
+      val.textContent = value === null ? '–' : `${fmt(value, digits)} ${unit}`;
+      apply.disabled = !dirty || !store.machine?.online;
     }
-  }
-
-  // Zieldruck Dampfkessel: nur sichtbar, solange der Dampfkessel an ist (0–1,8 bar wie die Original-Oberfläche)
-  let steamTarget = null;
-  let steamDirty = false;
-  const sValue = h('button', { class: 'temp-value', title: 'Wert eingeben', onclick: editSteam }, '–');
-  const steamApply = h('button', { class: 'btn filled wide', disabled: true, onclick: applySteam }, 'Dampfdruck übernehmen');
-  const stepS = (d) => {
-    if (steamTarget === null) return;
-    steamTarget = Math.round(Math.min(1.8, Math.max(0, steamTarget + d)) * 10) / 10;
-    steamDirty = true;
-    paintSteam();
-  };
-  const steamCard = h('div', { class: 'card temp-card', hidden: true },
-    h('div', { class: 'temp-caption' }, 'Zieldruck Dampfkessel'),
-    h('div', { class: 'temp-row' },
-      h('button', { class: 'icon-btn', 'aria-label': 'Weniger Druck', onclick: () => stepS(-0.1) }, icon('more')),
-      sValue,
-      h('button', { class: 'icon-btn', 'aria-label': 'Mehr Druck', onclick: () => stepS(0.1) }, icon('less'))),
-    steamApply);
-  function paintSteam() {
-    sValue.textContent = steamTarget === null ? '–' : `${fmt(steamTarget)} bar`;
-    steamApply.disabled = !steamDirty;
-  }
-  async function editSteam() {
-    const n = await promptNumber('Zieldruck Dampfkessel', { value: steamTarget, min: 0, max: 1.8, step: 0.1, unit: 'bar' });
-    if (n === null) return;
-    if (Number.isNaN(n)) return snackbar('Bitte einen Wert zwischen 0 und 1,8 bar eingeben');
-    steamTarget = Math.round(n * 10) / 10;
-    steamDirty = true;
-    paintSteam();
-  }
-  async function applySteam() {
-    steamApply.disabled = true;
-    try {
-      await api('/api/machine/settings', { method: 'POST', body: { changes: { SB_SET_PRESS: steamTarget } } });
-      steamDirty = false;
-      snackbar(`Dampfdruck ${fmt(steamTarget)} bar gespeichert`);
-    } catch (e) {
-      snackbar(e.message);
-      steamApply.disabled = false;
+    async function edit() {
+      const n = await promptNumber(caption, { value, min, max, step: 0.1, unit });
+      if (n === null) return;
+      if (Number.isNaN(n)) return snackbar(`Bitte einen Wert zwischen ${fmt(min, digits)} und ${fmt(max, digits)} ${unit} eingeben`);
+      value = Math.round(n * 10) / 10;
+      dirty = true;
+      paint();
     }
+    async function save() {
+      apply.disabled = true;
+      try {
+        await api('/api/machine/settings', { method: 'POST', body: { changes: { [key]: value } } });
+        dirty = false;
+        snackbar(`${caption}: ${fmt(value, digits)} ${unit} gespeichert`);
+      } catch (e) {
+        snackbar(e.message);
+        apply.disabled = false;
+      }
+    }
+    card.update = (m) => {
+      const v = read(m);
+      if (!dirty && v !== null && v !== undefined) value = v;
+      paint();
+    };
+    return card;
   }
+  const groupCard = targetCard({ caption: 'Zieltemperatur Brühgruppe', key: 'BG_SET_TEMP', min: 60, max: 96, step: 0.5, unit: '°C', read: (m) => m.temp.groupSet });
+  const boilerCard = targetCard({ caption: 'Zieltemperatur Brühkessel', key: 'BB_SET_TEMP', min: 60, max: 96, step: 0.5, unit: '°C', read: (m) => m.temp.boilerSet });
+  const steamCard = targetCard({ caption: 'Zieldruck Dampfkessel', key: 'SB_SET_PRESS', min: 0, max: 1.8, step: 0.1, unit: 'bar', read: (m) => m.pressure?.steamSet });
 
   // Live-Werte und -Diagramm (wie die Seite „General“ der Original-Oberfläche)
   const liveChartBox = h('div', {});
@@ -178,8 +146,9 @@ export function homeView(root) {
     shotCard,
     h('div', { class: 'section-title' }, 'Power'),
     h('div', { class: 'list' }, rowMachine, rowEco, rowSteam, rowNoSteam),
-    h('div', { class: 'section-title' }, 'Temperatur'),
-    tempCard,
+    h('div', { class: 'section-title' }, 'Sollwerte'),
+    groupCard,
+    boilerCard,
     steamCard,
     lastShotCard,
     h('div', { class: 'section-title' }, 'Sensoren'),
@@ -218,11 +187,7 @@ export function homeView(root) {
     if (m.statusKey !== 'off' && m.temp.groupSet) extra.push(h('span', { class: 'muted small' }, `Ziel ${fmt(m.temp.groupSet)} °C`));
     statusLine.replaceChildren(badge, ...extra);
 
-    if (!targetDirty && m.temp.groupSet !== null) target = m.temp.groupSet;
-    paintTarget();
-    steamCard.hidden = !(m.online && machineOn() && m.steamOn);
-    if (!steamDirty && m.pressure?.steamSet !== null && m.pressure?.steamSet !== undefined) steamTarget = m.pressure.steamSet;
-    paintSteam();
+    for (const c of [groupCard, boilerCard, steamCard]) c.update(m);
 
     // laufender Bezug
     if (m.shot.running) {
