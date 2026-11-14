@@ -647,7 +647,7 @@ code.fp { font: 11px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywh
 .navbar-inner.many .nav-item { font-size: 11px; }
 @media (max-width: 420px) { .navbar-inner.many .nav-item { font-size: 10px; letter-spacing: -.3px; } }
 @media (max-width: 380px) { .nav-item { font-size: 11px; letter-spacing: -.2px; } }
-.dash { --cell: 150px; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: var(--cell); gap: 12px; align-items: stretch; grid-auto-flow: row dense; }
+.dash { --cell: 180px; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: var(--cell); gap: 12px; align-items: stretch; grid-auto-flow: row dense; }
 /* Raster wie Android-Widgets: Breite in Spalten, Höhe in Zellen; alle Kacheln einer Zeile werden gleich hoch */
 .dash > .tile { background: var(--surface-container-high); border-radius: var(--radius-l); padding: 14px 16px 16px; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; }
 .dash > .tile[hidden] { display: none; }
@@ -656,9 +656,9 @@ code.fp { font: 11px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywh
 .dash > .empty { grid-column: 1 / -1; }
 .dash-cfg-ctl { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .dash-cfg-ctl .small-select { padding: 4px 6px; font-size: 12px; max-width: 112px; }
-.dash-control { display: grid; gap: 10px; align-content: start; }
+.dash-control { display: grid; gap: 6px; align-content: start; }
 .dash-control .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; border-radius: 22px; border: 1px solid var(--outline-variant, rgba(127,127,127,.4)); background: transparent; color: var(--on-surface); font: inherit; font-weight: 600; cursor: pointer; position: relative; overflow: hidden; }
+.seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 22px; border: 1px solid var(--outline-variant, rgba(127,127,127,.4)); background: transparent; color: var(--on-surface); font: inherit; font-weight: 600; cursor: pointer; position: relative; overflow: hidden; }
 .seg-btn[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
 .seg-btn:disabled:not([aria-pressed="true"]) { opacity: .45; cursor: default; }
 .seg-btn:disabled[aria-pressed="true"] { cursor: default; }

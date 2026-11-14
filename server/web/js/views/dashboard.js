@@ -12,11 +12,13 @@ import { ALERT_TEXT } from '../../shared/grinder-core.js';
 import { shotMetrics } from '../../shared/shot-analysis.js';
 
 // w: Spalten (0 = ganze Breite), h: Höhe in Zellen
+// Reihenfolge = Standardanordnung. Bei vier Spalten: Status | Instrumente (3 Spalten), darunter Schalter,
+// Letzter Bezug, Bezüge pro Tag, Bezugszeiten, dann der Verlauf über die ganze Breite.
 const TILES = {
   shot: { title: 'Live-Bezug', icon: 'coffee', w: 0, h: 2, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
-  gauges: { title: 'Instrumente', icon: 'thermo', w: 0, h: 1, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
+  status: { title: 'Status', icon: 'power', w: 1, h: 2, build: statusTile },
+  gauges: { title: 'Instrumente', icon: 'thermo', w: 3, h: 2, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
   control: { title: 'Schalter', icon: 'power', w: 1, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
-  status: { title: 'Status', icon: 'power', w: 1, h: 1, build: statusTile },
   lastShot: { title: 'Letzter Bezug', icon: 'coffee', w: 1, h: 1, build: lastShotTile, link: '/bezuege' },
   lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', w: 1, h: 1, build: lastGrindTile, link: '/muehle' },
   week: { title: 'Bezüge pro Tag', icon: 'event', w: 1, h: 1, build: weekTile, link: '/bezuege' },
@@ -24,20 +26,20 @@ const TILES = {
   grinds: { title: 'Mahlgewichte', icon: 'scale', w: 1, h: 1, build: grindsTile, link: '/muehle' },
   grinder: { title: 'Mühle heute', icon: 'grinder', w: 1, h: 1, build: grinderTile, link: '/muehle' },
   care: { title: 'Pflege', icon: 'check', w: 1, h: 1, build: careTile, link: '/bezuege' },
-  live: { title: 'Verlauf (10 min)', icon: 'history', w: 0, h: 1, build: liveTile },
+  live: { title: 'Verlauf (10 min)', icon: 'history', w: 0, h: 2, build: liveTile },
 };
 const GRINDER_TILES = new Set(['lastGrind', 'grinds', 'grinder']);
 const KEY = 'dashboard';
-const LAYOUT_VERSION = 4; // 3: Breite in Spalten und Höhe in Zellen statt nur „breit“; 4: Instrumente nach oben
+const LAYOUT_VERSION = 5; // 3: Breite/Höhe in Zellen; 4: Instrumente oben; 5: neue Standardanordnung (Status | Instrumente, Schalter unter Status)
 const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende stehen
 const MIN_COL = 280;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl
 const GAP = 12;
 const WIDTHS = [[1, '1 Spalte'], [2, '2 Spalten'], [3, '3 Spalten'], [0, 'Ganze Breite']];
 const HEIGHTS = [[1, 'Höhe 1'], [2, 'Höhe 2'], [3, 'Höhe 3'], [4, 'Höhe 4']];
-const CELL = 150;           // Höhe einer Zelle (px), wie --cell in app.css
+const CELL = 180;           // Höhe einer Zelle (px), wie --cell in app.css
 // Mindesthöhe je Kachel in Zellen: wird bei jeder Anordnung für die aktuelle Breite gemessen (Inhalt bei 1 Zelle).
 // Bis dahin (oder für gerade ausgeblendete Kacheln wie den Live-Bezug) gelten diese Werte.
-const MIN_ROWS = { shot: 2, gauges: 2, control: 2, status: 2 };
+const MIN_ROWS = { shot: 2, gauges: 2, status: 2, live: 2 };
 const minRows = {};
 const minH = (id) => minRows[id] ?? MIN_ROWS[id] ?? 1;
 const clampW = (v, d) => ([0, 1, 2, 3].includes(Number(v)) ? Number(v) : d);
@@ -60,22 +62,21 @@ function loadLayout() {
     return { id: t.id, on: t.on !== false, w, h: v3 ? clampH(t.h, def.h) : def.h };
   });
   for (const id of Object.keys(TILES)) if (!tiles.some((t) => t.id === id)) tiles.push({ id, on: true, w: TILES[id].w, h: TILES[id].h });
-  // Ältere Layouts (vor Version 4): Instrumente einmalig ganz nach oben (hinter den Live-Bezug, der nur beim Bezug erscheint)
-  if (saved && Number(saved.v || 0) < 4) {
-    const i = tiles.findIndex((t) => t.id === 'gauges');
-    const [g] = tiles.splice(i, 1);
-    tiles.splice(tiles[0]?.id === 'shot' ? 1 : 0, 0, g);
+  // Ältere Layouts (vor Version 5): einmalig die neue Standardanordnung, ein-/ausgeblendete Kacheln bleiben
+  if (saved && Number(saved.v || 0) < 5) {
+    const on = Object.fromEntries(tiles.map((t) => [t.id, t.on]));
+    tiles.splice(0, tiles.length, ...Object.keys(TILES).map((id) => ({ id, on: on[id] !== false, w: TILES[id].w, h: TILES[id].h })));
   }
-  return { tiles: pinStatus(tiles), keepAwake: Boolean(saved?.keepAwake) };
+  return { tiles: pinControl(tiles), keepAwake: Boolean(saved?.keepAwake) };
 }
 const saveLayout = (l) => localStorageSet(KEY, JSON.stringify({ ...l, v: LAYOUT_VERSION }));
 
-// „Status“ gehört immer direkt unter „Schalter“: in der Reihenfolge gleich dahinter (beim Anordnen dieselbe Spalte)
-function pinStatus(tiles) {
-  const si = tiles.findIndex((t) => t.id === 'status');
-  if (si < 0 || !tiles.some((t) => t.id === 'control')) return tiles;
-  const [st] = tiles.splice(si, 1);
-  tiles.splice(tiles.findIndex((t) => t.id === 'control') + 1, 0, st);
+// „Schalter“ gehört immer direkt unter „Status“: in der Reihenfolge gleich dahinter (beim Anordnen dieselbe Spalte)
+function pinControl(tiles) {
+  const ci = tiles.findIndex((t) => t.id === 'control');
+  if (ci < 0 || !tiles.some((t) => t.id === 'status')) return tiles;
+  const [ct] = tiles.splice(ci, 1);
+  tiles.splice(tiles.findIndex((t) => t.id === 'status') + 1, 0, ct);
   return tiles;
 }
 
@@ -87,10 +88,15 @@ export function dashboardView(root) {
   // Spaltenzahl aus der verfügbaren Breite; Kacheln spannen über w Spalten (höchstens alle) und h Zellen
   let cols = 1;
   // Erst alle Kacheln auf 1 Zelle setzen und ihren Platzbedarf lesen (ein Layoutdurchgang, kein Zwischenbild),
-  // dann jede über max(gewählte Höhe, Mindesthöhe) Zellen spannen. Zellen sind fest 150 px hoch.
+  // dann jede über max(gewählte Höhe, Mindesthöhe) Zellen spannen. Zellen sind fest CELL px hoch.
   const place = () => {
+    const spanOf = (b) => (b.w === 0 ? cols : Math.min(b.w, cols));
+    // Passen Status und Instrumente nicht nebeneinander (weniger Spalten), kommen die Instrumente nach oben
+    const stB = built.find((b) => b.id === 'status' && !b.el.hidden);
+    const gaB = built.find((b) => b.id === 'gauges');
+    if (gaB) gaB.el.style.order = stB && spanOf(stB) + spanOf(gaB) > cols ? '-1' : '';
     for (const b of built) {
-      const span = b.w === 0 ? cols : Math.min(b.w, cols);
+      const span = spanOf(b);
       b.el.style.setProperty('grid-column', span >= cols ? '1 / -1' : `span ${span}`);
       b.el.style.setProperty('grid-row', 'span 1');
     }
@@ -99,17 +105,17 @@ export function dashboardView(root) {
       minRows[b.id] = Math.min(4, Math.max(1, Math.ceil((b.el.scrollHeight + GAP) / (CELL + GAP))));
     }
     for (const b of built) b.el.style.setProperty('grid-row', `span ${Math.max(b.h, minH(b.id))}`);
-    // Status unter die Schalter: dieselbe Spalte und Breite (die Zeile ergibt sich, weil er direkt dahinter folgt)
-    const ctl = built.find((b) => b.id === 'control' && !b.el.hidden);
-    const st = built.find((b) => b.id === 'status');
+    // Schalter unter den Status: dieselbe Spalte und Breite (die Zeile ergibt sich, weil sie direkt dahinter folgen)
+    const st = built.find((b) => b.id === 'status' && !b.el.hidden);
+    const ctl = built.find((b) => b.id === 'control');
     if (ctl && st) {
-      const span = ctl.w === 0 ? cols : Math.min(ctl.w, cols);
-      if (span >= cols) st.el.style.setProperty('grid-column', '1 / -1');
+      const span = spanOf(st);
+      if (span >= cols) ctl.el.style.setProperty('grid-column', '1 / -1');
       else {
         const g = grid.getBoundingClientRect();
         const colW = (g.width - (cols - 1) * GAP) / cols;
-        const col = Math.round((ctl.el.getBoundingClientRect().left - g.left) / (colW + GAP)) + 1;
-        st.el.style.setProperty('grid-column', `${col} / span ${span}`);
+        const col = Math.round((st.el.getBoundingClientRect().left - g.left) / (colW + GAP)) + 1;
+        ctl.el.style.setProperty('grid-column', `${col} / span ${span}`);
       }
     }
   };
@@ -199,21 +205,21 @@ export function dashboardView(root) {
     const paint = () => list.replaceChildren(visible().map((t, i, vis) => {
       const def = TILES[t.id];
       const move = (d) => {
-        // Status überspringen: er hängt fest unter den Schaltern und wandert mit ihnen
+        // Schalter überspringen: sie hängen fest unter dem Status und wandern mit ihm
         let j = i + d;
-        while (vis[j]?.id === 'status') j += d;
+        while (vis[j]?.id === 'control') j += d;
         const next = vis[j];
         if (!next) return;
         const a = layout.tiles.indexOf(t);
         const b = layout.tiles.indexOf(next);
         [layout.tiles[a], layout.tiles[b]] = [layout.tiles[b], layout.tiles[a]];
-        pinStatus(layout.tiles);
+        pinControl(layout.tiles);
         changed();
       };
-      const pinned = t.id === 'status' && layout.tiles.some((x) => x.id === 'control');
+      const pinned = t.id === 'control' && layout.tiles.some((x) => x.id === 'status');
       return h('div', { class: 'list-item dash-cfg-row' },
         switchEl({ checked: t.on, label: def.title, onChange: (on) => { t.on = on; changed(); } }),
-        h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), pinned ? h('div', { class: 'sub' }, 'Immer unter „Schalter“, gleiche Breite') : def.note ? h('div', { class: 'sub' }, def.note) : null),
+        h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), pinned ? h('div', { class: 'sub' }, 'Immer unter „Status“, gleiche Breite') : def.note ? h('div', { class: 'sub' }, def.note) : null),
         h('div', { class: 'dash-cfg-ctl' },
           pinned ? null : sizeSelect(WIDTHS, t.w, `${def.title}: Breite`, (v) => { t.w = v; changed(); }),
           // Nur Höhen anbieten, in die der Inhalt bei der aktuellen Breite passt
@@ -292,8 +298,8 @@ function sizeSelect(options, value, label, onChange) {
 // --- Kacheln -----------------------------------------------------------------------
 // Jede Kachel: build({wide, h}) → { body, update(ctx) → {hidden?, extra?} }; ctx = { m: Maschine, g: Mühle|null, shots }
 
-// Zusätzliche Höhe für Diagramme in höheren Kacheln (eine Zelle ≈ 150 px)
-const extraH = (h) => (Math.max(1, h || 1) - 1) * 150;
+// Zusätzliche Höhe für Diagramme in höheren Kacheln (eine Zelle = CELL px)
+const extraH = (h) => (Math.max(1, h || 1) - 1) * CELL;
 
 function shotTile({ wide, h: rows }) {
   const chart = h('div', { class: 'chart-box' });
@@ -309,7 +315,7 @@ function shotTile({ wide, h: rows }) {
       if (!running && !recent) return { hidden: true };
       const curve = running ? m.shot.curve : ls.curve;
       const secs = running ? (m.shot.timeMs || 0) / 1000 : (ls.timeMs || 0) / 1000;
-      chart.replaceChildren(shotChart(curve, { live: running, width: wide ? 560 : 320, height: Math.max(140, (wide ? 220 : 160) + extraH(rows) - 150) }));
+      chart.replaceChildren(shotChart(curve, { live: running, width: wide ? 560 : 320, height: Math.max(140, (wide ? 220 : 160) + extraH(rows) - CELL) }));
       const p = running ? m.pressure.pump : ls.maxPressure;
       const w = running ? m.scale.weight : ls.weight;
       const flow = running ? (m.scale.rate || m.flow.rate) : null;
@@ -626,7 +632,11 @@ function liveTile({ wide, h: rows }) {
   return {
     body: [box, legend],
     update() {
-      box.replaceChildren(liveChart(liveHistory, SERIES, { width: wide ? 640 : 320, height: (wide ? 200 : 150) + extraH(rows), spanMs: 10 * 60e3 }));
+      // Diagramm im Seitenverhältnis der Kachel zeichnen (Faktor 0,6 → Schrift und Linien etwa 1,7-fach), damit
+      // es die Fläche füllt, ohne die Beschriftung zu verkleinern
+      const bw = box.clientWidth, bh = box.clientHeight;
+      const size = bw > 50 && bh > 30 ? { width: Math.round(bw * 0.6), height: Math.round(bh * 0.6) } : { width: wide ? 640 : 320, height: (wide ? 200 : 150) + extraH(rows) };
+      box.replaceChildren(liveChart(liveHistory, SERIES, { ...size, spanMs: 10 * 60e3 }));
       return {};
     },
   };

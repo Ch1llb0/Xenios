@@ -465,7 +465,10 @@ export class Machine extends Emitter {
     // Paddle-Pumpen (Status 5) zählt die Maschine womöglich als Bezug: wie einen live gesehenen Start merken,
     // damit der Zählerabgleich daraus keinen „nachträglichen“ Bezug ohne Dauer macht (vergessen nach 3 min).
     if (status === 5 && prevStatus !== 5) this._liveStarts.push(Date.now());
-    s.steamOn = num(d.SB_STATUS) === 2;
+    // Dampfkessel an: neue Firmware SB_STATUS 2; alte Firmware wie deren Original-Oberfläche „alles außer 1 (aus)“,
+    // die DBL meldet beim Aufheizen einen anderen Wert als 2
+    const sb = num(d.SB_STATUS);
+    s.steamOn = this.api.general ? sb === 2 : sb !== null && sb !== 1;
     s.temp.groupRaw = num(d.BG_SENS_TEMP_A);
     s.temp.boilerRaw = num(d.BB_SENS_TEMP_A);
     s.temp.group = this._temp(s.temp.groupRaw, this._offsets.bg);
@@ -650,7 +653,7 @@ export class Machine extends Emitter {
         estimated: true, // nicht live erfasst: Zeitpunkt = Zeitpunkt der Zählerprüfung
       };
       // Zu kurze (Spülen/Backflush) bleiben im Speicher, werden aber nicht gelistet (listedShots)
-      if (i === 0 && !(timeMs && timeMs < this.minShotMs)) this.state.lastShot = shot;
+      if (i === 0 && timeMs && timeMs >= this.minShotMs) this.state.lastShot = shot;
       this._log(shot);
     }
     this.history.save();
@@ -780,7 +783,9 @@ export class Machine extends Emitter {
   // Bezüge, die gelistet werden: ohne zu kurze (bewertete/notierte bleiben immer sichtbar)
   listedShots() {
     const min = this.minShotMs;
-    return this.history.data.shots.filter((s) => !(s.timeMs && s.timeMs < min && !s.notes && !s.dose));
+    // Zu kurz oder Dauer unbekannt (nachträglich erkannt, ohne Bezugszeit) → nicht listen, außer bewertet/mit Dosis
+    const short = (s) => (s.timeMs ? s.timeMs < min : Boolean(s.estimated)) || (s.timeMs === 0);
+    return this.history.data.shots.filter((s) => !(short(s) && !s.notes && !s.dose));
   }
 
   shots(limit = 30, { curves = limit } = {}) {
