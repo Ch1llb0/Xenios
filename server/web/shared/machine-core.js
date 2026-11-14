@@ -365,7 +365,7 @@ export class Machine extends Emitter {
         await this.refreshSlow();
         this._slowAt = Date.now() + this.cfg.slowPollMs;
       }
-      const d = await this.client.get(this.api.livePath);
+      const d = await this.client.get(this.livePath);
       this._applyLive(normalizeLive(d));
       this._markOnline();
     } catch (e) {
@@ -383,7 +383,7 @@ export class Machine extends Emitter {
       try { general = await this.client.get('/api/v2/general'); } catch (e) { log.debug(`general nicht lesbar: ${e.message}`); }
     }
     // Live-Abfrage der alten API ist schon /overview; ein zweites Mal nur, wenn wir diagram/get pollen
-    const overview = this.api.livePath === '/api/v2/overview' ? (this._lastDiag || await this.client.get('/api/v2/overview')) : await this.client.get('/api/v2/overview');
+    const overview = this.livePath === '/api/v2/overview' ? (this._lastDiag || await this.client.get('/api/v2/overview')) : await this.client.get('/api/v2/overview');
     this._applySlow(single, general, overview);
     if (!this.state.info) {
       try {
@@ -462,6 +462,9 @@ export class Machine extends Emitter {
     const st = MA_STATUS[status] || { key: 'unknown', label: `Status ${status}` };
     s.statusKey = st.key;
     s.statusLabel = st.label;
+    // Paddle-Pumpen (Status 5) zählt die Maschine womöglich als Bezug: wie einen live gesehenen Start merken,
+    // damit der Zählerabgleich daraus keinen „nachträglichen“ Bezug ohne Dauer macht (vergessen nach 3 min).
+    if (status === 5 && prevStatus !== 5) this._liveStarts.push(Date.now());
     s.steamOn = num(d.SB_STATUS) === 2;
     s.temp.groupRaw = num(d.BG_SENS_TEMP_A);
     s.temp.boilerRaw = num(d.BB_SENS_TEMP_A);
@@ -997,6 +1000,13 @@ export class Machine extends Emitter {
     return this.api.general ? BUILTIN_SCRIPTS : CLASSIC_BUILTIN_SCRIPTS;
   }
 
+  // Live-Abfrage: neue Xenia und DBL mit Seiten-API über diagram/get (mit Bezugszeit der Maschine und Waage),
+  // ältere alte Firmware über overview (Bezugszeit misst Xenios selbst)
+  get livePath() {
+    if (this.api.general) return this.api.livePath;
+    return this._caps?.pages ? '/api/v2/diagram/get' : '/api/v2/overview';
+  }
+
   get hasPaddle() {
     return this.api.paddle || Boolean(this._caps?.paddle);
   }
@@ -1258,23 +1268,37 @@ export class Machine extends Emitter {
   async setSwitches({ singleDoseG, doubleDoseG, buttons }) {
     if (!this.features.settings) throw httpError(403, 'Einstellungen ändern ist deaktiviert');
     const cur = await this.client.get('/api/v2/switches');
-    const single = singleDoseG ?? cur.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE;
-    const double = doubleDoseG ?? cur.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE;
-    for (const v of [single, double]) if (!(Number(v) > 0 && Number(v) < 200)) throw httpError(400, 'Gewicht muss zwischen 1 und 199 g liegen');
-    const body = { MA_BEVERAGE_WEIGHT_SGL_INT_SCALE: String(single), MA_BEVERAGE_WEIGHT_DBL_INT_SCALE: String(double) };
+    const classic = !this.api.general;
+    const body = {};
+    // Dosis-Gewichte: Die DBL-Oberfläche sendet sie nie (dort feste Mengen), also nur auf ausdrücklichen Wunsch
+    if (!classic || singleDoseG !== undefined || doubleDoseG !== undefined) {
+      const single = singleDoseG ?? cur.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE;
+      const double = doubleDoseG ?? cur.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE;
+      for (const v of [single, double]) if (!(Number(v) > 0 && Number(v) < 200)) throw httpError(400, 'Gewicht muss zwischen 1 und 199 g liegen');
+      body.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE = String(single);
+      body.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE = String(double);
+    }
     if (buttons && typeof buttons === 'object') {
       const valid = new Set([0, ...Object.keys(this.builtinScripts()).map(Number), ...(await this.scripts()).map((s) => s.id)]);
+      // Immer alle sechs Belegungen senden (wie die Schalter-Seite der Original-Oberfläche): Die DBL setzt
+      // fehlende Felder auf „keine“, sonst löscht das Ändern von ③ die Belegung von ④ und umgekehrt.
       for (const key of ['LEFT_LEFT', 'RIGHT_LEFT', 'RIGHT_RIGHT']) {
-        const b = buttons[key];
-        if (!b) continue;
+        const b = buttons[key] || {};
         for (const [press, idx] of [['short', 0], ['long', 1]]) {
-          if (b[press] === undefined) continue;
+          const field = `SWITCH_SET_${key}_${idx}`;
+          if (b[press] === undefined) {
+            const keep = num(cur[field]);
+            if (keep === null) throw httpError(502, `Die Maschine liefert ${field} nicht – nichts gespeichert`);
+            body[field] = String(keep);
+            continue;
+          }
           const id = Number(b[press]);
           if (!Number.isInteger(id) || !valid.has(id)) throw httpError(400, `Unbekanntes Skript ${b[press]} für Taster ${key}`);
-          body[`SWITCH_SET_${key}_${idx}`] = String(id);
+          body[field] = String(id);
         }
       }
     }
+    if (!Object.keys(body).length) return { ok: true };
     await this.client.post('/api/v2/switches', body);
     return { ok: true };
   }

@@ -95,3 +95,37 @@ test('Modellname der alten Firmware: MA_TYPE 3 ist die Xenia DB + L', async () =
   assert.equal(m.state.info.typeName, 'Xenia Dual Boiler + L');
   assert.equal(m.state.info.caps.pages, true);
 });
+
+test('DBL: Live-Werte über diagram/get, Paddle erzeugt keinen Bezug ohne Dauer', async () => {
+  assert.equal(m.livePath, '/api/v2/diagram/get');
+  const live = (status, ms = 0) => ({ MA_STATUS: status, EXTRACTION_TIME_MS: ms, PU_SENS_PRESS: status === 5 ? 6 : 0, SB_STATUS: 1, BG_SENS_TEMP_A: 90, BB_SENS_TEMP_A: 90 });
+  m.history.data.counter = null; // Zählerstand früherer Tests vergessen
+  m._checkCounter(500);
+  const n0 = m.history.data.shots.length;
+  m.state.counters = { extractions: 500 };
+  m._applyLive(live(1));
+  m._applyLive(live(5)); // Paddle/Backflush
+  m._applyLive(live(5));
+  m._applyLive(live(1));
+  m._checkCounter(501); // die Maschine zählt den Paddle-Vorgang mit
+  assert.equal(m.history.data.shots.length, n0, 'kein nachträglicher Eintrag');
+  // ein wirklich verpasster Bezug bekommt die Bezugszeit aus diagram/get und wird bei < 15 s aussortiert
+  m._applyLive(live(1, 8000));
+  m._checkCounter(502);
+  assert.equal(m.history.data.shots[0].timeMs, 8000);
+  assert.ok(!m.listedShots().includes(m.history.data.shots[0]), 'zu kurz: nicht gelistet');
+});
+
+test('Schalter der DBL: Ändern von ③ lässt ④ unverändert (immer alle sechs Belegungen senden)', async () => {
+  xenia.state.switches.SWITCH_SET_RIGHT_RIGHT_0 = 7;
+  xenia.state.switches.SWITCH_SET_RIGHT_RIGHT_1 = 8;
+  const before = xenia.state.log.length;
+  await m.setSwitches({ buttons: { RIGHT_LEFT: { short: 1 } } });
+  assert.equal(xenia.state.switches.SWITCH_SET_RIGHT_LEFT_0, 1);
+  assert.equal(xenia.state.switches.SWITCH_SET_RIGHT_RIGHT_0, 7, '④ kurz bleibt');
+  assert.equal(xenia.state.switches.SWITCH_SET_RIGHT_RIGHT_1, 8, '④ lang bleibt');
+  const post = xenia.state.log.slice(before).find((l) => l.startsWith('POST /api/v2/switches'));
+  const body = JSON.parse(post.slice(post.indexOf('{')));
+  assert.equal(Object.keys(body).filter((k) => k.startsWith('SWITCH_SET_')).length, 6);
+  assert.ok(!('MA_BEVERAGE_WEIGHT_SGL_INT_SCALE' in body), 'DBL: keine Gewichte senden');
+});
