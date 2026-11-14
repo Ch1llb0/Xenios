@@ -39,7 +39,7 @@ const HEIGHTS = [[1, 'Höhe 1'], [2, 'Höhe 2'], [3, 'Höhe 3'], [4, 'Höhe 4']]
 const CELL = 180;           // Höhe einer Zelle (px), wie --cell in app.css
 // Mindesthöhe je Kachel in Zellen: wird bei jeder Anordnung für die aktuelle Breite gemessen (Inhalt bei 1 Zelle).
 // Bis dahin (oder für gerade ausgeblendete Kacheln wie den Live-Bezug) gelten diese Werte.
-const MIN_ROWS = { shot: 2, gauges: 2, status: 2, live: 2 };
+const MIN_ROWS = { shot: 2, status: 2, live: 2 };
 const minRows = {};
 const minH = (id) => minRows[id] ?? MIN_ROWS[id] ?? 1;
 const clampW = (v, d) => ([0, 1, 2, 3].includes(Number(v)) ? Number(v) : d);
@@ -439,8 +439,30 @@ function gaugesTile() {
   const temp = createGauge({ title: 'Brühgruppe', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20, unit: '°C', mano: { min: 0, max: 120, majorStep: 20, minorStep: 5, labelEvery: 20, label: 'GRUPPO' } });
   const boiler = createGauge({ title: 'Brühkessel', min: 20, max: 110, majorStep: 10, minorStep: 2.5, redFrom: 100, digits: 1, labelEvery: 20, unit: '°C', mano: { min: 0, max: 120, majorStep: 20, minorStep: 5, labelEvery: 20, label: 'CAFFÈ' } });
   const steam = createGauge({ title: 'Dampfkessel', min: 0, max: 2.5, majorStep: 0.5, minorStep: 0.1, redFrom: 2, digits: 2, labelEvery: 1, unit: 'bar', mano: { max: 3, majorStep: 0.5, minorStep: 0.1, labelEvery: 0.5, label: 'CALDAIA' } });
+  // Die Manometer füllen die Fläche der Kachel: je nach Breite und Höhe in einer Reihe (4 × 1) oder als 2 × 2,
+  // je nachdem, was größere Instrumente ergibt. So geht die Kachel bis auf Höhe 1 (flachste Version: kleine Reihe).
+  const grid = h('div', { class: 'gauges dash-gauges' }, pressure, temp, boiler, steam);
+  const fit = h('div', { class: 'gauge-fit' }, grid);
+  const OVER = 54; // Titel über und Messwert unter jedem Manometer (px)
+  const GAPX = 6;
+  const GAPY = 8;
+  const arrange = () => {
+    const W = fit.clientWidth;
+    const H = fit.clientHeight;
+    if (!W || !H) return;
+    let best = null;
+    for (const [c, r] of [[4, 1], [2, 2]]) {
+      const size = Math.min((W - GAPX * (c - 1)) / c, (H - r * OVER - GAPY * (r - 1)) / r, 220);
+      if (!best || size > best.size) best = { c, size };
+    }
+    const size = Math.max(36, Math.floor(best.size));
+    grid.style.setProperty('grid-template-columns', `repeat(${best.c}, minmax(0, 1fr))`);
+    grid.style.setProperty('--gsize', `${size}px`);
+    grid.classList.toggle('tiny', size < 90);
+  };
+  new ResizeObserver(arrange).observe(fit);
   return {
-    body: h('div', { class: 'gauges four' }, pressure, temp, boiler, steam),
+    body: fit,
     update({ m }) {
       if (!m) return {};
       pressure.update(m.pressure.pump, 'bar');
