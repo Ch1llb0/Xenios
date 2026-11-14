@@ -156,6 +156,9 @@ export function createMockXenia({ speed = 1, api = 'bbs', pages = false } = {}) 
           case 'POST /api/v2/incdecsb': return setFrom(['SB_SET_PRESS']);
           case 'POST /api/v2/inc_dec': case 'POST /api/v2/inc_dec_sb': res.writeHead(301, { Location: '/' }); return res.end();
           case 'GET /api/v2/switches': return json({ ...s.switches, MA_BEVERAGE_WEIGHT_SGL_INT_SCALE: 25, MA_BEVERAGE_WEIGHT_DBL_INT_SCALE: 50 });
+          case 'POST /api/v2/switches': // wie die echte DBL: nicht gesendete Belegungen werden zu „keine“
+            for (const k of Object.keys(s.switches)) if (k.startsWith('SWITCH_SET_')) s.switches[k] = Number(j[k] ?? 0);
+            return ok();
           default: break;
         }
       }
