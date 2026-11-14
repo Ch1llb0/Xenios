@@ -14,9 +14,9 @@ import { shotMetrics } from '../../shared/shot-analysis.js';
 // w: Spalten (0 = ganze Breite), h: Höhe in Zellen
 const TILES = {
   shot: { title: 'Live-Bezug', icon: 'coffee', w: 0, h: 2, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
+  gauges: { title: 'Instrumente', icon: 'thermo', w: 0, h: 1, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
   control: { title: 'Schalter', icon: 'power', w: 1, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
   status: { title: 'Status', icon: 'power', w: 1, h: 1, build: statusTile },
-  gauges: { title: 'Instrumente', icon: 'thermo', w: 1, h: 1, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
   lastShot: { title: 'Letzter Bezug', icon: 'coffee', w: 1, h: 1, build: lastShotTile, link: '/bezuege' },
   lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', w: 1, h: 1, build: lastGrindTile, link: '/muehle' },
   week: { title: 'Bezüge pro Tag', icon: 'event', w: 1, h: 1, build: weekTile, link: '/bezuege' },
@@ -28,12 +28,18 @@ const TILES = {
 };
 const GRINDER_TILES = new Set(['lastGrind', 'grinds', 'grinder']);
 const KEY = 'dashboard';
-const LAYOUT_VERSION = 3; // 3: Breite in Spalten und Höhe in Zellen statt nur „breit“
+const LAYOUT_VERSION = 4; // 3: Breite in Spalten und Höhe in Zellen statt nur „breit“; 4: Instrumente nach oben
 const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende stehen
 const MIN_COL = 280;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl
 const GAP = 12;
 const WIDTHS = [[1, '1 Spalte'], [2, '2 Spalten'], [3, '3 Spalten'], [0, 'Ganze Breite']];
 const HEIGHTS = [[1, 'Höhe 1'], [2, 'Höhe 2'], [3, 'Höhe 3'], [4, 'Höhe 4']];
+const CELL = 150;           // Höhe einer Zelle (px), wie --cell in app.css
+// Mindesthöhe je Kachel in Zellen: wird bei jeder Anordnung für die aktuelle Breite gemessen (Inhalt bei 1 Zelle).
+// Bis dahin (oder für gerade ausgeblendete Kacheln wie den Live-Bezug) gelten diese Werte.
+const MIN_ROWS = { shot: 2, gauges: 2, control: 2, status: 2 };
+const minRows = {};
+const minH = (id) => minRows[id] ?? MIN_ROWS[id] ?? 1;
 const clampW = (v, d) => ([0, 1, 2, 3].includes(Number(v)) ? Number(v) : d);
 const clampH = (v, d) => ([1, 2, 3, 4].includes(Number(v)) ? Number(v) : d);
 
@@ -46,7 +52,7 @@ function tileVisible(id) {
 function loadLayout() {
   let saved = null;
   try { saved = JSON.parse(localStorageGet(KEY) || 'null'); } catch { /* kaputt → Standard */ }
-  const v3 = saved?.v === LAYOUT_VERSION;
+  const v3 = Number(saved?.v) >= 3;
   const tiles = (Array.isArray(saved?.tiles) ? saved.tiles : []).filter((t) => TILES[t?.id]).map((t) => {
     const def = TILES[t.id];
     // Ältere Layouts: „breit“ wird zur ganzen Breite, die Höhe kommt aus dem Standard
@@ -54,9 +60,24 @@ function loadLayout() {
     return { id: t.id, on: t.on !== false, w, h: v3 ? clampH(t.h, def.h) : def.h };
   });
   for (const id of Object.keys(TILES)) if (!tiles.some((t) => t.id === id)) tiles.push({ id, on: true, w: TILES[id].w, h: TILES[id].h });
-  return { tiles, keepAwake: Boolean(saved?.keepAwake) };
+  // Ältere Layouts (vor Version 4): Instrumente einmalig ganz nach oben (hinter den Live-Bezug, der nur beim Bezug erscheint)
+  if (saved && Number(saved.v || 0) < 4) {
+    const i = tiles.findIndex((t) => t.id === 'gauges');
+    const [g] = tiles.splice(i, 1);
+    tiles.splice(tiles[0]?.id === 'shot' ? 1 : 0, 0, g);
+  }
+  return { tiles: pinStatus(tiles), keepAwake: Boolean(saved?.keepAwake) };
 }
 const saveLayout = (l) => localStorageSet(KEY, JSON.stringify({ ...l, v: LAYOUT_VERSION }));
+
+// „Status“ gehört immer direkt unter „Schalter“: in der Reihenfolge gleich dahinter (beim Anordnen dieselbe Spalte)
+function pinStatus(tiles) {
+  const si = tiles.findIndex((t) => t.id === 'status');
+  if (si < 0 || !tiles.some((t) => t.id === 'control')) return tiles;
+  const [st] = tiles.splice(si, 1);
+  tiles.splice(tiles.findIndex((t) => t.id === 'control') + 1, 0, st);
+  return tiles;
+}
 
 export function dashboardView(root) {
   let layout = loadLayout();
@@ -65,12 +86,36 @@ export function dashboardView(root) {
   const grid = h('div', { class: 'dash stagger' });
   // Spaltenzahl aus der verfügbaren Breite; Kacheln spannen über w Spalten (höchstens alle) und h Zellen
   let cols = 1;
+  // Erst alle Kacheln auf 1 Zelle setzen und ihren Platzbedarf lesen (ein Layoutdurchgang, kein Zwischenbild),
+  // dann jede über max(gewählte Höhe, Mindesthöhe) Zellen spannen. Zellen sind fest 150 px hoch.
   const place = () => {
     for (const b of built) {
       const span = b.w === 0 ? cols : Math.min(b.w, cols);
       b.el.style.setProperty('grid-column', span >= cols ? '1 / -1' : `span ${span}`);
-      b.el.style.setProperty('grid-row', `span ${b.h}`);
+      b.el.style.setProperty('grid-row', 'span 1');
     }
+    for (const b of built) {
+      if (b.el.hidden) continue;
+      minRows[b.id] = Math.min(4, Math.max(1, Math.ceil((b.el.scrollHeight + GAP) / (CELL + GAP))));
+    }
+    for (const b of built) b.el.style.setProperty('grid-row', `span ${Math.max(b.h, minH(b.id))}`);
+    // Status unter die Schalter: dieselbe Spalte und Breite (die Zeile ergibt sich, weil er direkt dahinter folgt)
+    const ctl = built.find((b) => b.id === 'control' && !b.el.hidden);
+    const st = built.find((b) => b.id === 'status');
+    if (ctl && st) {
+      const span = ctl.w === 0 ? cols : Math.min(ctl.w, cols);
+      if (span >= cols) st.el.style.setProperty('grid-column', '1 / -1');
+      else {
+        const g = grid.getBoundingClientRect();
+        const colW = (g.width - (cols - 1) * GAP) / cols;
+        const col = Math.round((ctl.el.getBoundingClientRect().left - g.left) / (colW + GAP)) + 1;
+        st.el.style.setProperty('grid-column', `${col} / span ${span}`);
+      }
+    }
+  };
+  // Wächst ein Inhalt nachträglich (z. B. Zeile „Zieldruck“ beim Einschalten des Dampfkessels), neu anordnen
+  const refit = () => {
+    if (built.some((b) => !b.el.hidden && b.el.scrollHeight > b.el.clientHeight + 1)) place();
   };
   const sizes = new ResizeObserver(() => {
     const width = grid.getBoundingClientRect().width;
@@ -116,6 +161,7 @@ export function dashboardView(root) {
         b.extra.replaceChildren(r.extra ?? '');
       } catch (e) { console.error(b.id, e); }
     }
+    refit();
   }
 
   let maint = null;
@@ -153,27 +199,33 @@ export function dashboardView(root) {
     const paint = () => list.replaceChildren(visible().map((t, i, vis) => {
       const def = TILES[t.id];
       const move = (d) => {
-        const next = vis[i + d];
+        // Status überspringen: er hängt fest unter den Schaltern und wandert mit ihnen
+        let j = i + d;
+        while (vis[j]?.id === 'status') j += d;
+        const next = vis[j];
         if (!next) return;
         const a = layout.tiles.indexOf(t);
         const b = layout.tiles.indexOf(next);
         [layout.tiles[a], layout.tiles[b]] = [layout.tiles[b], layout.tiles[a]];
+        pinStatus(layout.tiles);
         changed();
       };
+      const pinned = t.id === 'status' && layout.tiles.some((x) => x.id === 'control');
       return h('div', { class: 'list-item dash-cfg-row' },
         switchEl({ checked: t.on, label: def.title, onChange: (on) => { t.on = on; changed(); } }),
-        h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), def.note ? h('div', { class: 'sub' }, def.note) : null),
+        h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), pinned ? h('div', { class: 'sub' }, 'Immer unter „Schalter“, gleiche Breite') : def.note ? h('div', { class: 'sub' }, def.note) : null),
         h('div', { class: 'dash-cfg-ctl' },
-          sizeSelect(WIDTHS, t.w, `${def.title}: Breite`, (v) => { t.w = v; changed(); }),
-          sizeSelect(HEIGHTS, t.h, `${def.title}: Höhe`, (v) => { t.h = v; changed(); }),
-          t.id === 'shot' ? null : [
+          pinned ? null : sizeSelect(WIDTHS, t.w, `${def.title}: Breite`, (v) => { t.w = v; changed(); }),
+          // Nur Höhen anbieten, in die der Inhalt bei der aktuellen Breite passt
+          sizeSelect(HEIGHTS.filter(([v]) => v >= minH(t.id)), Math.max(t.h, minH(t.id)), `${def.title}: Höhe`, (v) => { t.h = v; changed(); }),
+          t.id === 'shot' || pinned ? null : [
             h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach oben`, disabled: i === 0, onclick: () => move(-1) }, icon('less')),
             h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]));
     }));
     const changed = () => {
       saveLayout(layout);
+      if (!disposed) build(); // zuerst anordnen: misst die Mindesthöhen für die neue Breite
       paint();
-      if (!disposed) build();
     };
     paint();
     const startHere = localStorageGet('startPage') === '/dashboard';
@@ -282,9 +334,29 @@ function controlTile() {
   const steamSw = switchEl({ label: 'Dampfkessel', onChange: (on, input) => setSteam(on, input) });
   const steamState = h('span', { class: 'muted small' });
   const noSteamSw = switchEl({ checked: noSteamOn(), label: 'Ohne Dampf einschalten', onChange: (on) => setNoSteamOn(on) });
+  // Zieldruck Dampfkessel (nur bei laufendem Dampfkessel): ±0,1 bar, gespeichert 1,5 s nach dem letzten Tipp
+  let steamTarget = null;
+  let steamTimer = null;
+  const sVal = h('span', { class: 'num steam-target' }, '–');
+  const stepSteam = (d) => {
+    if (steamTarget === null) return;
+    steamTarget = Math.round(Math.min(1.8, Math.max(0, steamTarget + d)) * 10) / 10;
+    sVal.textContent = `${fmt(steamTarget)} bar`;
+    clearTimeout(steamTimer);
+    steamTimer = setTimeout(() => {
+      steamTimer = null;
+      run(() => api('/api/machine/settings', { method: 'POST', body: { changes: { SB_SET_PRESS: steamTarget } } }), `Dampfdruck ${fmt(steamTarget)} bar gespeichert`);
+    }, 1500);
+  };
+  const steamRow = h('div', { class: 'ctl-row', hidden: true },
+    icon('tune', 's20'), h('span', { class: 'grow' }, 'Zieldruck'),
+    h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Weniger Druck', onclick: () => stepSteam(-0.1) }, icon('more', 's20')),
+    sVal,
+    h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Mehr Druck', onclick: () => stepSteam(0.1) }, icon('less', 's20')));
   const body = h('div', { class: 'dash-control' },
     h('div', { class: 'seg' }, btnOn, btnEco, btnOff),
     h('div', { class: 'ctl-row' }, icon('cloud', 's20'), h('span', { class: 'grow' }, 'Dampfkessel ', steamState), steamSw),
+    steamRow,
     h('div', { class: 'ctl-row' }, icon('power', 's20'), h('span', { class: 'grow' }, 'Ohne Dampf einschalten'), noSteamSw));
 
   async function run(fn, msg) {
@@ -335,6 +407,11 @@ function controlTile() {
       sIn.disabled = !online || !(on || eco) || !machineOn(m);
       steamState.textContent = !online ? '' : m.steamOn ? (m.steamReady ? `bereit · ${fmt(m.pressure.steam, 1)} bar` : `heizt · ${fmt(m.pressure.steam, 1)} bar`) : 'aus';
       noSteamSw.querySelector('input').checked = noSteamOn();
+      steamRow.hidden = !(online && m.steamOn && machineOn(m));
+      if (!steamTimer && m?.pressure?.steamSet !== null && m?.pressure?.steamSet !== undefined) {
+        steamTarget = m.pressure.steamSet;
+        sVal.textContent = `${fmt(steamTarget)} bar`;
+      }
       return { extra: !online ? h('span', { class: 'badge bad' }, 'Offline') : null };
     },
   };
@@ -544,7 +621,7 @@ function grinderTile() {
 }
 
 function liveTile({ wide, h: rows }) {
-  const box = h('div', {});
+  const box = h('div', { class: 'chart-fit' }); // füllt die Kachel; Höhe kommt aus der gewählten Zellenzahl
   const legend = h('div', { class: 'legend muted small' }, SERIES.map((s) => [h('span', { class: `sw ${s.cls}` }), s.label]));
   return {
     body: [box, legend],
