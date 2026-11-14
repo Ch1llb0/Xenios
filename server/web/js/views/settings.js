@@ -312,7 +312,7 @@ function themeCard() {
   const box = h('div', { class: 'card' });
   const paint = () => {
     const theme = localStorageGet('theme') || 'system';
-    const style = localStorageGet('uiStyle') || THEME_DEFAULTS.style;
+    const style = localStorageGet('uiStyle') === 'material' ? 'material' : 'xenia';
     const chips = (current, list, onPick) => h('div', { class: 'chips' }, list.map(([v, label]) =>
       h('button', { class: 'chip', 'aria-pressed': String(current === v), onclick: () => { onPick(v); applyTheme(); paint(); } }, label)));
     const color = (key, label, fallback) => {
@@ -323,10 +323,10 @@ function themeCard() {
         localStorageGet(key) ? h('button', { class: 'btn text', onclick: () => { try { localStorage.removeItem(key); } catch { /* privat */ } applyTheme(); paint(); } }, 'Standard') : null);
     };
     box.replaceChildren(
-      h('div', { class: 'muted small' }, 'Stil'),
-      chips(style, [['xenia', 'Xenia'], ['material', 'Material']], (v) => { localStorageSet('uiStyle', v); location.reload(); }),
-      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Temperatur- und Druckanzeigen'),
-      chips(localStorageGet('gaugeStyle') || THEME_DEFAULTS.gauge, [['black', 'Wie die Maschine: schwarz'], ['white', 'Wie die Maschine: weiß'], ['app', 'Flach']], (v) => localStorageSet('gaugeStyle', v)),
+      h('div', { class: 'muted small' }, 'Farbvorlage (Layout, Schrift und Icons bleiben gleich)'),
+      chips(style, [['xenia', 'Xenia'], ['material', 'Material']], (v) => localStorageSet('uiStyle', v)),
+      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Manometer (Temperatur- und Druckanzeigen)'),
+      chips(localStorageGet('gaugeStyle') === 'white' ? 'white' : 'black', [['black', 'Zifferblatt schwarz'], ['white', 'Zifferblatt weiß']], (v) => localStorageSet('gaugeStyle', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
       chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Farben (gilt für dieses Gerät)'),

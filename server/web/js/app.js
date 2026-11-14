@@ -33,17 +33,18 @@ let current = null;      // { route, dispose }
 
 // --- Darstellung --------------------------------------------------------------
 // Stil „xenia“ (Standard, wie die Web-Oberfläche der Maschine) oder „material“; dazu optional eigene Akzent- und Aktiv-Farbe.
-export const THEME_DEFAULTS = { style: 'xenia', gauge: 'black', accent: { xenia: '#4f9a1c', material: '#4a5891' }, active: { xenia: '#f5862f', material: '#4a5891' } };
+// Design (Layout, Schrift, Icons, Navigation) ist immer das der Xenia. Einstellbar sind nur Farben:
+// Farbvorlage (xenia/material), eigene Akzent-/Aktiv-Farbe, Hell/Dunkel und das Zifferblatt der Manometer.
+export const THEME_DEFAULTS = { palette: 'xenia', gauge: 'black', accent: { xenia: '#4f9a1c', material: '#4a5891' }, active: { xenia: '#f5862f', material: '#5c6bc0' } };
 export function applyTheme(theme = localStorageGet('theme') || 'system') {
   const root = document.documentElement;
   if (theme === 'system') delete root.dataset.theme;
   else root.dataset.theme = theme;
-  const style = localStorageGet('uiStyle') || THEME_DEFAULTS.style;
-  root.dataset.style = style;
-  // Anzeigen: wie die Manometer der Maschine (schwarz/weiß) oder flach („app“)
-  const gauge = localStorageGet('gaugeStyle') || THEME_DEFAULTS.gauge;
-  if (gauge === 'app') delete root.dataset.gauge;
-  else root.dataset.gauge = gauge;
+  root.dataset.style = 'xenia';
+  const palette = localStorageGet('uiStyle') === 'material' ? 'material' : 'xenia';
+  if (palette === 'material') root.dataset.palette = 'material';
+  else delete root.dataset.palette;
+  root.dataset.gauge = localStorageGet('gaugeStyle') === 'white' ? 'white' : 'black';
   const setColor = (name, onName, value, extra) => {
     if (!value) {
       for (const n of [name, onName, ...Object.keys(extra || {})]) root.style.removeProperty(n);
@@ -61,7 +62,7 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
   } : null);
   setColor('--active', '--on-active', localStorageGet('activeColor'));
   const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  const bar = style === 'xenia' ? (dark ? '#2b2d34' : '#383c44') : (dark ? '#121318' : '#fbf8ff');
+  const bar = palette === 'material' ? (dark ? '#1b1b21' : '#2f3e74') : (dark ? '#2b2d34' : '#383c44');
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', bar));
 }
 // Schrift auf einer Farbfläche: schwarz oder weiß, je nach Helligkeit
@@ -99,6 +100,8 @@ function buildNav() {
   const inner = h('div', { class: `navbar-inner${routes.length > 5 ? ' many' : ''}${routes.length > 7 ? ' lots' : ''}` }, routes.map((r) =>
     h('button', { class: 'nav-item', dataset: { path: r.path }, onclick: () => navigate(r.path) },
       h('span', { class: 'pill' }, icon(r.icon)), h('span', { class: 'nav-label' }, r.label))));
+  // Auf kleinen Bildschirmen nur Symbole: Name als Tooltip und für Screenreader
+  inner.querySelectorAll('.nav-item').forEach((b, i) => { b.title = routes[i].label; b.setAttribute('aria-label', routes[i].label); });
   $('navbar').replaceChildren(inner);
 }
 

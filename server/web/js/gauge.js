@@ -10,14 +10,14 @@ function polar(r, deg) {
 }
 
 let gaugeNo = 0;
-// Stil der Anzeigen (Einstellungen → Darstellung): „black“/„white“ wie die Manometer der Maschine, „app“ flach
-export const gaugeStyle = () => document.documentElement.dataset.gauge || 'app';
+// Zifferblatt der Manometer (Einstellungen → Darstellung): „black“ oder „white“ wie an der Maschine
+export const gaugeStyle = () => (document.documentElement.dataset.gauge === 'white' ? 'white' : 'black');
 
 const num = (v) => String(Math.round(v * 10) / 10); // Skalenzahlen wie auf dem Manometer: 0.5, 1, 1.5 …
 
 // mano: abweichende Skala für den Manometer-Stil (z. B. Pumpe 0–16 bar wie an der Maschine) und Aufschrift
 export function createGauge({ title, min, max, majorStep, minorStep, redFrom = null, digits = 1, labelEvery = majorStep, unit = '', mano: manoOpts = {} }) {
-  const mano = gaugeStyle() !== 'app';
+  const mano = true; // immer im Stil der Manometer der Maschine
   if (mano) ({ min = min, max = max, majorStep = majorStep, minorStep = minorStep, labelEvery = labelEvery } = { ...manoOpts });
   const gid = `gb${++gaugeNo}`;
   const near = (x) => Math.abs(x - Math.round(x)) < 1e-6;

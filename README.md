@@ -10,7 +10,7 @@ Sicherer Web-Server, installierbare Web-App (PWA) und native Android-App mit Wid
 
 **Einstellungen** als eigener Tab, gegliedert wie die Seite der Maschine (Waage, Maschine, Brühgruppe, Brühkessel, Dampfkessel, Pumpe inkl. Bezugszeit für Standardbezüge, PID, Timer, Schalter, System, Wi-Fi, Aufzeichnung, Firmware). Die Xenia DBL mit Firmware 4.1xx wird erkannt und über die Endpunkte ihrer Original-Seiten eingestellt.
 
-**Anpassen** (je Gerät): Stil „Xenia“ (Schrift, Farben und Icons wie die Web-Oberfläche der Maschine, Standard) oder „Material“, Temperatur- und Druckanzeigen wie die Manometer der Maschine (schwarz oder weiß) oder flach, Akzent- und Aktiv-Farbe frei wählbar, Tabs der unteren Leiste ein-/ausblenden, Komponenten wie Mühle, Waage oder Pflege komplett ausblenden, „Ohne Dampf einschalten“ als Standard für Ein. Bezüge unter einer Mindestdauer (Standard 15 s) werden aussortiert. Dashboard-Kacheln in Breite (Spalten) und Höhe (Zellen) wählbar, Kachel „Schalter“ für Ein/Eco/Aus und Dampf.
+**Design** wie die Web-Oberfläche der Maschine (Schrift, Icons, Navigation links bzw. am Handy unten nur mit Symbolen), Anzeigen wie die Manometer der Maschine. **Anpassen** (je Gerät): Farbvorlage „Xenia“ oder „Material“ (nur Farben), Akzent- und Aktiv-Farbe, Hell/Dunkel, Zifferblatt schwarz oder weiß, Akzent- und Aktiv-Farbe frei wählbar, Tabs der unteren Leiste ein-/ausblenden, Komponenten wie Mühle, Waage oder Pflege komplett ausblenden, „Ohne Dampf einschalten“ als Standard für Ein. Bezüge unter einer Mindestdauer (Standard 15 s) werden aussortiert. Dashboard-Kacheln in Breite (Spalten) und Höhe (Zellen) wählbar, Kachel „Schalter“ für Ein/Eco/Aus und Dampf.
 
 ## Aufbau
 
