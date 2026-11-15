@@ -442,9 +442,10 @@ export class Machine extends Emitter {
     };
     s.settings = {};
     for (const k of [...GENERAL_FIELDS, 'BB_FILL_LEVEL', 'MA_FIX_WATER_SUPPLY', 'VIEW']) s.settings[k] = num(general[k]);
-    s.temp.groupSet = num(single.BG_SET_TEMP ?? general.BG_SET_TEMP);
-    s.temp.boilerSet = num(single.BB_SET_TEMP ?? general.BB_SET_TEMP);
-    s.pressure.steamSet = num(single.SB_SET_PRESS ?? general.SB_SET_PRESS);
+    // Ein gerade erst gespeicherter Sollwert gilt 5 s lang vor dem (evtl. noch alten) Wert der Maschine
+    s.temp.groupSet = this._recentSaved('groupSet') ?? num(single.BG_SET_TEMP ?? general.BG_SET_TEMP);
+    s.temp.boilerSet = this._recentSaved('boilerSet') ?? num(single.BB_SET_TEMP ?? general.BB_SET_TEMP);
+    s.pressure.steamSet = this._recentSaved('steamSet') ?? num(single.SB_SET_PRESS ?? general.SB_SET_PRESS);
     s.pressure.pumpSet = num(single.PU_SET_PRESS);
     const tankOk = num(single.PU_SENS_WATER_TANK_LEVEL) === 1;
     if (s.tankOk !== null && s.tankOk && !tankOk) this._event('tank', { title: 'Wassertank leer', body: 'Bitte Wasser nachfüllen.' });
@@ -957,6 +958,30 @@ export class Machine extends Emitter {
 
   // --- Aktionen ---------------------------------------------------------------
 
+  // Nach dem Speichern von Einstellungen: Sollwerte sofort im Zustand zeigen und die Maschine neu lesen. Mehrere
+  // Speichervorgänge kurz hintereinander könnten sonst einen noch alten Wert lesen und bis zur nächsten langsamen
+  // Abfrage (1 min) anzeigen; deshalb nach 3 s noch einmal lesen.
+  _settingsSaved(changes) {
+    const s = this.state;
+    const v = (k) => (k in changes && Number.isFinite(Number(changes[k])) ? Number(changes[k]) : null);
+    if (v('BG_SET_TEMP') !== null) s.temp.groupSet = v('BG_SET_TEMP');
+    if (v('BB_SET_TEMP') !== null) s.temp.boilerSet = v('BB_SET_TEMP');
+    if (v('SB_SET_PRESS') !== null) s.pressure.steamSet = v('SB_SET_PRESS');
+    this._savedSet = { at: Date.now(), groupSet: v('BG_SET_TEMP') ?? this._recentSaved('groupSet'), boilerSet: v('BB_SET_TEMP') ?? this._recentSaved('boilerSet'), steamSet: v('SB_SET_PRESS') ?? this._recentSaved('steamSet') };
+    this.emit('state');
+    this._slowAt = 0;
+    this._acted();
+    clearTimeout(this._rereadTimer);
+    this._rereadTimer = setTimeout(() => { this._slowAt = 0; if (!this._stopped) this.kick(); }, 3000);
+    this._rereadTimer.unref?.();
+  }
+
+  // Kurz zuvor gespeicherter Sollwert (5 s): hat Vorrang vor einem noch alten Wert aus der Maschine
+  _recentSaved(key) {
+    const r = this._savedSet;
+    return r && Date.now() - r.at < 5000 ? r[key] ?? null : null;
+  }
+
   _acted() {
     this._lastAppAction = Date.now();
     setTimeout(() => this.kick(), 300);
@@ -1071,8 +1096,7 @@ export class Machine extends Emitter {
     }
     for (const k of Object.keys(changes)) if (!GENERAL_FIELDS.includes(k)) throw httpError(400, `Unbekannte Einstellung ${k}`);
     await this.client.post('/api/v2/general', body);
-    this._slowAt = 0;
-    this._acted();
+    this._settingsSaved(changes);
     return { ok: true };
   }
 
@@ -1101,8 +1125,7 @@ export class Machine extends Emitter {
     if ('SB_SET_PRESS' in changes) {
       await post(['/api/v2/incdecsb', '/api/v2/inc_dec_sb'], { SB_SET_PRESS: String(changes.SB_SET_PRESS) });
     }
-    this._slowAt = 0;
-    this._acted();
+    this._settingsSaved(changes);
     return { ok: true };
   }
 
@@ -1137,8 +1160,7 @@ export class Machine extends Emitter {
       const path = pg.path === '/api/v2/pump' && !('PU_MODE' in body) ? '/api/v2/pump2' : pg.path;
       await this.client.post(path, body);
     }
-    this._slowAt = 0;
-    this._acted();
+    this._settingsSaved(changes);
     return { ok: true };
   }
 

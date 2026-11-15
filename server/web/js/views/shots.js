@@ -1,7 +1,7 @@
 // Bezugs-Protokoll: alle Bezüge dauerhaft (Server-Datei bzw. App-Speicher), Statistik, Filter, Pflege, CSV-Export.
 // Ein Bezug öffnet die Analyse (Kurve mit Vergleich, Kennzahlen, Bewertung).
 import { h, icon, fmt, fmtInt, snackbar, sheet, confirmDialog } from '../ui.js';
-import { api, subscribe } from '../api.js';
+import { api, subscribe, hasPaddle } from '../api.js';
 import { setTopActions, navigate } from '../app.js';
 import { isHidden } from '../prefs.js';
 import { shotMetrics, dialIn } from '../../shared/shot-analysis.js';
@@ -11,6 +11,8 @@ import { openShot, quickRate, adviceNote } from './shot-detail.js';
 // Backflush starten (direkte Pumpensteuerung, auch aus dem Skripte-Tab): erst nachfragen, dann mit Stopp in der Meldung.
 // Er trägt sich nach dem Lauf selbst als erledigt ein.
 export async function startBackflush() {
+  // Ohne direkte Pumpensteuerung (ältere Firmware der alten Xenia) gar nicht erst nachfragen
+  if (!hasPaddle()) return snackbar('Backflush braucht die direkte Pumpensteuerung, diese Xenia hat sie nicht');
   const content = h('div', {}, h('p', { class: 'muted' }, 'Blindträger installiert?'), h('p', { class: 'muted' }, 'Driptray ausgeleert?'));
   if (!(await confirmDialog('Backflush starten?', content, 'Starten'))) return;
   try {

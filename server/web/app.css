@@ -258,7 +258,7 @@ input[type="range"]::-moz-range-thumb { width: 4px; height: 32px; border: 0; bor
 .gauge .g-tick.major { stroke-width: 2.4; }
 .gauge .g-zone { stroke: var(--danger); stroke-width: 2.4; }
 .gauge .g-label { fill: var(--on-surface-variant); font-size: 9px; text-anchor: middle; }
-.gauge .g-needle { fill: var(--gauge-needle); transition: transform .6s cubic-bezier(.3,1.3,.5,1); transform-origin: 100px 100px; }
+.gauge .g-needle { fill: var(--gauge-needle); transition: transform .35s cubic-bezier(.3,1.2,.5,1); transform-origin: 100px 100px; }
 .gauge .g-hub { fill: var(--gauge-needle); }
 .gauge .g-value { fill: var(--on-surface); font-size: 26px; font-weight: 700; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .gauge .g-sub { fill: var(--on-surface-variant); font-size: 10px; text-anchor: middle; }

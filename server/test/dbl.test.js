@@ -129,3 +129,19 @@ test('Schalter der DBL: Ändern von ③ lässt ④ unverändert (immer alle sech
   assert.equal(Object.keys(body).filter((k) => k.startsWith('SWITCH_SET_')).length, 6);
   assert.ok(!('MA_BEVERAGE_WEIGHT_SGL_INT_SCALE' in body), 'DBL: keine Gewichte senden');
 });
+
+test('Gespeicherte Sollwerte bleiben stehen, auch wenn die Maschine kurz noch den alten Wert meldet', async () => {
+  await m.updateSettings({ BB_SET_TEMP: 94 });
+  await m.updateSettings({ SB_SET_PRESS: 1.2 });
+  assert.equal(m.state.temp.boilerSet, 94, 'sofort im Zustand');
+  assert.equal(m.state.pressure.steamSet, 1.2);
+  // langsame Abfrage liefert noch die alten Werte (Maschine hat noch nicht übernommen)
+  m._applySlow({ BG_SET_TEMP: 93.5, BB_SET_TEMP: 92, SB_SET_PRESS: 1.6, PU_SENS_WATER_TANK_LEVEL: 1 }, {}, { MA_EXTRACTIONS: m.history.data.counter });
+  assert.equal(m.state.temp.boilerSet, 94, 'früher gespeicherter Wert bleibt');
+  assert.equal(m.state.pressure.steamSet, 1.2);
+  // nach Ablauf der Schonfrist gilt wieder die Maschine
+  m._savedSet.at -= 6000;
+  m._applySlow({ BG_SET_TEMP: 93.5, BB_SET_TEMP: 94, SB_SET_PRESS: 1.2, PU_SENS_WATER_TANK_LEVEL: 1 }, {}, { MA_EXTRACTIONS: m.history.data.counter });
+  assert.equal(m.state.temp.boilerSet, 94);
+  clearTimeout(m._rereadTimer);
+});

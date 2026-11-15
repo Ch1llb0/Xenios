@@ -55,6 +55,7 @@ export function homeView(root) {
   function targetCard({ caption, key, min, max, step, unit, digits = 1, read }) {
     let value = null;
     let dirty = false;
+    let hold = null;
     const val = h('button', { class: 'temp-value', title: 'Wert eingeben', onclick: edit }, '–');
     const apply = h('button', { class: 'btn filled wide', disabled: true, onclick: save }, 'Übernehmen');
     const stepBy = (d) => {
@@ -87,6 +88,7 @@ export function homeView(root) {
       try {
         await api('/api/machine/settings', { method: 'POST', body: { changes: { [key]: value } } });
         dirty = false;
+        hold = { value, until: Date.now() + 8000 }; // bis die Maschine den neuen Wert meldet, nicht auf den alten zurückspringen
         snackbar(`${caption}: ${fmt(value, digits)} ${unit} gespeichert`);
       } catch (e) {
         snackbar(e.message);
@@ -95,7 +97,8 @@ export function homeView(root) {
     }
     card.update = (m) => {
       const v = read(m);
-      if (!dirty && v !== null && v !== undefined) value = v;
+      if (hold && (v === hold.value || Date.now() > hold.until)) hold = null;
+      if (!dirty && !hold && v !== null && v !== undefined) value = v;
       paint();
     };
     return card;
