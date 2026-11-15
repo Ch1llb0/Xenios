@@ -7,6 +7,23 @@ import { shotMetrics, dialIn } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
 import { openShot, quickRate, adviceNote } from './shot-detail.js';
 
+// Backflush starten (direkte Pumpensteuerung, auch aus dem Skripte-Tab): erst nachfragen, dann mit Stopp in der Meldung.
+// Er trägt sich nach dem Lauf selbst als erledigt ein.
+export async function startBackflush() {
+  const content = h('div', {}, h('p', { class: 'muted' }, 'Blindträger installiert?'), h('p', { class: 'muted' }, 'Driptray ausgeleert?'));
+  if (!(await confirmDialog('Backflush starten?', content, 'Starten'))) return;
+  try {
+    await api('/api/maintenance/backflush/run', { method: 'POST' });
+    snackbar('Backflush läuft', { action: 'Stopp', duration: 8000, onAction: stopBackflush });
+  } catch (e) {
+    snackbar(e.status === 502 ? 'Start nicht möglich (Maschine aus oder nicht bereit?)' : e.message);
+  }
+}
+
+async function stopBackflush() {
+  try { await api('/api/maintenance/backflush/stop', { method: 'POST' }); snackbar('Backflush wird gestoppt'); } catch (e) { snackbar(e.message); }
+}
+
 export function shotsView(root) {
   const dial = h('div', {});
   const care = h('div', {});
@@ -44,13 +61,7 @@ export function shotsView(root) {
     const done = h('button', { class: `btn ${m.due ? 'filled' : 'tonal'}`, onclick: async () => {
       try { await api('/api/maintenance/backflush', { method: 'POST' }); snackbar('Backflush eingetragen'); loadCare(); } catch (e) { snackbar(e.message); }
     } }, icon('check', 's18'), 'Erledigt');
-    // Startet den Backflush (direkte Pumpensteuerung); trägt sich nach dem Lauf selbst als erledigt ein
-    const run = h('button', { class: 'btn text', onclick: async () => {
-      try {
-        await api('/api/maintenance/backflush/run', { method: 'POST' });
-        snackbar('Backflush läuft – Blindsieb eingesetzt?', { action: 'Stopp', duration: 8000, onAction: () => api('/api/maintenance/backflush/stop', { method: 'POST' }).catch(() => {}) });
-      } catch (e) { snackbar(e.status === 502 ? 'Start nicht möglich (Maschine aus oder nicht bereit?)' : e.message); }
-    } }, icon('play', 's18'), 'Starten');
+    const run = h('button', { class: 'btn text', onclick: startBackflush }, icon('play', 's18'), 'Starten');
     const status = m.lastAt === null ? 'Noch nie eingetragen'
       : `Vor ${m.daysSince === 0 ? 'weniger als einem Tag' : `${fmtInt(m.daysSince)} ${m.daysSince === 1 ? 'Tag' : 'Tagen'}`} · ${fmtInt(m.shotsSince)} Bezüge seitdem`;
     care.replaceChildren(h('section', { class: `card care ${m.due ? 'due' : ''}` },

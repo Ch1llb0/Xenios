@@ -1026,6 +1026,8 @@ export class Machine extends Emitter {
   }
 
   async stopScript() {
+    // Backflush läuft über die Pumpensteuerung, nicht als Skript; „Stoppen“ beendet ihn trotzdem
+    if (this._backflush) return { ...this.stopBackflush(), backflush: true };
     try {
       await this.client.get('/api/v2/scripts/stop');
       return { ok: true, stopped: true };

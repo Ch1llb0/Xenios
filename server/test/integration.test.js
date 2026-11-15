@@ -507,6 +507,16 @@ test('Backflush über die Pumpensteuerung: Runden, Entlasten, eingetragen; Stopp
     assert.equal(r.json.stopped, true);
     assert.ok(await until(() => events.some((e) => e.title === 'Backflush gestoppt'), 8000));
     assert.equal(xenia.state.pumpPw, 0);
+    // „Skript stoppen“ beendet ihn auch
+    await until(() => !app.machine.snapshot().backflush && app.machine.snapshot().status === 1);
+    events.length = 0;
+    await call('POST', '/api/maintenance/backflush/run');
+    await new Promise((ok) => setTimeout(ok, 300));
+    r = await call('POST', '/api/machine/scripts/stop');
+    assert.equal(r.json.stopped, true);
+    assert.equal(r.json.backflush, true);
+    assert.ok(await until(() => events.some((e) => e.title === 'Backflush gestoppt'), 8000));
+    assert.equal(xenia.state.pumpPw, 0);
     app.machine.off('event', onEvent);
   } finally {
     Object.assign(BACKFLUSH, saved);

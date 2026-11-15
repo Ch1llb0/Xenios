@@ -6,6 +6,7 @@ import { shotChart } from '../gauge.js';
 import { targetCurve, profileSteps } from '../../shared/shot-analysis.js';
 import { scriptName } from '../../shared/visualizer.js';
 import { openCommunity } from './community.js';
+import { startBackflush } from './shots.js';
 
 export function scriptsView(root) {
   return listTab(root);
@@ -111,14 +112,7 @@ function listTab(root) {
   }
   // Backflush über die direkte Pumpensteuerung (10 Runden, mit Blindsieb); zählt nicht als Bezug
   function backflushBtn() {
-    const b = h('button', { class: 'btn tonal', disabled: !machineOn(), onclick: async () => {
-      try {
-        await api('/api/maintenance/backflush/run', { method: 'POST' });
-        snackbar('Backflush läuft – Blindsieb eingesetzt?', { action: 'Stopp', onAction: stopBackflush, duration: 8000 });
-      } catch (e) {
-        snackbar(e.status === 502 ? 'Start nicht möglich (Maschine aus oder nicht bereit?)' : e.message);
-      }
-    } }, icon('play', 's18'), 'Backflush');
+    const b = h('button', { class: 'btn tonal', disabled: !machineOn(), onclick: startBackflush }, icon('play', 's18'), 'Backflush');
     runButtons.push(b);
     return b;
   }
@@ -136,13 +130,10 @@ function listTab(root) {
       snackbar(e.status === 502 ? 'Start nicht möglich (Maschine aus oder nicht bereit?)' : e.message);
     }
   }
-  async function stopBackflush() {
-    try { await api('/api/maintenance/backflush/stop', { method: 'POST' }); snackbar('Backflush wird gestoppt'); } catch (e) { snackbar(e.message); }
-  }
   async function stop() {
     try {
       const r = await api('/api/machine/scripts/stop', { method: 'POST' });
-      snackbar(r.stopped ? 'Skript gestoppt' : 'Kein Skript aktiv – nichts gestoppt');
+      snackbar(r.backflush ? 'Backflush wird gestoppt' : r.stopped ? 'Skript gestoppt' : 'Kein Skript aktiv – nichts gestoppt');
     } catch (e) {
       snackbar(e.message);
     }
