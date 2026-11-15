@@ -18,8 +18,16 @@ import kotlin.concurrent.thread
 object Widgets {
     const val ACTION_TOGGLE = "app.xeniabridge.widget.TOGGLE"
     const val ACTION_POWER = "app.xeniabridge.widget.POWER"
+    /** ↻ im Widget angetippt: Fehler sofort zeigen. */
     const val ACTION_REFRESH = "app.xeniabridge.widget.REFRESH"
+    /** Automatisch (Android, Nachsehen beim Aufheizen, erneuter Versuch, App verlassen): kurze Aussetzer übergehen. */
+    const val ACTION_UPDATE = "app.xeniabridge.widget.UPDATE"
     const val EXTRA_MODE = "mode"
+
+    /** So viele automatische Updates in Folge dürfen scheitern, bevor das Widget den Fehler zeigt. */
+    private const val QUIET_FAILS = 2
+    /** Abstand der erneuten Versuche, solange kein Live-Zustand da ist (danach greift der letzte Wert). */
+    private val RETRY_MS = longArrayOf(60_000, 120_000, 300_000, 900_000)
 
     private sealed interface View {
         data class Ok(val s: Api.State) : View
@@ -27,10 +35,12 @@ object Widgets {
         data object Busy : View
     }
 
-    /** Im Hintergrund Zustand holen und alle Widgets neu zeichnen. */
+    /**
+     * Im Hintergrund Zustand holen und alle Widgets neu zeichnen. Läuft als Broadcast mit goAsync: Ein bloßer
+     * Thread in einem Hintergrund-Prozess kann eingefroren werden, der Abruf läuft dann in eine Zeitüberschreitung.
+     */
     fun refreshAll(context: Context) {
-        val app = context.applicationContext
-        thread(name = "xenia-widgets") { renderFresh(app) }
+        context.sendBroadcast(Intent(context, StatusWidget::class.java).setAction(ACTION_UPDATE))
     }
 
     private fun hasWidgets(context: Context): Boolean {
@@ -41,21 +51,31 @@ object Widgets {
             m.getAppWidgetIds(ComponentName(context, WideWidget::class.java)).isNotEmpty()
     }
 
-    /** Blockierend (aus einem Hintergrund-Thread aufrufen). */
-    fun renderFresh(context: Context): Api.State? {
-        if (!Prefs(context).configured) {
+    /**
+     * Blockierend (aus einem Hintergrund-Thread aufrufen). quiet: automatisches Update – scheitert der Abruf nur kurz
+     * (Netz nach dem Aufwachen noch nicht da, Netzwechsel), bleibt der letzte Stand stehen und es folgt bald ein neuer Versuch.
+     */
+    fun renderFresh(context: Context, quiet: Boolean = false): Api.State? {
+        val prefs = Prefs(context)
+        if (!prefs.configured) {
             render(context, View.Error(context.getString(R.string.state_login), true))
             return null
         }
         return try {
             val s = Api.state(context)
+            prefs.widgetFails = if (s.online) 0 else prefs.widgetFails + 1
             render(context, View.Ok(s))
-            scheduleFollowUp(context, s)
+            scheduleFollowUp(context, s, prefs.widgetFails)
             AlarmReport.sendIfChanged(context)
             s
         } catch (e: Exception) {
             val login = e is Api.ApiException && e.status == 401
-            render(context, View.Error(if (login) context.getString(R.string.state_login) else Api.message(e), login))
+            val fails = prefs.widgetFails + 1
+            prefs.widgetFails = fails
+            if (login || !quiet || fails > QUIET_FAILS) {
+                render(context, View.Error(if (login) context.getString(R.string.state_login) else Api.message(e), login))
+            }
+            if (!login) schedule(context, retryDelay(fails))
             null
         } finally {
             try {
@@ -64,16 +84,27 @@ object Widgets {
         }
     }
 
-    /** Während die Maschine aufheizt, öfter nachsehen (sonst nur alle 30 min). */
-    private fun scheduleFollowUp(context: Context, s: Api.State) {
-        if (!hasWidgets(context)) return
+    /** Beim Bezug und Aufheizen öfter nachsehen, ohne Live-Zustand bald erneut versuchen (sonst nur alle 30 min). */
+    private fun scheduleFollowUp(context: Context, s: Api.State, fails: Int) {
         val delay = when {
+            !s.online -> retryDelay(fails)
             s.shot -> 30_000L
             s.isOn && !s.heated -> 120_000L
             else -> return
         }
+        schedule(context, delay)
+    }
+
+    private fun retryDelay(fails: Int): Long = RETRY_MS[(fails - 1).coerceIn(0, RETRY_MS.lastIndex)]
+
+    /**
+     * Ein Update nachholen. Weckt das Handy nicht: Bei ausgeschaltetem Bildschirm kommt es mit dem nächsten
+     * Aufwachen, also spätestens, wenn man wieder auf den Startbildschirm schaut. Ersetzt ein schon geplantes.
+     */
+    private fun schedule(context: Context, delay: Long) {
+        if (!hasWidgets(context)) return
         val am = context.getSystemService(AlarmManager::class.java) ?: return
-        am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + delay, broadcast(context, StatusWidget::class.java, ACTION_REFRESH, null, 99))
+        am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + delay, broadcast(context, StatusWidget::class.java, ACTION_UPDATE, null, 99))
     }
 
     /** Aktion aus einem Widget: ausführen, kurz warten, neu zeichnen. Läuft im goAsync-Kontext. */
@@ -84,6 +115,7 @@ object Widgets {
             try {
                 when (intent.action) {
                     ACTION_REFRESH -> renderFresh(app)
+                    ACTION_UPDATE -> renderFresh(app, quiet = true)
                     ACTION_TOGGLE, ACTION_POWER -> {
                         val prefs = Prefs(app)
                         if (!prefs.configured) {
@@ -234,50 +266,27 @@ object Widgets {
     }
 }
 
-/** 1×1: Ein/Aus mit einem Tipp; Farbe zeigt den Zustand. */
-class PowerWidget : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = Widgets.refreshAll(context)
+/** Gemeinsam für alle Widgets: Updates von Android und eigene Aktionen laufen per goAsync (siehe refreshAll). */
+abstract class XeniaWidget : AppWidgetProvider() {
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) =
+        Widgets.handleAction(this, context, Intent(Widgets.ACTION_UPDATE))
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Widgets.ACTION_TOGGLE, Widgets.ACTION_POWER, Widgets.ACTION_REFRESH -> Widgets.handleAction(this, context, intent)
+            Widgets.ACTION_TOGGLE, Widgets.ACTION_POWER, Widgets.ACTION_REFRESH, Widgets.ACTION_UPDATE -> Widgets.handleAction(this, context, intent)
             else -> super.onReceive(context, intent)
         }
     }
 }
+
+/** 1×1: Ein/Aus mit einem Tipp; Farbe zeigt den Zustand. */
+class PowerWidget : XeniaWidget()
 
 /** 3×2: Status, Temperatur, Dampf und Ein/Eco/Aus. */
-class StatusWidget : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = Widgets.refreshAll(context)
-
-    override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            Widgets.ACTION_TOGGLE, Widgets.ACTION_POWER, Widgets.ACTION_REFRESH -> Widgets.handleAction(this, context, intent)
-            else -> super.onReceive(context, intent)
-        }
-    }
-}
+class StatusWidget : XeniaWidget()
 
 /** 4×2: Status, Brühgruppe/Brühkessel/Dampf, nächstes geplantes Einschalten, Ein/Eco/Aus. */
-class LargeWidget : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = Widgets.refreshAll(context)
-
-    override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            Widgets.ACTION_TOGGLE, Widgets.ACTION_POWER, Widgets.ACTION_REFRESH -> Widgets.handleAction(this, context, intent)
-            else -> super.onReceive(context, intent)
-        }
-    }
-}
+class LargeWidget : XeniaWidget()
 
 /** 4×1: Status und Temperatur, Ein/Eco/Aus in einer Zeile. */
-class WideWidget : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = Widgets.refreshAll(context)
-
-    override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            Widgets.ACTION_TOGGLE, Widgets.ACTION_POWER, Widgets.ACTION_REFRESH -> Widgets.handleAction(this, context, intent)
-            else -> super.onReceive(context, intent)
-        }
-    }
-}
+class WideWidget : XeniaWidget()

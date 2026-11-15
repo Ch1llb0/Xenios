@@ -84,6 +84,9 @@ export const BUILTIN_SCRIPTS = { 0: 'Keine', 2: 'Dauerbezug', 7: 'Einfache Dosis
 // Kürzere Pumpvorgänge sind kein Bezug (Spülen, Rückspülen von Hand) und kommen nicht ins Protokoll.
 export const MIN_SHOT_MS = 15000;
 
+// Antwortet die Maschine einmal nicht, wird so bald erneut gefragt; erst der zweite Fehlschlag in Folge gilt als offline.
+const RETRY_AFTER_FAIL_MS = 1500;
+
 // Rückspülen mit Blindsieb über die direkte Pumpensteuerung (Paddle). Skripte bricht die Xenia mit Blindsieb sofort ab
 // (Status 4, Pumpe aus). Paddle-Pumpe läuft nur, solange laufend Befehle kommen; an der Maschine gemessen (01.11.2026):
 // mit 35 % in ~12 s auf 8,5 bar, Spitze ~9,5 bar, beim Halten bis ~10 bar; bei 0 % bleibt er stehen, paddle/stop entlastet.
@@ -330,6 +333,7 @@ export class Machine extends Emitter {
 
   async _loop() {
     clearTimeout(this._timer);
+    let delay = null;
     try {
       if (Date.now() >= this._slowAt) {
         await this.refreshSlow();
@@ -339,10 +343,18 @@ export class Machine extends Emitter {
       this._applyLive(normalizeLive(d));
       this._markOnline();
     } catch (e) {
-      this._markOffline(e);
+      // Ein einzelner Aussetzer (WLAN der Maschine, Zeitüberschreitung) ist noch nicht „offline“: gleich noch einmal
+      // fragen. Sonst meldet z. B. ein Widget, das genau dann nachsieht, bis zum nächsten Update „Offline“.
+      if (this.state.online && !this._retrying) {
+        this._retrying = true;
+        delay = RETRY_AFTER_FAIL_MS;
+        log.debug(`Maschine antwortet nicht (${e.message}), neuer Versuch`);
+      } else {
+        this._markOffline(e);
+      }
     }
     if (this._stopped) return;
-    this._timer = setTimeout(() => this._loop(), this._interval());
+    this._timer = setTimeout(() => this._loop(), delay ?? this._interval());
     this._timer.unref?.();
   }
 
@@ -535,6 +547,7 @@ export class Machine extends Emitter {
     s.online = true;
     s.error = null;
     s.lastSeen = new Date().toISOString();
+    this._retrying = false;
     this._failSince = null;
     this._offlineNotified = false;
   }

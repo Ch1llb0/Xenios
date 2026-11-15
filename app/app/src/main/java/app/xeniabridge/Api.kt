@@ -124,7 +124,11 @@ object Api {
 
     fun state(context: Context): State {
         if (Prefs(context).direct) return DirectMachine.state(context)
-        return serverOrDirect(context, { serverState(context) }) { DirectMachine.state(context) }
+        // Notbetrieb nur, wenn die Maschine im Heimnetz wirklich antwortet. Sonst (kein Netz nach dem Aufwachen,
+        // unterwegs) weiß die App nichts über die Maschine: den Fehler melden statt „Offline“ vorzutäuschen.
+        return serverOrDirect(context, { serverState(context) }) { e ->
+            (try { DirectMachine.state(context) } catch (_: IOException) { null })?.takeIf { it.online } ?: throw e
+        }
     }
 
     private fun serverState(context: Context): State {
@@ -163,12 +167,12 @@ object Api {
     }
 
     /** Server nicht erreichbar (oder Cloudflare meldet ihn als down)? Dann die Maschine direkt im Heimnetz ansprechen. */
-    private fun <T> serverOrDirect(context: Context, server: () -> T, direct: () -> T): T = try {
+    private fun <T> serverOrDirect(context: Context, server: () -> T, direct: (IOException) -> T): T = try {
         server()
     } catch (e: IOException) {
         val down = e !is ApiException || e.status in SERVER_DOWN
         if (!down || Prefs(context).machineIp.isNullOrBlank()) throw e
-        direct()
+        direct(e)
     }
 
     /** HTTP-Status, mit denen Cloudflare oder ein Proxy einen ausgefallenen Server meldet. */

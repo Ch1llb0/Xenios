@@ -31,6 +31,11 @@ class Prefs(context: Context) {
         get() = p.getLong("alarmAt", 0L)
         set(v) = p.edit().putLong("alarmAt", v).apply()
 
+    /** Widget-Updates in Folge ohne Live-Zustand der Maschine (bestimmt den Abstand der erneuten Versuche). */
+    var widgetFails: Int
+        get() = p.getInt("widgetFails", 0)
+        set(v) = p.edit().putInt("widgetFails", v).apply()
+
     /** "server" (über Xenios) oder "direct" (Maschine/Mühle direkt im Heimnetz, ohne Server). */
     var mode: String
         get() = p.getString("mode", null) ?: "server"
