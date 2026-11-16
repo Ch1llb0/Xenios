@@ -8,7 +8,7 @@ import { controlsView, paddleView } from './views/controls.js';
 import { shotsView } from './views/shots.js';
 import { timerView } from './views/timer.js';
 import { grinderView } from './views/grinder.js';
-import { settingsView } from './views/settings.js';
+import { settingsView, machineSettingsView } from './views/settings.js';
 import { serverView } from './views/server.js';
 import { showSetup } from './setup.js';
 import { quickRate } from './views/shot-detail.js';
@@ -25,7 +25,8 @@ const ROUTES = [
   { path: '/muehle', label: 'Mühle', icon: 'grinder', view: grinderView, title: 'Mühle' },
   // Einstellungen: immer in der Leiste, lässt sich nicht ausblenden
   { path: '/einstellungen', label: 'Einstellungen', icon: 'settings', view: settingsView, title: 'Einstellungen', fixed: true },
-  { path: '/server', label: 'Server', icon: 'shield', view: serverView, title: 'Server & Sicherheit', nav: false, back: '/einstellungen' },
+  { path: '/einstellungen/maschine', label: 'Maschine', icon: 'settings', view: machineSettingsView, title: 'Maschinen-Einstellungen', nav: false, back: '/einstellungen' },
+  { path: '/server', label: 'Server', icon: 'shield', view: serverView, title: 'Server- & App-Einstellungen', nav: false, back: '/einstellungen' },
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -103,6 +104,14 @@ function buildNav() {
   // Auf kleinen Bildschirmen nur Symbole: Name als Tooltip und für Screenreader
   inner.querySelectorAll('.nav-item').forEach((b, i) => { b.title = routes[i].label; b.setAttribute('aria-label', routes[i].label); });
   $('navbar').replaceChildren(inner);
+  markNav();
+}
+
+// Aktiven Tab markieren: nach jedem Seitenwechsel UND nach jedem Neuaufbau der Leiste (Server-Zustand, Einstellungen)
+function markNav() {
+  const here = ROUTES.find((r) => r.path === location.pathname);
+  const navPath = here?.navPath || here?.back || location.pathname;
+  document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === navPath ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
 }
 
 export function navigate(path, { replace = false } = {}) {
@@ -135,8 +144,7 @@ function render() {
   $('back-btn').hidden = !route.back;
   $('back-btn').onclick = () => navigate(route.back);
   document.title = route.title === 'Xenios' ? 'Xenios' : `${route.title} · Xenios`;
-  const navPath = route.path === '/server' ? '/einstellungen' : route.path;
-  document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === navPath ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
+  markNav();
   const view = $('view');
   view.replaceChildren();
   view.scrollTop = 0;
@@ -155,7 +163,6 @@ subscribe((part) => {
 onPrefs(() => {
   if (!window.__authed) return;
   buildNav();
-  document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === location.pathname ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
 });
 
 // Verbindungspunkt oben rechts

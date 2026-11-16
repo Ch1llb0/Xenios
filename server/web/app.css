@@ -1002,3 +1002,27 @@ svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height
 .dash-gauges .gauge-title { font-size: 12px; margin-bottom: 2px; white-space: nowrap; }
 .dash-gauges.tiny .gauge-foot .gs { display: none; }
 .dash-gauges.tiny .gauge-foot .gv { font-size: 13px; }
+
+/* Dashboard: laufendes Skript bzw. letzte Störung in „Status“ */
+.dash-running { margin: 8px 0 2px; padding: 8px 10px; border-radius: var(--radius-m); background: var(--primary-container); color: var(--on-primary-container); }
+.dash-running .run-title { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.dash-running.fault { background: var(--danger-container); color: var(--danger); }
+.dash-control > .btn.danger { height: 40px; }
+
+.machine-svg.mk { max-width: 380px; }
+/* Einklappbare Kategorien (Maschinen-Einstellungen, Server & App) */
+.folds { display: flex; flex-direction: column; gap: 8px; }
+details.fold { padding: 0; margin: 0; }
+details.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 14px 16px; font-size: 16px; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary > svg:first-child { color: var(--primary); }
+details.fold > summary .chev { color: var(--on-surface-variant); transition: transform .2s; }
+details.fold[open] > summary .chev { transform: rotate(180deg); }
+details.fold[open] > summary { border-bottom: 1px solid var(--outline-variant); }
+.fold-body { padding: 14px 16px 16px; }
+.fold-body > .card { border: 0; padding: 0; margin: 0; background: none; }
+.fold-body > .list:first-child, .fold-body > :first-child { margin-top: 0; }
+/* Abstände: Text nach Schaltflächen und Zeilen mit Schaltfläche rechts */
+.card .row + p, .card .btn + p, .card .row + .muted, .card p + p { margin-top: 10px; }
+.card p.muted.small { line-height: 1.5; }
+.card h3 + .row, .card h4 + .row { margin-top: 4px; }

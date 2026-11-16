@@ -396,6 +396,9 @@ export class Machine extends Emitter {
     }
     // Live-Abfrage der alten API ist schon /overview; ein zweites Mal nur, wenn wir diagram/get pollen
     const overview = this.livePath === '/api/v2/overview' ? (this._lastDiag || await this.client.get('/api/v2/overview')) : await this.client.get('/api/v2/overview');
+    if (!this.api.general && this._caps?.pages) {
+      try { this._diagExtractionMs = num((await this.client.get('/api/v2/diagram/get')).EXTRACTION_TIME_MS); } catch { /* optional */ }
+    }
     this._applySlow(single, general, overview);
     if (!this.state.info) {
       try {
@@ -499,6 +502,7 @@ export class Machine extends Emitter {
         this._shotClock = Date.now();
         this._liveStarts.push(this._shotClock);
         s.shot = { running: true, timeMs: 0, startedAt: new Date().toISOString(), curve: [] };
+        s.lastFault = null;
         // Hat die App kurz vorher ein Skript gestartet, gehört es zu diesem Bezug (für die Zielkurve in der Analyse)
         const p = this._pendingScript;
         if (p && Date.now() - p.at < 20e3) s.shot.script = { id: p.id, title: p.title ?? this.builtinScripts()[p.id] ?? null, steps: p.steps ?? null };
@@ -546,7 +550,12 @@ export class Machine extends Emitter {
       if (was === 'off' && (status === 1 || status === 2)) this._event('power', { title: 'Xenia eingeschaltet', body: status === 2 ? 'Eco-Modus' : 'Heizt auf …', tag: 'power' });
       if ((prevStatus === 1 || prevStatus === 2) && status === 0) this._event('power', { title: 'Xenia ausgeschaltet', body: 'Automatisch oder am Gerät ausgeschaltet.', tag: 'power' });
     }
-    if (status === 6 && prevStatus !== 6) this._event('fault', { title: 'Xenia meldet eine Störung', body: 'Bitte die Maschine prüfen.', tag: 'fault' });
+    if (status === 6 && prevStatus !== 6) {
+      // Lief gerade ein Bezug bzw. Skript, den Abbruch festhalten (Dashboard „Status“ zeigt ihn bis zum nächsten Bezug)
+      const what = s.shot.running ? (s.shot.script?.title ? `Skript „${s.shot.script.title}“` : 'Bezug') : this._backflush ? 'Backflush' : null;
+      s.lastFault = { at: new Date().toISOString(), text: what ? `${what} mit Störung abgebrochen` : 'Die Maschine meldet eine Störung' };
+      this._event('fault', { title: 'Xenia meldet eine Störung', body: what ? `${what} wurde abgebrochen. Bitte die Maschine prüfen.` : 'Bitte die Maschine prüfen.', tag: 'fault' });
+    }
     if (prevStatus !== status) this.kick(this.cfg.pollActiveMs);
     this.emit('state');
   }
@@ -647,7 +656,8 @@ export class Machine extends Emitter {
     this._liveStarts.splice(0, used);
     const missed = count - prev - used;
     // Werte der letzten Abfrage nur übernehmen, wenn sie nicht zu einem schon live protokollierten Bezug gehören
-    const diag = this._lastDiag || {};
+    const diag = { ...(this._lastDiag || {}) };
+    if (num(diag.EXTRACTION_TIME_MS) === null && this._diagExtractionMs != null) diag.EXTRACTION_TIME_MS = this._diagExtractionMs;
     const lastLogged = h.shots[0];
     const stale = Boolean(lastLogged && !lastLogged.estimated && Math.abs((lastLogged.timeMs || 0) - (num(diag.EXTRACTION_TIME_MS) || 0)) < 500);
     // älteste zuerst eintragen, damit der neueste oben im Protokoll steht
@@ -1043,11 +1053,11 @@ export class Machine extends Emitter {
     return this.api.general ? BUILTIN_SCRIPTS : CLASSIC_BUILTIN_SCRIPTS;
   }
 
-  // Live-Abfrage: neue Xenia und DBL mit Seiten-API über diagram/get (mit Bezugszeit der Maschine und Waage),
-  // ältere alte Firmware über overview (Bezugszeit misst Xenios selbst)
+  // Live-Abfrage: neue Xenia über diagram/get. Alte Xenia immer über overview: nur dort steht das Gewicht einer
+  // per Bluetooth verbundenen Waage (SCALE_WEIGHT, PU_SENS_SCALE_RATE). Die Bezugszeit der Maschine holt bei der
+  // DBL mit Seiten-API die langsame Abfrage aus diagram/get (für nachträglich erkannte Bezüge).
   get livePath() {
-    if (this.api.general) return this.api.livePath;
-    return this._caps?.pages ? '/api/v2/diagram/get' : '/api/v2/overview';
+    return this.api.general ? this.api.livePath : '/api/v2/overview';
   }
 
   get hasPaddle() {
@@ -1341,8 +1351,26 @@ export class Machine extends Emitter {
       }
     }
     if (!Object.keys(body).length) return { ok: true };
+    const weights = 'MA_BEVERAGE_WEIGHT_SGL_INT_SCALE' in body;
+    if (classic && weights) {
+      // Die DBL setzt nicht gesendete Belegungen auf „keine“: immer alle sechs mitsenden
+      for (const key of ['LEFT_LEFT', 'RIGHT_LEFT', 'RIGHT_RIGHT']) for (const idx of [0, 1]) {
+        const field = `SWITCH_SET_${key}_${idx}`;
+        if (field in body) continue;
+        const keep = num(cur[field]);
+        if (keep === null) throw httpError(502, `Die Maschine liefert ${field} nicht – nichts gespeichert`);
+        body[field] = String(keep);
+      }
+    }
     await this.client.post('/api/v2/switches', body);
-    return { ok: true };
+    if (classic && weights) {
+      // Die Original-Oberfläche der DBL schreibt diese Werte nie: prüfen, ob die Firmware sie übernommen hat
+      const after = await this.client.get('/api/v2/switches');
+      const applied = Number(after.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE) === Number(body.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE)
+        && Number(after.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE) === Number(body.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE);
+      return { ok: true, applied, singleDoseG: num(after.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE), doubleDoseG: num(after.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE) };
+    }
+    return { ok: true, applied: true };
   }
 
   async timers() {

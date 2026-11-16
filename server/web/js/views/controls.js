@@ -45,8 +45,7 @@ function s(tag, attrs = {}, ...children) {
   return el;
 }
 
-// Vereinfachte Frontansicht der Xenia nach Fotos: Taster außen, Drehknöpfe, Dampf- und Wasserlanze, Brühgruppe,
-// zwei Manometer, Display rechts, Abtropfschale. Ohne Siebträger.
+// Tasterbereich der neuen Xenia: dunkle Front mit den vier Tastern (oben/unten, links/rechts).
 function machineSvg(onPick) {
   const glyph = (kind, x, y) => {
     const g = s('g', { class: 'glyph', transform: `translate(${x} ${y})` });
@@ -66,51 +65,13 @@ function machineSvg(onPick) {
     g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(b.key); } });
     return g;
   });
-  // Drehknopf (Ventil) seitlich gesehen: Sechskant-Mutter, schwarzer Griff, Endkappe
-  const knob = (x, y, dir) => s('g', { class: 'valve' },
-    s('rect', { class: 'chrome', x: x - 9, y: y - 9, width: 18, height: 18, rx: 3 }),
-    s('rect', { class: 'grip', x: dir < 0 ? x - 34 : x + 9, y: y - 8, width: 25, height: 16, rx: 4 }),
-    s('rect', { class: 'cap-end', x: dir < 0 ? x - 40 : x + 32, y: y - 9, width: 8, height: 18, rx: 4 }));
-  const grill = (x0, x1) => {
-    const out = [];
-    for (let x = x0; x <= x1; x += 8) out.push(s('line', { x1: x, y1: 322, x2: x, y2: 344 }));
-    return out;
-  };
-  const gauge = (cx) => s('g', { class: 'gauge' },
-    s('circle', { cx, cy: 248, r: 16, class: 'bezel' }), s('circle', { cx, cy: 248, r: 12.5, class: 'face' }),
-    s('line', { x1: cx, y1: 248, x2: cx - 6, y2: 243, class: 'needle' }));
-  return s('svg', { class: 'machine-svg', viewBox: '0 0 320 370', role: 'img', 'aria-label': 'Xenia von vorn mit den vier Tastern' },
+  // Nur der Bereich der Taster (wie bei der DBL): dunkle Front, links und rechts je zwei Taster.
+  // Brühgruppe, Lanzen, Manometer und Abtropfschale bleiben weg.
+  return s('svg', { class: 'machine-svg mk', viewBox: '30 72 260 84', role: 'img', 'aria-label': 'Xenia: die vier Taster an der Front' },
     s('defs', {},
-      s('linearGradient', { id: 'mChrome', x1: 0, y1: 0, x2: 1, y2: 0 },
-        s('stop', { offset: '0', 'stop-color': '#7d8186' }), s('stop', { offset: '.45', 'stop-color': '#f4f6f8' }), s('stop', { offset: '1', 'stop-color': '#8a8e93' })),
       s('linearGradient', { id: 'mBody', x1: 0, y1: 0, x2: 0, y2: 1 },
         s('stop', { offset: '0', 'stop-color': '#2a2b2f' }), s('stop', { offset: '1', 'stop-color': '#17181b' }))),
-    // Tassenablage
-    s('path', { class: 'rail', d: 'M40 44 V26 M280 44 V26' }),
-    // Gehäuse
-    s('rect', { class: 'body', x: 36, y: 44, width: 248, height: 262, rx: 6 }),
-    // Brühgruppe (ohne Siebträger)
-    s('path', { class: 'group-top', d: 'M138 64 H182 L176 104 H144 Z' }),
-    s('rect', { class: 'light', x: 147, y: 68, width: 26, height: 30, rx: 3 }),
-    s('path', { fill: 'url(#mChrome)', d: 'M118 112 H202 Q206 112 204 120 L196 138 H124 L116 120 Q114 112 118 112 Z' }),
-    s('rect', { fill: 'url(#mChrome)', x: 140, y: 138, width: 40, height: 10, rx: 3 }),
-    // Dampf- (links) und Wasserlanze (rechts) als gerade Striche
-    knob(96, 102, 1),
-    s('line', { class: 'wand', x1: 96, y1: 111, x2: 70, y2: 290 }),
-    knob(224, 102, -1),
-    s('line', { class: 'wand', x1: 224, y1: 111, x2: 224, y2: 196 }),
-    // Display rechts
-    s('rect', { class: 'display', x: 250, y: 162, width: 12, height: 40, rx: 2 }),
-    s('rect', { class: 'display-txt', x: 252, y: 168, width: 8, height: 4 }),
-    s('rect', { class: 'display-txt', x: 252, y: 182, width: 8, height: 10 }),
-    // Manometer
-    gauge(118), gauge(202),
-    s('path', { class: 'warn-tri', d: 'M262 282 L270 268 L278 282 Z' }),
-    // Abtropfschale
-    s('rect', { class: 'tray', x: 28, y: 306, width: 264, height: 52, rx: 6 }),
-    s('rect', { class: 'grill-bg', x: 44, y: 316, width: 98, height: 34, rx: 3 }),
-    s('rect', { class: 'grill-bg', x: 178, y: 316, width: 98, height: 34, rx: 3 }),
-    s('g', { class: 'grill' }, grill(50, 136), grill(184, 270)),
+    s('rect', { class: 'body', x: 30.5, y: 72.5, width: 259, height: 83, rx: 6 }),
     ...buttons);
 }
 

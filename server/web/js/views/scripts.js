@@ -1,6 +1,6 @@
 // Skripte: Liste, Start/Stopp, Editor, Export/Import.
 import { h, icon, fmt, snackbar, sheet, confirmDialog, fullscreen, sliderRow, switchEl, ago } from '../ui.js';
-import { api, store, subscribe, machineOn, directMode, hasGrinder, isClassic } from '../api.js';
+import { api, store, subscribe, machineOn, scriptActive, directMode, hasGrinder, isClassic } from '../api.js';
 import { setTopActions, navigate } from '../app.js';
 import { shotChart } from '../gauge.js';
 import { targetCurve, profileSteps } from '../../shared/shot-analysis.js';
@@ -119,7 +119,7 @@ function listTab(root) {
   function paintEnabled() {
     const on = machineOn();
     for (const b of runButtons) b.disabled = !on;
-    stopBtn.disabled = !on;
+    stopBtn.disabled = !scriptActive(); // nur drückbar, solange ein Skript, Bezug oder Backflush läuft
   }
 
   async function run(id, title) {

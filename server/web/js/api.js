@@ -190,6 +190,9 @@ export async function refreshState() {
 }
 
 // Maschine erreichbar und eingeschaltet (nicht Aus)? Sonst sind außer „Ein“ alle Bedienelemente gesperrt.
+// Läuft gerade etwas, das „Skript stoppen“ beenden kann (Bezug/Skript oder Backflush)?
+export const scriptActive = (m = store.machine) => Boolean(m?.online && (m.shot?.running || m.backflush));
+
 export function machineOn(m = store.machine) {
   return Boolean(m?.online) && m.statusKey !== 'off';
 }

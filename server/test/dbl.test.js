@@ -96,8 +96,8 @@ test('Modellname der alten Firmware: MA_TYPE 3 ist die Xenia DB + L', async () =
   assert.equal(m.state.info.caps.pages, true);
 });
 
-test('DBL: Live-Werte über diagram/get, Paddle erzeugt keinen Bezug ohne Dauer', async () => {
-  assert.equal(m.livePath, '/api/v2/diagram/get');
+test('DBL: Live-Werte über overview (Waage), Paddle erzeugt keinen Bezug ohne Dauer', async () => {
+  assert.equal(m.livePath, '/api/v2/overview');
   const live = (status, ms = 0) => ({ MA_STATUS: status, EXTRACTION_TIME_MS: ms, PU_SENS_PRESS: status === 5 ? 6 : 0, SB_STATUS: 1, BG_SENS_TEMP_A: 90, BB_SENS_TEMP_A: 90 });
   m.history.data.counter = null; // Zählerstand früherer Tests vergessen
   m._checkCounter(500);
@@ -110,7 +110,9 @@ test('DBL: Live-Werte über diagram/get, Paddle erzeugt keinen Bezug ohne Dauer'
   m._checkCounter(501); // die Maschine zählt den Paddle-Vorgang mit
   assert.equal(m.history.data.shots.length, n0, 'kein nachträglicher Eintrag');
   // ein wirklich verpasster Bezug bekommt die Bezugszeit aus diagram/get und wird bei < 15 s aussortiert
-  m._applyLive(live(1, 8000));
+  m._applyLive(live(1)); // overview kennt keine Bezugszeit …
+  delete m._lastDiag.EXTRACTION_TIME_MS;
+  m._diagExtractionMs = 8000; // … sie kommt bei der langsamen Abfrage aus diagram/get
   m._checkCounter(502);
   assert.equal(m.history.data.shots[0].timeMs, 8000);
   assert.ok(!m.listedShots().includes(m.history.data.shots[0]), 'zu kurz: nicht gelistet');
@@ -144,4 +146,24 @@ test('Gespeicherte Sollwerte bleiben stehen, auch wenn die Maschine kurz noch de
   m._applySlow({ BG_SET_TEMP: 93.5, BB_SET_TEMP: 94, SB_SET_PRESS: 1.2, PU_SENS_WATER_TANK_LEVEL: 1 }, {}, { MA_EXTRACTIONS: m.history.data.counter });
   assert.equal(m.state.temp.boilerSet, 94);
   clearTimeout(m._rereadTimer);
+});
+
+test('DBL: Gewicht der Bluetooth-Waage aus overview landet in der Bezugskurve', async () => {
+  const ov = (status, w) => ({ MA_STATUS: status, PU_SENS_PRESS: status === 3 ? 9 : 0, SB_STATUS: 1, BG_SENS_TEMP_A: 90, BB_SENS_TEMP_A: 90, SCALE_WEIGHT: w, PU_SENS_SCALE_RATE: w ? 1.5 : 0 });
+  const { normalizeLive } = await import('../web/shared/machine-api.js');
+  m._applyLive(normalizeLive(ov(1, 0)));
+  m._applyLive(normalizeLive(ov(3, 0)));
+  m._applyLive(normalizeLive(ov(3, 12.5)));
+  assert.equal(m.state.scale.weight, 12.5);
+  assert.equal(m.state.shot.curve.at(-1)[2], 12.5);
+  m._shotClock = Date.now() - 20000; // Bezug lief 20 s
+  m._applyLive(normalizeLive(ov(1, 36)));
+  assert.equal(m.history.data.shots[0].weight, 36);
+});
+
+test('DBL: Bezugsgewicht speichern sendet alle sechs Belegungen mit und meldet, ob die Maschine es übernimmt', async () => {
+  const before = { ...xenia.state.switches };
+  const r = await m.setSwitches({ singleDoseG: 20, doubleDoseG: 40 });
+  assert.equal(typeof r.applied, 'boolean');
+  for (const k of Object.keys(before)) if (k.startsWith('SWITCH_SET_')) assert.equal(xenia.state.switches[k], before[k], `${k} unverändert`);
 });

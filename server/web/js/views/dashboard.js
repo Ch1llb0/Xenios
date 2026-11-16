@@ -2,14 +2,14 @@
 // (Ein/Eco/Aus, Dampf). Auswahl, Reihenfolge, Breite und Höhe der Kacheln speichert jedes Gerät für sich (localStorage).
 // Raster wie bei Android-Widgets: Breite in Spalten (oder ganze Breite), Höhe in Zellen; Kacheln einer Zeile sind gleich hoch.
 import { h, icon, fmt, fmtInt, ago, sheet, switchEl, snackbar } from '../ui.js';
-import { api, store, subscribe, hasGrinder, machineOn } from '../api.js';
+import { api, store, subscribe, hasGrinder, machineOn, scriptActive } from '../api.js';
 import { isHidden, noSteamOn, setNoSteamOn, powerOnBody, onPrefs } from '../prefs.js';
 import { createGauge, ring, shotChart, barChart, targetBar, liveChart } from '../gauge.js';
 import { navigate, setTopActions, localStorageGet, localStorageSet } from '../app.js';
 import { liveHistory, SERIES } from './home.js';
 import { TYPE_DE, TRIGGER_DE } from './grinder.js';
 import { ALERT_TEXT } from '../../shared/grinder-core.js';
-import { shotMetrics } from '../../shared/shot-analysis.js';
+import { shotMetrics, scriptDuration } from '../../shared/shot-analysis.js';
 
 // w: Spalten (0 = ganze Breite), h: Höhe in Zellen
 // Reihenfolge = Standardanordnung. Bei vier Spalten: Status | Instrumente (3 Spalten), darunter Schalter,
@@ -340,7 +340,13 @@ function controlTile() {
   const steamSw = switchEl({ label: 'Dampfkessel', onChange: (on, input) => setSteam(on, input) });
   const steamState = h('span', { class: 'muted small' });
   const noSteamSw = switchEl({ checked: noSteamOn(), label: 'Ohne Dampf einschalten', onChange: (on) => setNoSteamOn(on) });
+  // „Skript stoppen“: erscheint nur, solange ein Skript, Bezug oder Backflush läuft
+  const stopBtn = h('button', { class: 'btn danger wide', type: 'button', hidden: true, onclick: () => run(async () => {
+    const r = await api('/api/machine/scripts/stop', { method: 'POST' });
+    if (!r.stopped && !r.backflush) throw new Error('Kein Skript aktiv – nichts gestoppt');
+  }, 'Wird gestoppt') }, icon('stop', 's18'), 'Skript stoppen');
   const body = h('div', { class: 'dash-control' },
+    stopBtn,
     h('div', { class: 'seg' }, btnOn, btnEco, btnOff),
     h('div', { class: 'ctl-row' }, icon('cloud', 's20'), h('span', { class: 'grow' }, 'Dampfkessel ', steamState), steamSw),
     h('div', { class: 'ctl-row' }, icon('power', 's20'), h('span', { class: 'grow' }, 'Ohne Dampf einschalten'), noSteamSw));
@@ -393,6 +399,8 @@ function controlTile() {
       sIn.disabled = !online || !(on || eco) || !machineOn(m);
       steamState.textContent = !online ? '' : m.steamOn ? (m.steamReady ? `bereit · ${fmt(m.pressure.steam, 1)} bar` : `heizt · ${fmt(m.pressure.steam, 1)} bar`) : 'aus';
       noSteamSw.querySelector('input').checked = noSteamOn();
+      stopBtn.hidden = !scriptActive(m);
+      stopBtn.lastChild.textContent = m?.backflush ? 'Backflush stoppen' : m?.shot?.script?.title ? `„${m.shot.script.title}“ stoppen` : 'Bezug stoppen';
       return { extra: !online ? h('span', { class: 'badge bad' }, 'Offline') : null };
     },
   };
@@ -402,8 +410,9 @@ function statusTile() {
   const head = h('div', { class: 'dash-status' });
   const meters = h('div', { class: 'dash-meters' });
   const chips = h('div', { class: 'chips' });
+  const running = h('div', { class: 'dash-running', hidden: true });
   return {
-    body: [head, meters, chips],
+    body: [head, running, meters, chips],
     update({ m, shots }) {
       if (!m) {
         head.replaceChildren(orb('info', ''), h('div', {}, h('div', { class: 'label' }, 'Keine Daten')));
@@ -418,6 +427,30 @@ function statusTile() {
       head.className = `dash-status ${cls}`;
       head.replaceChildren(orb(ic), h('div', {}, h('div', { class: 'label' }, text),
         h('div', { class: 'muted small' }, m.online ? `Brühgruppe ${fmt(m.temp.group)} °C` : `Letzter Kontakt ${ago(m.lastSeen)}`)));
+      // Laufendes Skript (Name, Zeit, Restzeit soweit bekannt), Backflush-Runde oder die letzte Störung
+      const sh = m.shot || {};
+      if (m.online && m.backflush) {
+        running.hidden = false;
+        running.className = 'dash-running';
+        running.replaceChildren(h('div', { class: 'run-title' }, icon('play', 's18'), 'Backflush'),
+          h('div', { class: 'muted small' }, `Runde ${fmtInt(m.backflush.cycle)} von ${fmtInt(m.backflush.cycles)}`),
+          targetBar(m.backflush.cycle, m.backflush.cycles, { max: m.backflush.cycles }));
+      } else if (m.online && sh.running) {
+        const secs = (sh.timeMs || 0) / 1000;
+        const total = scriptDuration(sh.script?.steps);
+        const left = total ? Math.max(0, total - secs) : null;
+        running.hidden = false;
+        running.className = 'dash-running';
+        running.replaceChildren(h('div', { class: 'run-title' }, icon('play', 's18'), sh.script?.title || 'Bezug (an der Maschine gestartet)'),
+          h('div', { class: 'muted small' }, left !== null ? `${fmt(secs, 0)} s · noch etwa ${fmt(left, 0)} s` : `${fmt(secs, 0)} s`),
+          total ? targetBar(Math.min(secs, total), total, { max: total }) : null);
+      } else if (m.lastFault) {
+        running.hidden = false;
+        running.className = 'dash-running fault';
+        running.replaceChildren(h('div', { class: 'run-title' }, icon('warn', 's18'), m.lastFault.text), h('div', { class: 'muted small' }, ago(m.lastFault.at)));
+      } else {
+        running.hidden = true;
+      }
       const on = m.online && m.statusKey !== 'off';
       meters.replaceChildren(
         on && m.temp.groupSet ? meter('Brühgruppe', `${fmt(m.temp.group)} / ${fmt(m.temp.groupSet)} °C`, targetBar(m.temp.group, m.temp.groupSet, { max: m.temp.groupSet + 5, heating: true })) : null,

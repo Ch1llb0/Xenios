@@ -36,6 +36,19 @@ export function targetCurve(steps) {
 
 // Druckprofil-Baukasten → Skript-Schritte (Anzeigeeinheiten): Brühventil auf → Vorbrühen → optional Pause
 // (Pumpe aus) → Hauptdruck → optional Abfall in vier Stufen → Pumpe aus. Ergibt ein normales Skript der Maschine.
+// Geplante Laufzeit eines Skripts in Sekunden (Schritte mit Dauer: Pumpe 3/4/5, Warten 12); null, wenn unbekannt
+export function scriptDuration(steps) {
+  if (!Array.isArray(steps) || !steps.length) return null;
+  let t = 0;
+  for (const st of steps) {
+    const op = Number(st.op);
+    const a = (st.args || []).map(Number);
+    if ([3, 4, 5].includes(op) && a[1] > 0) t += a[1];
+    else if (op === 12 && a[0] > 0) t += a[0];
+  }
+  return t > 0 ? t : null;
+}
+
 export function profileSteps(p) {
   const r1 = (v) => Math.round(v * 10) / 10;
   const steps = [{ op: 13, args: [] }];
