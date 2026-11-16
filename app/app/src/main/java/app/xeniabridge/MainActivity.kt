@@ -150,6 +150,16 @@ class MainActivity : Activity() {
         val top = barTop ?: bg
         val bottom = barBottom ?: bg
         if (::frame.isInitialized) frame.setBars(top, bottom)
+        // Android legt sonst einen halbdurchsichtigen Schleier über die Leisten (wirkt schwarz statt in App-Farbe)
+        window.isNavigationBarContrastEnforced = false
+        window.isStatusBarContrastEnforced = false
+        // Bis Android 14 (nicht randlos) färbt das System die Leisten selbst
+        if (Build.VERSION.SDK_INT < 35) {
+            @Suppress("DEPRECATION")
+            window.statusBarColor = top
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = bottom
+        }
         // Symbole dunkel auf hellen Leisten, hell auf dunklen
         fun light(c: Int) = if (barTop == null && barBottom == null) !dark else Color.luminance(c) > 0.5f
         var flags = 0

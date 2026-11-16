@@ -1,4 +1,4 @@
-import './motion.js'; // zuerst: animiertes Ein- und Ausblenden für die ganze App
+import { pageEnter } from './motion.js'; // zuerst: animiertes Ein- und Ausblenden für die ganze App
 // App-Start: Login, Navigation, Live-Verbindung, Service Worker, Shortcuts.
 import { h, icon, snackbar } from './ui.js';
 import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode, hasGrinder, hasPaddle } from './api.js';
@@ -119,6 +119,11 @@ export function localStorageGet(k) {
 export function localStorageSet(k, v) {
   try { localStorage.setItem(k, v); } catch { /* privat */ }
 }
+// Einmalig (2.10.5): neue Standards übernehmen – Material, Anzeigen folgen der Helligkeit
+if (localStorageGet('themeDefaults') !== '2') {
+  for (const k of ['uiStyle', 'gaugeStyle', 'gaugeStyleMaterial']) { try { localStorage.removeItem(k); } catch { /* privat */ } }
+  localStorageSet('themeDefaults', '2');
+}
 applyTheme();
 
 // --- Navigation ---------------------------------------------------------------
@@ -204,6 +209,7 @@ function render() {
   window.scrollTo(0, 0);
   // Einblend-Animation bei jedem Seitenwechsel neu starten
   view.classList.remove('enter');
+  pageEnter(view, !route.back);
   void view.offsetWidth;
   view.classList.add('enter');
   current = { route, dispose: route.view(view) };

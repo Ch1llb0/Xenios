@@ -103,3 +103,37 @@ document.addEventListener('click', (e) => {
     });
   }
 }, true);
+
+// Nachgeladene Inhalte einer Seite (Karten, Listen, Kacheln) blenden ebenso ein wie der erste Aufbau. Nur in der
+// Ladephase kurz nach dem Seitenwechsel, damit laufende Aktualisierungen (Statuswerte) nicht ständig animieren.
+const ENTER = '.card, .tile, .list, .list-item, .script-item, details.fold, .section-title, .empty, .offline-banner, .chips, .kv';
+let enterView = null;
+let enterUntil = 0;
+let enterDy = 24;
+const observer = typeof MutationObserver === 'function' ? new MutationObserver((records) => {
+  if (performance.now() > enterUntil || reduced()) return;
+  let n = 0;
+  for (const r of records) {
+    for (const node of r.addedNodes) {
+      if (!(node instanceof HTMLElement) || node.parentElement === enterView || !node.matches(ENTER)) continue;
+      if (node.closest('[data-noanim]') || typeof node.animate !== 'function') continue;
+      // nicht noch einmal, wenn ein umgebendes Element gerade selbst einblendet
+      let p = node.parentElement, busy = false;
+      while (p && p !== enterView) { if (p.__entering) { busy = true; break; } p = p.parentElement; }
+      if (busy) continue;
+      node.__entering = true;
+      const a = node.animate([{ opacity: 0, transform: `translateY(${enterDy}px)` }, { opacity: 1, transform: 'none' }],
+        { duration: 380, delay: Math.min(n++, 8) * 30, easing: 'cubic-bezier(.05, .7, .1, 1)', fill: 'backwards' });
+      a.onfinish = a.oncancel = () => { node.__entering = false; };
+    }
+  }
+}) : null;
+
+// Beim Seitenwechsel aufrufen: fromAbove für die Seiten der unteren Leiste
+export function pageEnter(view, fromAbove) {
+  enterDy = fromAbove ? -18 : 24;
+  view.classList.toggle('from-above', Boolean(fromAbove));
+  if (!observer) return;
+  if (enterView !== view) { observer.disconnect(); observer.observe(view, { childList: true, subtree: true }); enterView = view; }
+  enterUntil = performance.now() + 2500;
+}

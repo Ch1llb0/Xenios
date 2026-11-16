@@ -30,9 +30,9 @@ export function settingsView(root) {
       listButton('settings', 'Maschinen-Einstellungen', 'Waage, Temperaturen, Dampf, Pumpe, Firmware', () => navigate('/einstellungen/maschine')),
       direct ? null : listButton('shield', 'Server- & App-Einstellungen', 'Geräte, Zugriff von unterwegs, Zeit, Sicherheit, Benachrichtigungen, Aufzeichnung, Konto', () => navigate('/server')),
       direct && inAndroidApp() ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null),
+    // Direkt-Modus: ohne Server-Seite gehört die Aufzeichnung hierher, als Kategorie wie dort
+    direct ? h('div', { style: { 'margin-top': '12px' } }, fold('Aufzeichnung', 'shotlog', shotFilterCard())) : null,
     direct ? h('div', { class: 'card low muted small', style: { 'margin-top': '12px' } }, 'Direkt-Modus: Die App spricht Maschine und Mühle ohne Server im Heimnetz an. Server-Einstellungen gibt es dabei nicht.') : null,
-    direct ? h('div', { class: 'section-title' }, 'Aufzeichnung') : null,
-    direct ? shotFilterCard() : null,
     h('p', { class: 'muted small', style: { 'text-align': 'center', 'margin-top': '24px' } }, `Xenios ${store.server?.version || ''}`));
   return () => unsubs.forEach((u) => u());
 }

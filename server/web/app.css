@@ -502,7 +502,10 @@ details.adv > summary::-webkit-details-marker { display: none; }
 @keyframes leave { to { opacity: 0; transform: translateX(24px); height: 0; padding-top: 0; padding-bottom: 0; margin: 0; } }
 
 /* Seitenwechsel: Inhalte steigen gestaffelt auf */
-.view.enter > *, .stagger > * { animation: rise .42s var(--ease-out) both; }
+.view.enter > *, .stagger > * { animation: enter .42s var(--ease-out) backwards; } /* backwards: danach gelten wieder die eigenen Werte (z. B. Deckkraft gesperrter Knöpfe) */
+@keyframes enter { from { opacity: 0; transform: translateY(var(--enter-dy, 24px)); } to { opacity: 1; transform: none; } }
+/* Seiten der unteren Leiste: Inhalt kommt von oben; Unterseiten (mit Zurück) von unten wie das Anpassen-Menü */
+.view.from-above { --enter-dy: -18px; }
 .view.enter > :nth-child(2), .stagger > :nth-child(2) { animation-delay: 30ms; }
 .view.enter > :nth-child(3), .stagger > :nth-child(3) { animation-delay: 60ms; }
 .view.enter > :nth-child(4), .stagger > :nth-child(4) { animation-delay: 90ms; }
