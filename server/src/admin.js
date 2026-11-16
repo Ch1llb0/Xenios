@@ -422,7 +422,15 @@ export function authRoutes(route, app) {
   // --- Server-Einstellungen ---
   route('GET', '/api/admin/config', async (ctx) => view(ctx));
   route('PUT', '/api/admin/config', async (ctx) => {
-    const applied = applyChanges(validate(ctx.body.changes));
+    const clean = validate(ctx.body.changes);
+    // Nicht den Zugang abschalten, über den diese Anfrage gerade kommt (sonst sperrt man sich aus)
+    const sock = ctx.req?.socket;
+    const kind = sock?.encrypted ? 'https' : ctx.req?.lanPort ? 'lan' : 'http';
+    const label = { https: 'HTTPS', lan: 'Heimnetz-HTTP', http: 'den Zugang über den Tunnel-Port' }[kind];
+    if (ctx.req && clean[`${kind}.enabled`] === false) {
+      throw bad(`Über ${label} bist du gerade verbunden. Zum Abschalten erst über einen anderen Zugang öffnen, sonst ist Xenios von hier nicht mehr erreichbar.`);
+    }
+    const applied = applyChanges(clean);
     return { ...view(ctx), applied };
   });
   route('POST', '/api/admin/password', async (ctx) => {

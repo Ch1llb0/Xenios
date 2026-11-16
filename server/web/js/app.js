@@ -1,7 +1,6 @@
 // App-Start: Login, Navigation, Live-Verbindung, Service Worker, Shortcuts.
 import { h, icon, snackbar } from './ui.js';
-import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode, hasGrinder } from './api.js';
-import { homeView } from './views/home.js';
+import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode, hasGrinder, hasPaddle } from './api.js';
 import { dashboardView } from './views/dashboard.js';
 import { scriptsView } from './views/scripts.js';
 import { controlsView, paddleView } from './views/controls.js';
@@ -15,12 +14,12 @@ import { quickRate } from './views/shot-detail.js';
 import { hiddenTabs, onPrefs, powerOnBody } from './prefs.js';
 
 const ROUTES = [
-  { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', view: dashboardView, title: 'Dashboard', wide: true },
-  { path: '/', label: 'Home', icon: 'home', view: homeView, title: 'Xenios' },
+  // Home ist das Dashboard (frühere eigene Startseite entfällt; /dashboard leitet hierher)
+  { path: '/', label: 'Home', icon: 'home', view: dashboardView, title: 'Xenios', wide: true },
   { path: '/bezuege', label: 'Bezüge', icon: 'coffee', view: shotsView, title: 'Bezüge' },
   { path: '/skripte', label: 'Skripte', icon: 'list', view: scriptsView, title: 'Skripte' },
-  { path: '/steuerung', label: 'Schalter', icon: 'toggle', view: controlsView, title: 'Schalter' },
-  { path: '/paddle', label: 'Paddle', icon: 'speed', view: paddleView, title: 'Paddle' },
+  { path: '/steuerung', label: 'Schalter', icon: 'toggle', view: controlsView, title: 'Schalter', feature: 'settings' },
+  { path: '/paddle', label: 'Paddle', icon: 'speed', view: paddleView, title: 'Paddle', feature: 'paddle' },
   { path: '/timer', label: 'Timer', icon: 'event', view: timerView, title: 'Timer' },
   { path: '/muehle', label: 'Mühle', icon: 'grinder', view: grinderView, title: 'Mühle' },
   // Einstellungen: immer in der Leiste, lässt sich nicht ausblenden
@@ -85,8 +84,16 @@ applyTheme();
 
 // --- Navigation ---------------------------------------------------------------
 // Alle Seiten, die in die untere Leiste können (die Mühle nur, wenn eingerichtet und nicht ausgeblendet)
+// Ausgeschaltete Funktionen (Einstellungen → Komponenten & Funktionen) blenden ihre Seiten aus: Paddle ohne
+// Pumpensteuerung, Schalter (Tastenbelegung) ohne „Maschinen-Einstellungen ändern“.
+export function routeAvailable(r) {
+  if (r.path === '/muehle' && !hasGrinder()) return false;
+  if (r.feature && store.server?.features?.[r.feature] === false) return false;
+  if (r.path === '/paddle' && store.machine?.info && !hasPaddle()) return false; // erst entscheiden, wenn die Firmware bekannt ist
+  return true;
+}
 export function navChoices() {
-  return ROUTES.filter((r) => r.nav !== false && (r.path !== '/muehle' || hasGrinder()));
+  return ROUTES.filter((r) => r.nav !== false && routeAvailable(r));
 }
 
 // Sichtbare Tabs: ohne die in den Einstellungen ausgeblendeten; „Einstellungen“ bleibt immer stehen
@@ -134,8 +141,14 @@ export function setTabs(tabs, active, onSelect) {
 }
 
 function render() {
-  if (location.pathname === '/muehle' && !hasGrinder()) return navigate('/', { replace: true });
+  if (location.pathname === '/dashboard') return navigate('/', { replace: true });
+  const want = ROUTES.find((r) => r.path === location.pathname);
+  if (want && !routeAvailable(want)) return navigate('/', { replace: true });
   const route = ROUTES.find((r) => r.path === location.pathname) || ROUTES.find((r) => r.path === '/');
+  // Scrollposition einer Seite merken, wenn man in eine ihrer Unterseiten wechselt (z. B. Einstellungen → Server)
+  const prev = current?.route;
+  if (prev && route.back === prev.path) scrollMemory.set(prev.path, window.scrollY);
+  const restore = prev && prev.back === route.path ? scrollMemory.get(route.path) : null;
   current?.dispose?.();
   $('app').classList.toggle('wide', Boolean(route.wide));
   setTopActions();
@@ -154,11 +167,39 @@ function render() {
   void view.offsetWidth;
   view.classList.add('enter');
   current = { route, dispose: route.view(view) };
+  if (restore) {
+    // nach dem Aufbau (und noch einmal, wenn nachgeladene Inhalte die Seite verlängert haben)
+    requestAnimationFrame(() => window.scrollTo(0, restore));
+    setTimeout(() => { if (current?.route === route && window.scrollY < restore) window.scrollTo(0, restore); }, 350);
+  }
 }
+const scrollMemory = new Map();
+
+// Aufgeklappte Kategorie (details.fold): passt sie unterhalb ihres Kopfes nicht mehr auf den Bildschirm, so weit
+// hochscrollen, dass der Kopf direkt unter der Kopfleiste steht. Nachgeladener Inhalt wird kurz danach berücksichtigt.
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!(d instanceof HTMLDetailsElement) || !d.classList.contains('fold') || !d.open) return;
+  const fit = () => {
+    const top = (document.querySelector('.topbar')?.getBoundingClientRect().bottom || 64) + 8;
+    const nav = $('navbar').getBoundingClientRect();
+    const bottom = nav.top > window.innerHeight / 2 ? nav.top : window.innerHeight;
+    const r = d.getBoundingClientRect();
+    if (r.bottom > bottom && r.top > top) window.scrollBy({ top: Math.min(r.top - top, r.bottom - bottom), behavior: 'smooth' });
+  };
+  requestAnimationFrame(fit);
+  setTimeout(fit, 450);
+}, true);
 window.addEventListener('popstate', render);
 
-subscribe((part) => {
-  if (part === 'server' || part === 'all') buildNav();
+// Leiste neu aufbauen, sobald sich die verfügbaren Seiten ändern (Funktionen, Mühle, Firmware der Maschine erkannt)
+let navSig = '';
+subscribe(() => {
+  if (!window.__authed) return;
+  const sig = navChoices().map((r) => r.path).join();
+  if (sig === navSig) return;
+  navSig = sig;
+  buildNav();
 });
 onPrefs(() => {
   if (!window.__authed) return;
@@ -214,7 +255,6 @@ async function showApp() {
   buildNav();
   // Erst den Zustand (u. a. Server-Features) holen, sonst fehlen beim direkten Aufruf einer Seite Bedienelemente
   await refreshState().catch(() => {});
-  if (location.pathname === '/' && !location.search && localStorageGet('startPage') === '/dashboard') history.replaceState({}, '', '/dashboard');
   render();
   connect();
   $('splash').classList.add('hide');

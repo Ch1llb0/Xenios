@@ -1026,3 +1026,44 @@ details.fold[open] > summary { border-bottom: 1px solid var(--outline-variant); 
 .card .row + p, .card .btn + p, .card .row + .muted, .card p + p { margin-top: 10px; }
 .card p.muted.small { line-height: 1.5; }
 .card h3 + .row, .card h4 + .row { margin-top: 4px; }
+
+/* Home am Handy (eine Spalte): Kacheln so hoch wie ihr Inhalt */
+.dash.single { grid-auto-rows: auto; }
+.dash.single > .tile { overflow: visible; }
+.dash.single > .tile > .tile-body > .gauge-fit { position: static; min-height: 0; overflow: visible; }
+.dash.single .gauge-fit > .dash-gauges { position: static; }
+.dash.single > .tile > .tile-body > .chart-fit { flex: none; height: 200px; }
+/* Verlauf: Reiter „Alle Werte“ unter dem Diagramm */
+.live-foot { display: flex; align-items: center; gap: 8px; }
+.live-foot .legend { flex: 1; margin-top: 4px; }
+.tab-mini { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--outline-variant); background: none; color: var(--on-surface-variant); border-radius: var(--radius-s); padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+.tab-mini[aria-expanded="true"] svg { transform: rotate(180deg); }
+.live-values { margin-top: 8px; }
+/* Sollwerte */
+.tgt-list { display: grid; gap: 2px; }
+.tgt-row { display: flex; align-items: center; gap: 4px; }
+.tgt-row .icon-btn { width: 34px; height: 34px; }
+.tgt-val { min-width: 76px; text-align: center; border: 0; background: none; font-size: 16px; font-weight: 600; color: var(--on-surface); padding: 4px; border-radius: var(--radius-s); }
+
+/* Schalter-Ansichten (neue Xenia und DBL) rein schematisch: nur Linien in Textfarben, Form der Schalter bleibt */
+.machine-svg .front, .machine-svg .body { fill: none; stroke: var(--outline); stroke-width: 1.2; }
+.machine-svg .sym { stroke: var(--on-surface-variant); }
+.machine-svg .mbtn .cap { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1; }
+.machine-svg .mbtn .cap-in { fill: none; stroke: var(--outline-variant); }
+.machine-svg .mbtn .glyph path { stroke: var(--on-surface); }
+.machine-svg .tg-nut { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1; }
+.machine-svg .tg-ring { fill: none; stroke: var(--outline); }
+.machine-svg .tg-hole { fill: var(--on-surface-variant); }
+.machine-svg .tg-stem { stroke: var(--on-surface-variant); }
+.machine-svg .tg-head { fill: var(--surface-container-lowest); stroke: var(--on-surface); stroke-width: 1; }
+.machine-svg .pos-ring { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); }
+.machine-svg .pos-no { fill: var(--on-surface); }
+.machine-svg .mbtn .halo { fill: var(--on-surface); }
+.machine-svg .mbtn.sel .halo { opacity: .14; }
+.machine-svg .mbtn:hover .halo, .machine-svg .mbtn:focus-visible .halo { opacity: .08; }
+.machine-svg .lever-side.sel .pos-ring { stroke: var(--on-surface); stroke-width: 1.6; }
+.machine-svg .lever-side .pos-ring { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1.2; }
+.machine-svg .lever-side .pos-no { fill: var(--on-surface); }
+.machine-svg .lever-side.sel .pos-ring { fill: var(--on-surface); stroke: var(--on-surface); }
+.machine-svg .lever-side.sel .pos-no { fill: var(--surface-container-lowest); }
+.machine-svg .lever-side.sel .halo { opacity: .12; }

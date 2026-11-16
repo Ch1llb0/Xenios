@@ -27,7 +27,7 @@ export function settingsView(root) {
     h('div', { class: 'section-title' }, 'Komponenten & Funktionen'), componentsCard(),
     h('div', { class: 'section-title' }, 'Weitere Einstellungen'),
     h('div', { class: 'list' },
-      listButton('settings', 'Maschinen-Einstellungen', 'Waage, Temperaturen, Dampf, Pumpe, Timer, Schalter, Firmware', () => navigate('/einstellungen/maschine')),
+      listButton('settings', 'Maschinen-Einstellungen', 'Waage, Temperaturen, Dampf, Pumpe, Firmware', () => navigate('/einstellungen/maschine')),
       direct ? null : listButton('shield', 'Server- & App-Einstellungen', 'Geräte, Zugriff von unterwegs, Zeit, Sicherheit, Benachrichtigungen, Aufzeichnung, Konto', () => navigate('/server')),
       direct && inAndroidApp() ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null),
     direct ? h('div', { class: 'card low muted small', style: { 'margin-top': '12px' } }, 'Direkt-Modus: Die App spricht Maschine und Mühle ohne Server im Heimnetz an. Server-Einstellungen gibt es dabei nicht.') : null,
@@ -66,6 +66,9 @@ export function machineSettingsView(root) {
   const slots = { maschine: h('div'), bruehgruppe: h('div'), bruehkessel: h('div'), dampfkessel: h('div'), pumpe: h('div') };
   slots.maschine.append(h('div', { class: 'muted small' }, 'Lade Einstellungen …'));
   const wifiBox = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
+  // Wi-Fi nur, wenn die Maschine ihre WLAN-Verbindung über die API meldet (die DBL tut es nicht)
+  const wifiFold = fold('Wi-Fi', 'wifi', wifiBox);
+  wifiFold.hidden = true;
   const fwBox = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
 
   root.append(h('div', { class: 'folds' },
@@ -75,12 +78,7 @@ export function machineSettingsView(root) {
     fold('Brühkessel', 'boiler', slots.bruehkessel),
     fold('Dampfkessel', 'cloud', slots.dampfkessel),
     fold('Pumpe', 'drop', slots.pumpe),
-    fold('PID', 'pid', serviceDetails()),
-    fold('Timer', 'event', h('div', { class: 'list' }, listButton('event', 'Wochen-Timer & Eco', 'Ein- und Ausschaltzeiten', () => navigate('/timer')))),
-    fold('Schalter', 'toggle', h('div', { class: 'list' },
-      listButton('toggle', 'Tastenbelegung', 'Was die Schalter an der Maschine starten', () => navigate('/steuerung')),
-      listButton('speed', 'Paddle', 'Pumpe direkt steuern', () => navigate('/paddle')))),
-    fold('Wi-Fi', 'wifi', wifiBox),
+    wifiFold,
     fold('Firmware', 'info', fwBox)), savebar);
 
   async function loadMachine() {
@@ -152,9 +150,8 @@ export function machineSettingsView(root) {
       const st = store.machine || {};
       const sig = Number(n.WIFI_SIGNAL_STRENGTH);
       const sigTxt = Number.isFinite(sig) ? `${sig} dBm (${sig > -55 ? 'sehr gut' : sig > -67 ? 'gut' : sig > -75 ? 'schwach' : 'sehr schwach'})` : '–';
-      wifiBox.replaceChildren(n.error && !n.WIFI_NAME
-        ? h('div', { class: 'muted small' }, 'Diese Firmware gibt die WLAN-Daten nicht über die API heraus.')
-        : h('dl', { class: 'kv' },
+      wifiFold.hidden = !n.WIFI_NAME && !Number.isFinite(sig);
+      wifiBox.replaceChildren(h('dl', { class: 'kv' },
           h('dt', {}, 'Signal'), h('dd', {}, sigTxt),
           h('dt', {}, 'WLAN-Name'), h('dd', {}, n.WIFI_NAME || '–'),
           h('dt', {}, 'IP-Adresse'), h('dd', {}, n.WIFI_AP_IP || '–'),
@@ -173,7 +170,6 @@ export function machineSettingsView(root) {
         i.TZ_IND !== undefined ? h('dt', {}, 'Zeitzone (Index)') : null, i.TZ_IND !== undefined ? h('dd', {}, String(i.TZ_IND)) : null),
       h('p', { class: 'muted small' }, 'Firmware-Updates nur über die Original-Oberfläche der Maschine.'));
     } catch (e) {
-      wifiBox.replaceChildren(h('div', { class: 'muted small' }, e.message));
       fwBox.replaceChildren(h('div', { class: 'muted small' }, e.message));
     }
   })();
@@ -239,15 +235,15 @@ function navCard(unsubs) {
     }));
   };
   paint();
-  unsubs.push(onPrefs((k) => { if (k === 'hiddenComponents') paint(); }));
+  unsubs.push(onPrefs((k) => { if (k === 'hiddenComponents' || k === 'features') paint(); }));
   return h('div', {}, h('p', { class: 'muted small' }, 'Welche Seiten in der Leiste stehen (gilt für dieses Gerät). Ausgeblendete Seiten bleiben über Links erreichbar. „Einstellungen“ bleibt immer sichtbar.'), list);
 }
 
 // Komponenten ausblenden (je Gerät) und Funktionen ein-/ausschalten (gilt auf dem Server für alle Geräte)
 const FEATURES = [
-  ['features.paddle', 'speed', 'Paddle', 'Pumpe direkt steuern (auch für den Backflush nötig)'],
+  ['features.paddle', 'speed', 'Paddle', 'Pumpe direkt steuern (auch für den Backflush nötig); aus: Tab „Paddle“ verschwindet'],
   ['features.scriptEditor', 'list', 'Skript-Editor', 'Skripte anlegen, ändern, löschen'],
-  ['features.settings', 'settings', 'Maschinen-Einstellungen ändern', 'Temperaturen, Druck, Timer, Tastenbelegung'],
+  ['features.settings', 'settings', 'Maschinen-Einstellungen ändern', 'Temperaturen, Druck, Timer, Tastenbelegung; aus: Tab „Schalter“ und Kachel „Sollwerte“ verschwinden'],
   ['features.clockSync', 'clock', 'Uhr stellen', 'Uhrzeit und Zeitzone der Maschine setzen'],
 ];
 function componentsCard() {
@@ -264,6 +260,7 @@ function componentsCard() {
             try {
               await api('/api/admin/config', { method: 'PUT', body: { changes: { [key]: on } } });
               await refreshState().catch(() => {});
+              window.dispatchEvent(new CustomEvent('xenios-prefs', { detail: 'features' })); // Leiste und Tabs neu
               snackbar(`${title}: ${on ? 'ein' : 'aus'}`);
             } catch (e) { input.checked = !on; snackbar(e.message); }
           } }));
@@ -340,36 +337,6 @@ function themeCard() {
 function b64ToBytes(b64) {
   const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((b64.length + 3) % 4));
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
-}
-
-// PID- und Sensorwerte der Original-Oberfläche – nur lesend; Ändern bleibt dort (Regelverhalten/Kalibrierung).
-const SERVICE = [
-  ['Brühgruppe (PID/Sensor)', 'brewgroup/pid'],
-  ['Brühkessel (PID/Sensor)', 'brewboiler/pid'],
-  ['Pumpe (PID/Sensor)', 'pump/pid'],
-  ['Dampfkessel (Sensor)', 'steamboiler/pid'],
-  ['Waage, Durchfluss, Display', 'mahlkonig/get'],
-];
-function serviceDetails() {
-  const body = h('div', {}, h('div', { class: 'muted small' }, 'Lade …'));
-  let loaded = false;
-  // lädt, sobald die Kategorie aufgeklappt wird
-  queueMicrotask(() => body.closest('details')?.addEventListener('toggle', async (ev) => {
-    if (!ev.target.open || loaded) return;
-    loaded = true;
-    const parts = [];
-    for (const [title, ep] of SERVICE) {
-      try {
-        const d = await api(`/api/raw/machine/${ep}`);
-        const rows = Object.entries(d).filter(([k]) => k !== 'VIEW').flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, String(v))]);
-        parts.push(h('h3', { style: { 'margin-top': '12px' } }, title), h('dl', { class: 'kv' }, ...rows));
-      } catch (e) {
-        parts.push(h('h3', { style: { 'margin-top': '12px' } }, title), h('div', { class: 'muted small' }, e.message));
-      }
-    }
-    body.replaceChildren(h('p', { class: 'muted small' }, 'Nur zur Ansicht. Regelparameter und Kalibrierung ändert Xenios bewusst nicht (Gefahr falscher Temperaturen bzw. Waage). Dafür die Original-Oberfläche im WLAN nutzen.'), ...parts);
-  }));
-  return body;
 }
 
 export async function paintPush(box) {

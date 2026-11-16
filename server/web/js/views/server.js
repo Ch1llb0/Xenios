@@ -330,7 +330,7 @@ export function serverView(root) {
     const pushBox = h('div', {});
     paintPush(pushBox);
     const notify = card('Benachrichtigungen', 'bell', pushBox);
-    const recording = card('Aufzeichnung', 'record', shotFilterCard());
+    const recording = card('Aufzeichnung', 'shotlog', shotFilterCard());
     const account = card('Konto', 'logout',
       inAndroidApp() ? h('button', { class: 'btn outlined wide', style: { 'margin-bottom': '8px' }, onclick: () => window.XeniaApp.reauth() }, icon('wifi', 's18'), 'App-Verbindung ändern') : null,
       h('button', { class: 'btn outlined wide', onclick: logout }, icon('logout', 's18'), 'Abmelden'));

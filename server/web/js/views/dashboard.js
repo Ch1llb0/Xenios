@@ -1,12 +1,12 @@
-// Dashboard: anpassbare Übersicht (Handy, Tablet hochkant und quer). Bedienen lässt sich nur die Kachel „Schalter“
-// (Ein/Eco/Aus, Dampf). Auswahl, Reihenfolge, Breite und Höhe der Kacheln speichert jedes Gerät für sich (localStorage).
+// Home (Dashboard): anpassbare Übersicht (Handy, Tablet hochkant und quer). Bedienen lassen sich die Kacheln „Schalter“
+// (Ein/Eco/Aus, Dampf, Skript stoppen) und „Sollwerte“. Am Handy (eine Spalte) sind die Kacheln so hoch wie ihr Inhalt. Auswahl, Reihenfolge, Breite und Höhe der Kacheln speichert jedes Gerät für sich (localStorage).
 // Raster wie bei Android-Widgets: Breite in Spalten (oder ganze Breite), Höhe in Zellen; Kacheln einer Zeile sind gleich hoch.
-import { h, icon, fmt, fmtInt, ago, sheet, switchEl, snackbar } from '../ui.js';
+import { h, icon, fmt, fmtInt, ago, sheet, switchEl, snackbar, promptNumber } from '../ui.js';
 import { api, store, subscribe, hasGrinder, machineOn, scriptActive } from '../api.js';
 import { isHidden, noSteamOn, setNoSteamOn, powerOnBody, onPrefs } from '../prefs.js';
 import { createGauge, ring, shotChart, barChart, targetBar, liveChart } from '../gauge.js';
 import { navigate, setTopActions, localStorageGet, localStorageSet } from '../app.js';
-import { liveHistory, SERIES } from './home.js';
+import { liveHistory, SERIES } from '../live.js';
 import { TYPE_DE, TRIGGER_DE } from './grinder.js';
 import { ALERT_TEXT } from '../../shared/grinder-core.js';
 import { shotMetrics, scriptDuration } from '../../shared/shot-analysis.js';
@@ -25,6 +25,7 @@ const TILES = {
   shotTimes: { title: 'Bezugszeiten', icon: 'timer', w: 1, h: 1, build: shotTimesTile, link: '/bezuege' },
   grinds: { title: 'Mahlgewichte', icon: 'scale', w: 1, h: 1, build: grindsTile, link: '/muehle' },
   grinder: { title: 'Mühle heute', icon: 'grinder', w: 1, h: 1, build: grinderTile, link: '/muehle' },
+  targets: { title: 'Sollwerte', icon: 'thermo', w: 1, h: 1, note: 'Brühgruppe, Brühkessel und Dampfdruck einstellen', build: targetsTile },
   care: { title: 'Pflege', icon: 'check', w: 1, h: 1, build: careTile, link: '/bezuege' },
   live: { title: 'Verlauf (10 min)', icon: 'history', w: 0, h: 2, build: liveTile },
 };
@@ -48,6 +49,8 @@ const clampH = (v, d) => ([1, 2, 3, 4].includes(Number(v)) ? Number(v) : d);
 function tileVisible(id) {
   if (GRINDER_TILES.has(id) && !hasGrinder()) return false;
   if (id === 'care' && isHidden('care')) return false;
+  // Sollwerte nur, wenn „Maschinen-Einstellungen ändern“ erlaubt ist
+  if (id === 'targets' && store.server?.features?.settings === false) return false;
   return true;
 }
 
@@ -90,6 +93,16 @@ export function dashboardView(root) {
   // Erst alle Kacheln auf 1 Zelle setzen und ihren Platzbedarf lesen (ein Layoutdurchgang, kein Zwischenbild),
   // dann jede über max(gewählte Höhe, Mindesthöhe) Zellen spannen. Zellen sind fest CELL px hoch.
   const place = () => {
+    // Eine Spalte (Handy): alle Kacheln untereinander, jede so hoch wie ihr Inhalt; Breite/Höhe sind dann ohne Wirkung
+    grid.classList.toggle('single', cols === 1);
+    if (cols === 1) {
+      for (const b of built) {
+        b.el.style.setProperty('grid-column', '1 / -1');
+        b.el.style.setProperty('grid-row', 'auto');
+        b.el.style.order = b.id === 'gauges' ? '-1' : '';
+      }
+      return;
+    }
     const spanOf = (b) => (b.w === 0 ? cols : Math.min(b.w, cols));
     // Passen Status und Instrumente nicht nebeneinander (weniger Spalten), kommen die Instrumente nach oben
     const stB = built.find((b) => b.id === 'status' && !b.el.hidden);
@@ -121,8 +134,9 @@ export function dashboardView(root) {
   };
   // Wächst ein Inhalt nachträglich (z. B. Zeile „Zieldruck“ beim Einschalten des Dampfkessels), neu anordnen
   const refit = () => {
-    if (built.some((b) => !b.el.hidden && b.el.scrollHeight > b.el.clientHeight + 1)) place();
+    if (cols > 1 && built.some((b) => !b.el.hidden && b.el.scrollHeight > b.el.clientHeight + 1)) place();
   };
+  const relayout = () => place(); // Kachel hat ihren Inhalt verkleinert (z. B. Werte im Verlauf eingeklappt)
   const sizes = new ResizeObserver(() => {
     const width = grid.getBoundingClientRect().width;
     const n = Math.max(1, Math.min(4, Math.floor((width + GAP) / (MIN_COL + GAP))));
@@ -133,12 +147,12 @@ export function dashboardView(root) {
     }
   });
   root.append(grid);
-  setTopActions(h('button', { class: 'icon-btn', 'aria-label': 'Dashboard anpassen', title: 'Dashboard anpassen', onclick: customize }, icon('tune')));
+  setTopActions(h('button', { class: 'icon-btn', 'aria-label': 'Home anpassen', title: 'Home anpassen', onclick: customize }, icon('tune')));
 
   function build() {
     built = layout.tiles.filter((t) => t.on && tileVisible(t.id)).map((t) => {
       const def = TILES[t.id];
-      const t0 = def.build({ wide: t.w !== 1, h: t.h });
+      const t0 = def.build({ wide: t.w !== 1, h: t.h, relayout: () => relayout() });
       const extra = h('span', { class: 'extra' });
       const open = def.link ? () => navigate(def.link) : null;
       const el = h('section', {
@@ -221,9 +235,9 @@ export function dashboardView(root) {
         switchEl({ checked: t.on, label: def.title, onChange: (on) => { t.on = on; changed(); } }),
         h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), pinned ? h('div', { class: 'sub' }, 'Immer unter „Status“, gleiche Breite') : def.note ? h('div', { class: 'sub' }, def.note) : null),
         h('div', { class: 'dash-cfg-ctl' },
-          pinned ? null : sizeSelect(WIDTHS, t.w, `${def.title}: Breite`, (v) => { t.w = v; changed(); }),
+          pinned || cols === 1 ? null : sizeSelect(WIDTHS, t.w, `${def.title}: Breite`, (v) => { t.w = v; changed(); }),
           // Nur Höhen anbieten, in die der Inhalt bei der aktuellen Breite passt
-          sizeSelect(HEIGHTS.filter(([v]) => v >= minH(t.id)), Math.max(t.h, minH(t.id)), `${def.title}: Höhe`, (v) => { t.h = v; changed(); }),
+          cols === 1 ? null : sizeSelect(HEIGHTS.filter(([v]) => v >= minH(t.id)), Math.max(t.h, minH(t.id)), `${def.title}: Höhe`, (v) => { t.h = v; changed(); }),
           t.id === 'shot' || pinned ? null : [
             h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach oben`, disabled: i === 0, onclick: () => move(-1) }, icon('less')),
             h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]));
@@ -234,17 +248,16 @@ export function dashboardView(root) {
       paint();
     };
     paint();
-    const startHere = localStorageGet('startPage') === '/dashboard';
     // Wake Lock gibt es im Browser nur über HTTPS (bzw. localhost); in der Android-App immer
     const canWake = typeof window.XeniaApp?.keepScreenOn === 'function' || ('wakeLock' in navigator && window.isSecureContext);
-    sheet('Dashboard anpassen', h('div', {},
-      h('p', { class: 'muted small' }, 'Breite in Spalten, Höhe in Zellen (wie Android-Widgets); Kacheln einer Zeile sind gleich hoch. Bedienen lässt sich nur die Kachel „Schalter“. Die Auswahl gilt für dieses Gerät.'),
+    sheet('Home anpassen', h('div', {},
+      h('p', { class: 'muted small' }, cols === 1
+        ? 'Kacheln ein- und ausblenden und ihre Reihenfolge ändern. Auf diesem schmalen Bildschirm stehen alle Kacheln untereinander, jede so hoch wie ihr Inhalt; Breite und Höhe lassen sich ab Tablet-Breite einstellen. Die Auswahl gilt für dieses Gerät.'
+        : 'Breite in Spalten, Höhe in Zellen (wie Android-Widgets); Kacheln einer Zeile sind gleich hoch. Die Auswahl gilt für dieses Gerät.'),
       list,
       h('div', { class: 'section-title' }, 'Dieses Gerät'),
       h('div', { class: 'list' },
-        h('div', { class: 'list-item' }, h('span', { class: 'lead' }, icon('dashboard')), h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Beim Start öffnen'), h('div', { class: 'sub' }, 'Die App startet mit dem Dashboard')),
-          switchEl({ checked: startHere, label: 'Beim Start öffnen', onChange: (on) => localStorageSet('startPage', on ? '/dashboard' : '') })),
-        canWake ? h('div', { class: 'list-item' }, h('span', { class: 'lead' }, icon('screen')), h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Bildschirm anlassen'), h('div', { class: 'sub' }, 'Solange das Dashboard offen ist')),
+        canWake ? h('div', { class: 'list-item' }, h('span', { class: 'lead' }, icon('screen')), h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Bildschirm anlassen'), h('div', { class: 'sub' }, 'Solange Home offen ist')),
           switchEl({ checked: layout.keepAwake, label: 'Bildschirm anlassen', onChange: (on) => { layout.keepAwake = on; saveLayout(layout); setAwake(on); } })) : null),
       h('button', { class: 'btn text wide', onclick: () => { const keep = layout.keepAwake; layout = loadLayoutDefaults(keep); changed(); } }, icon('refresh', 's18'), 'Standard wiederherstellen')));
   }
@@ -482,7 +495,17 @@ function gaugesTile() {
   const arrange = () => {
     const W = fit.clientWidth;
     const H = fit.clientHeight;
-    if (!W || !H) return;
+    if (!W) return;
+    if (fit.closest('.dash.single')) {
+      // Handy: Höhe nach Inhalt; vier nebeneinander nur, wenn jedes Manometer mindestens 120 px groß wird
+      const c = (W - GAPX * 3) / 4 >= 120 ? 4 : 2;
+      const size = Math.floor(Math.min((W - GAPX * (c - 1)) / c - 8, 200));
+      grid.style.setProperty('grid-template-columns', `repeat(${c}, minmax(0, 1fr))`);
+      grid.style.setProperty('--gsize', `${size}px`);
+      grid.classList.toggle('tiny', size < 90);
+      return;
+    }
+    if (!H) return;
     let best = null;
     for (const [c, r] of [[4, 1], [2, 2]]) {
       const size = Math.min((W - GAPX * (c - 1)) / c, (H - r * OVER - GAPY * (r - 1)) / r, 220);
@@ -656,18 +679,95 @@ function grinderTile() {
   };
 }
 
-function liveTile({ wide, h: rows }) {
+// Verlauf der letzten 10 Minuten; darunter lassen sich alle Sensorwerte aufklappen (die Kachel wächst dann mit)
+function liveTile({ wide, h: rows, relayout }) {
   const box = h('div', { class: 'chart-fit' }); // füllt die Kachel; Höhe kommt aus der gewählten Zellenzahl
   const legend = h('div', { class: 'legend muted small' }, SERIES.map((s) => [h('span', { class: `sw ${s.cls}` }), s.label]));
+  const values = h('dl', { class: 'kv live-values', hidden: true });
+  const toggle = h('button', { class: 'tab-mini', type: 'button', 'aria-expanded': 'false', onclick: (e) => {
+    e.stopPropagation();
+    // Diagramm behält seine Höhe; die Kachel bekommt für die Werte zusätzliche Zellen
+    if (values.hidden) box.style.minHeight = `${box.clientHeight}px`;
+    else box.style.minHeight = '';
+    values.hidden = !values.hidden;
+    toggle.setAttribute('aria-expanded', String(!values.hidden));
+    toggle.lastChild.textContent = values.hidden ? 'Alle Werte' : 'Werte ausblenden';
+    relayout?.();
+  } }, icon('more', 's18'), h('span', {}, 'Alle Werte'));
+  const row = (k, v) => [h('dt', {}, k), h('dd', {}, v)];
   return {
-    body: [box, legend],
-    update() {
+    body: [box, h('div', { class: 'live-foot' }, legend, toggle), values],
+    update({ m }) {
       // Diagramm im Seitenverhältnis der Kachel zeichnen (Faktor 0,6 → Schrift und Linien etwa 1,7-fach), damit
       // es die Fläche füllt, ohne die Beschriftung zu verkleinern
       const bw = box.clientWidth, bh = box.clientHeight;
       const size = bw > 50 && bh > 30 ? { width: Math.round(bw * 0.6), height: Math.round(bh * 0.6) } : { width: wide ? 640 : 320, height: (wide ? 200 : 150) + extraH(rows) };
       box.replaceChildren(liveChart(liveHistory, SERIES, { ...size, spanMs: 10 * 60e3 }));
+      if (m && !values.hidden) {
+        values.replaceChildren(
+          ...row('Brühgruppe', `${fmt(m.temp.group)} °C (Ziel ${fmt(m.temp.groupSet)})`),
+          ...row('Brühkessel', `${fmt(m.temp.boiler)} °C (Ziel ${fmt(m.temp.boilerSet)})`),
+          ...row('Pumpendruck', `${fmt(m.pressure.pump)} bar`),
+          ...row('Dampfkessel', m.steamOn ? `${fmt(m.pressure.steam, 2)} bar (Ziel ${fmt(m.pressure.steamSet)})` : `aus (Ziel ${fmt(m.pressure.steamSet)} bar)`),
+          ...row('Heizleistung Gruppe / Kessel', `${fmt(m.power?.group, 0)} % / ${fmt(m.power?.boiler, 0)} %`),
+          ...row('Pumpenleistung', `${fmt(m.power?.pump, 0)} %`),
+          ...(isHidden('scale') ? [] : row('Waage', `${fmt(m.scale?.weight)} g · ${fmt(m.scale?.rate)} g/s`)),
+          ...row('Durchfluss', `${fmt(m.flow?.ml ?? m.flow?.volume, 0)} ml · ${fmt(m.flow?.rate)} ml/s`),
+          ...row('Wassertank', m.tankOk === false ? 'leer' : m.tankOk ? 'ok' : '–'));
+      }
       return {};
+    },
+  };
+}
+
+// Sollwerte: Brühgruppe, Brühkessel, Dampfdruck mit − / +; gespeichert wird 1,5 s nach dem letzten Tipp.
+// Ein gespeicherter Wert bleibt stehen, bis die Maschine ihn meldet (höchstens 8 s).
+function targetsTile() {
+  const rows = [
+    { key: 'BG_SET_TEMP', label: 'Brühgruppe', min: 60, max: 96, step: 0.5, unit: '°C', read: (m) => m.temp.groupSet },
+    { key: 'BB_SET_TEMP', label: 'Brühkessel', min: 60, max: 96, step: 0.5, unit: '°C', read: (m) => m.temp.boilerSet },
+    { key: 'SB_SET_PRESS', label: 'Dampfdruck', min: 0, max: 1.8, step: 0.1, unit: 'bar', read: (m) => m.pressure?.steamSet },
+  ].map((r) => {
+    const st = { ...r, value: null, timer: null, hold: null };
+    const val = h('button', { class: 'tgt-val num', type: 'button', title: 'Wert eingeben', onclick: async (e) => {
+      e.stopPropagation();
+      const n = await promptNumber(r.label, { value: st.value, min: r.min, max: r.max, step: 0.1, unit: r.unit });
+      if (n === null || Number.isNaN(n)) return;
+      set(Math.round(n * 10) / 10, 0);
+    } }, '–');
+    const set = (v, delay = 1500) => {
+      st.value = Math.round(Math.min(r.max, Math.max(r.min, v)) * 10) / 10;
+      val.textContent = `${fmt(st.value)} ${r.unit}`;
+      clearTimeout(st.timer);
+      st.timer = setTimeout(async () => {
+        st.timer = null;
+        try {
+          await api('/api/machine/settings', { method: 'POST', body: { changes: { [r.key]: st.value } } });
+          st.hold = { value: st.value, until: Date.now() + 8000 };
+          snackbar(`${r.label}: ${fmt(st.value)} ${r.unit} gespeichert`);
+        } catch (e) { snackbar(e.message); }
+      }, delay);
+    };
+    st.el = h('div', { class: 'tgt-row' }, h('span', { class: 'grow' }, r.label),
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': `${r.label} verringern`, onclick: (e) => { e.stopPropagation(); if (st.value !== null) set(st.value - r.step); } }, icon('more', 's20')),
+      val,
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': `${r.label} erhöhen`, onclick: (e) => { e.stopPropagation(); if (st.value !== null) set(st.value + r.step); } }, icon('less', 's20')));
+    st.val = val;
+    return st;
+  });
+  return {
+    body: h('div', { class: 'tgt-list' }, rows.map((r) => r.el)),
+    update({ m }) {
+      if (!m) return {};
+      for (const r of rows) {
+        const v = r.read(m);
+        if (r.hold && (v === r.hold.value || Date.now() > r.hold.until)) r.hold = null;
+        if (!r.timer && !r.hold && v !== null && v !== undefined) {
+          r.value = v;
+          r.val.textContent = `${fmt(v)} ${r.unit}`;
+        }
+      }
+      return { extra: m.online ? null : h('span', { class: 'badge bad' }, 'Offline') };
     },
   };
 }
