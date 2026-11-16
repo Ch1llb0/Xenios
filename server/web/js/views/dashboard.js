@@ -62,7 +62,7 @@ function loadLayout() {
     const def = TILES[t.id];
     // Ältere Layouts: „breit“ wird zur ganzen Breite, die Höhe kommt aus dem Standard
     const w = v3 ? clampW(t.w, def.w) : t.wide ? 0 : def.w;
-    return { id: t.id, on: t.on !== false, w, h: v3 ? clampH(t.h, def.h) : def.h, ...(t.arr === 4 ? { arr: 4 } : {}) };
+    return { id: t.id, on: t.on !== false, w, h: v3 ? clampH(t.h, def.h) : def.h, ...(t.arr === 2 || t.arr === 4 ? { arr: t.arr } : {}) };
   });
   for (const id of Object.keys(TILES)) if (!tiles.some((t) => t.id === id)) tiles.push({ id, on: true, w: TILES[id].w, h: TILES[id].h });
   // Ältere Layouts (vor Version 5): einmalig die neue Standardanordnung, ein-/ausgeblendete Kacheln bleiben
@@ -243,8 +243,8 @@ export function dashboardView(root) {
           pinned || cols === 1 ? null : sizeSelect(WIDTHS, t.w, `${def.title}: Breite`, (v) => { t.w = v; changed(); }),
           // Nur Höhen anbieten, in die der Inhalt bei der aktuellen Breite passt
           cols === 1 ? null : sizeSelect(HEIGHTS.filter(([v]) => v >= minH(t.id)), Math.max(t.h, minH(t.id)), `${def.title}: Höhe`, (v) => { t.h = v; changed(); }),
-          // Handy: Instrumente 2 × 2 (größer) oder 1 × 4 (klein)
-          cols === 1 && t.id === 'gauges' ? sizeSelect([[2, '2 × 2'], [4, '1 × 4']], t.arr === 4 ? 4 : 2, `${def.title}: Anordnung`, (v) => { if (v === 4) t.arr = 4; else delete t.arr; changed(); }) : null,
+          // Handy: Instrumente 1 × 4 (Standard) oder 2 × 2 (größer)
+          cols === 1 && t.id === 'gauges' ? sizeSelect([[4, '1 × 4'], [2, '2 × 2']], t.arr === 2 ? 2 : 4, `${def.title}: Anordnung`, (v) => { t.arr = v; changed(); }) : null,
           t.id === 'shot' || pinned ? null : [
             h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach oben`, disabled: i === 0, onclick: () => move(-1) }, icon('less')),
             h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]));
@@ -504,8 +504,8 @@ function gaugesTile({ arr } = {}) {
     const H = fit.clientHeight;
     if (!W) return;
     if (fit.closest('.dash.single')) {
-      // Handy: Höhe nach Inhalt; Anordnung in „Home anpassen“ wählbar (Standard 2 × 2, sonst 1 × 4)
-      const c = arr === 4 ? 4 : 2;
+      // Handy: Höhe nach Inhalt; Anordnung in „Home anpassen“ wählbar (Standard 1 × 4, sonst 2 × 2)
+      const c = arr === 2 ? 2 : 4;
       const size = Math.floor(Math.min((W - GAPX * (c - 1)) / c - 8, 200));
       grid.style.setProperty('grid-template-columns', `repeat(${c}, minmax(0, 1fr))`);
       grid.style.setProperty('--gsize', `${size}px`);
