@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.view.KeyEvent
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.CookieManager
@@ -170,6 +171,12 @@ class MainActivity : Activity() {
         if (light(top)) flags = flags or WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
         if (light(bottom)) flags = flags or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
         window.insetsController?.setSystemBarsAppearance(flags, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
+    }
+
+    // Zoom-Tasten (Geräte- und Fernbedienungstasten) haben in der App keine Wirkung
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_ZOOM_IN || event.keyCode == KeyEvent.KEYCODE_ZOOM_OUT) return true
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

@@ -75,6 +75,11 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
 if (/XeniaApp\//.test(navigator.userAgent)) {
   document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
   document.documentElement.classList.add('in-app');
+  // Strg/Cmd + Plus/Minus/0 und Strg + Mausrad (Tastatur oder Maus am Handy/Tablet)
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0', 'Add', 'Subtract'].includes(e.key)) e.preventDefault();
+  }, { capture: true });
+  window.addEventListener('wheel', (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { capture: true, passive: false });
 }
 
 // Farbvorlage: Material ist Standard
