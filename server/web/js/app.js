@@ -44,7 +44,11 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
   const palette = localStorageGet('uiStyle') === 'material' ? 'material' : 'xenia';
   if (palette === 'material') root.dataset.palette = 'material';
   else delete root.dataset.palette;
-  root.dataset.gauge = localStorageGet('gaugeStyle') === 'white' ? 'white' : 'black';
+  // Anzeigen: Farbvorlage Xenia → Manometer (Zifferblatt schwarz/weiß), Material → flache Anzeigen (dunkel/hell).
+  // Die Wahl hell/dunkel merkt sich jede Vorlage für sich (Material standardmäßig hell, Xenia schwarz).
+  root.dataset.gauge = palette === 'material'
+    ? (localStorageGet('gaugeStyleMaterial') === 'black' ? 'black' : 'white')
+    : (localStorageGet('gaugeStyle') === 'white' ? 'white' : 'black');
   const setColor = (name, onName, value, extra) => {
     if (!value) {
       for (const n of [name, onName, ...Object.keys(extra || {})]) root.style.removeProperty(n);

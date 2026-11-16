@@ -31,7 +31,7 @@ const TILES = {
 };
 const GRINDER_TILES = new Set(['lastGrind', 'grinds', 'grinder']);
 const KEY = 'dashboard';
-const LAYOUT_VERSION = 5; // 3: Breite/Höhe in Zellen; 4: Instrumente oben; 5: neue Standardanordnung (Status | Instrumente, Schalter unter Status)
+const LAYOUT_VERSION = 6; // 3: Breite/Höhe in Zellen; 4: Instrumente oben; 5: neue Standardanordnung (Status | Instrumente, Schalter unter Status)
 const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende stehen
 const MIN_COL = 280;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl
 const GAP = 12;
@@ -70,16 +70,21 @@ function loadLayout() {
     const on = Object.fromEntries(tiles.map((t) => [t.id, t.on]));
     tiles.splice(0, tiles.length, ...Object.keys(TILES).map((id) => ({ id, on: on[id] !== false, w: TILES[id].w, h: TILES[id].h })));
   }
-  return { tiles: pinControl(tiles), keepAwake: Boolean(saved?.keepAwake) };
+  // Vor Version 6: am Handy einmalig Instrumente, Schalter, Status nach oben (neue Standardanordnung dort)
+  if (saved && Number(saved.v || 0) < 6 && narrowScreen()) mobileOrder(tiles);
+  if (!saved && narrowScreen()) mobileOrder(tiles);
+  return { tiles, keepAwake: Boolean(saved?.keepAwake) };
 }
 const saveLayout = (l) => localStorageSet(KEY, JSON.stringify({ ...l, v: LAYOUT_VERSION }));
 
-// „Schalter“ gehört immer direkt unter „Status“: in der Reihenfolge gleich dahinter (beim Anordnen dieselbe Spalte)
-function pinControl(tiles) {
-  const ci = tiles.findIndex((t) => t.id === 'control');
-  if (ci < 0 || !tiles.some((t) => t.id === 'status')) return tiles;
-  const [ct] = tiles.splice(ci, 1);
-  tiles.splice(tiles.findIndex((t) => t.id === 'status') + 1, 0, ct);
+// Handy (eine Spalte): Standard ist Instrumente, Schalter, Status oben; alles bleibt frei verschiebbar
+const narrowScreen = () => window.innerWidth < 2 * MIN_COL + GAP + 40;
+function mobileOrder(tiles) {
+  const first = ['shot', 'gauges', 'control', 'status'];
+  tiles.sort((a, b) => {
+    const ia = first.indexOf(a.id); const ib = first.indexOf(b.id);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
   return tiles;
 }
 
@@ -99,7 +104,7 @@ export function dashboardView(root) {
       for (const b of built) {
         b.el.style.setProperty('grid-column', '1 / -1');
         b.el.style.setProperty('grid-row', 'auto');
-        b.el.style.order = b.id === 'gauges' ? '-1' : '';
+        b.el.style.order = '';
       }
       return;
     }
@@ -122,8 +127,10 @@ export function dashboardView(root) {
     }
     for (const b of built) b.el.style.setProperty('grid-row', `span ${Math.max(b.h, minH(b.id))}`);
     // Schalter unter den Status: dieselbe Spalte und Breite (die Zeile ergibt sich, weil sie direkt dahinter folgen)
-    const st = built.find((b) => b.id === 'status' && !b.el.hidden);
-    const ctl = built.find((b) => b.id === 'control');
+    // Folgt „Schalter“ direkt auf „Status“ (Standard), steht er in dessen Spalte und Breite darunter
+    const si = built.findIndex((b) => b.id === 'status' && !b.el.hidden);
+    const st = built[si];
+    const ctl = built[si + 1]?.id === 'control' ? built[si + 1] : null;
     if (ctl && st) {
       const span = spanOf(st);
       if (span >= cols) ctl.el.style.setProperty('grid-column', '1 / -1');
@@ -224,18 +231,14 @@ export function dashboardView(root) {
     const paint = () => list.replaceChildren(visible().map((t, i, vis) => {
       const def = TILES[t.id];
       const move = (d) => {
-        // Schalter überspringen: sie hängen fest unter dem Status und wandern mit ihm
-        let j = i + d;
-        while (vis[j]?.id === 'control') j += d;
-        const next = vis[j];
+        const next = vis[i + d];
         if (!next) return;
         const a = layout.tiles.indexOf(t);
         const b = layout.tiles.indexOf(next);
         [layout.tiles[a], layout.tiles[b]] = [layout.tiles[b], layout.tiles[a]];
-        pinControl(layout.tiles);
         changed();
       };
-      const pinned = t.id === 'control' && layout.tiles.some((x) => x.id === 'status');
+      const pinned = false;
       return h('div', { class: 'list-item dash-cfg-row' },
         switchEl({ checked: t.on, label: def.title, onChange: (on) => { t.on = on; changed(); } }),
         h('div', { class: 'grow' }, h('div', { class: 'title' }, def.title), pinned ? h('div', { class: 'sub' }, 'Immer unter „Status“, gleiche Breite') : def.note ? h('div', { class: 'sub' }, def.note) : null),
@@ -305,7 +308,8 @@ export function dashboardView(root) {
 }
 
 function loadLayoutDefaults(keepAwake) {
-  return { tiles: Object.keys(TILES).map((id) => ({ id, on: true, w: TILES[id].w, h: TILES[id].h })), keepAwake };
+  const tiles = Object.keys(TILES).map((id) => ({ id, on: true, w: TILES[id].w, h: TILES[id].h }));
+  return { tiles: narrowScreen() ? mobileOrder(tiles) : tiles, keepAwake };
 }
 
 function sizeSelect(options, value, label, onChange) {

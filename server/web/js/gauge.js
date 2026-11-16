@@ -17,7 +17,7 @@ const num = (v) => String(Math.round(v * 10) / 10); // Skalenzahlen wie auf dem 
 
 // mano: abweichende Skala für den Manometer-Stil (z. B. Pumpe 0–16 bar wie an der Maschine) und Aufschrift
 export function createGauge({ title, min, max, majorStep, minorStep, redFrom = null, digits = 1, labelEvery = majorStep, unit = '', mano: manoOpts = {} }) {
-  const mano = true; // immer im Stil der Manometer der Maschine
+  const mano = document.documentElement.dataset.palette !== 'material'; // Material: flache Anzeigen
   if (mano) ({ min = min, max = max, majorStep = majorStep, minorStep = minorStep, labelEvery = labelEvery } = { ...manoOpts });
   const gid = `gb${++gaugeNo}`;
   const near = (x) => Math.abs(x - Math.round(x)) < 1e-6;

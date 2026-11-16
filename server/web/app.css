@@ -1067,3 +1067,15 @@ details.fold[open] > summary { border-bottom: 1px solid var(--outline-variant); 
 .machine-svg .lever-side.sel .pos-ring { fill: var(--on-surface); stroke: var(--on-surface); }
 .machine-svg .lever-side.sel .pos-no { fill: var(--surface-container-lowest); }
 .machine-svg .lever-side.sel .halo { opacity: .12; }
+
+/* Fenster (Sheet) mit fester Kopfzeile und Schließen-Knopf */
+.sheet { padding-top: 0; }
+.sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; margin: 0 -16px 8px; padding: 12px 8px 8px 20px; background: var(--surface-container-low); border-bottom: 1px solid var(--outline-variant); }
+.sheet-head h2 { margin: 0; font-size: 20px; }
+
+/* Farbvorlage Material: flache Anzeigen (frühere Optik), hell oder dunkel */
+:root[data-palette="material"][data-gauge="white"] { --gauge-face: #ffffff; --gauge-ring: #d9d8e0; --gauge-tick: #5d5e6b; --gauge-needle: #4a5891; --gauge-text: #1b1b21; --gauge-text2: #46464f; }
+:root[data-palette="material"][data-gauge="black"] { --gauge-face: #1f1f25; --gauge-ring: #3a3a42; --gauge-tick: #b9b8c4; --gauge-needle: #b8c4ff; --gauge-text: #e4e1e9; --gauge-text2: #c6c5d0; }
+:root[data-palette="material"] .gauge:not(.mano) .g-label { fill: var(--gauge-text2); }
+:root[data-palette="material"] .gauge:not(.mano) .g-value { fill: var(--gauge-text); }
+:root[data-palette="material"] .gauge:not(.mano) .g-sub { fill: var(--gauge-text2); }

@@ -189,8 +189,13 @@ function overlay(panel, { onClose } = {}) {
 }
 
 export function sheet(title, content, opts) {
-  const panel = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title }, h('div', { class: 'handle' }), title ? h('h2', {}, title) : null, content);
-  return overlay(panel, opts);
+  // Kopf mit Titel und Schließen-Knopf; am Handy füllt das Fenster den Bildschirm fast ganz, ein Wisch-Griff reicht dort nicht
+  let close = () => {};
+  const closeBtn = h('button', { class: 'icon-btn sheet-close', type: 'button', 'aria-label': 'Schließen', title: 'Schließen', onclick: () => close() }, icon('close'));
+  const panel = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title },
+    h('div', { class: 'sheet-head' }, h('h2', { class: 'grow' }, title || ''), closeBtn), content);
+  close = overlay(panel, opts);
+  return close;
 }
 
 export function dialog(title, content, actions = []) {

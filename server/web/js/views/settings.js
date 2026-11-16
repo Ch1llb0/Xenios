@@ -322,8 +322,10 @@ function themeCard() {
     box.replaceChildren(
       h('div', { class: 'muted small' }, 'Farbvorlage (Layout, Schrift und Icons bleiben gleich)'),
       chips(style, [['xenia', 'Xenia'], ['material', 'Material']], (v) => localStorageSet('uiStyle', v)),
-      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Manometer (Temperatur- und Druckanzeigen)'),
-      chips(localStorageGet('gaugeStyle') === 'white' ? 'white' : 'black', [['black', 'Zifferblatt schwarz'], ['white', 'Zifferblatt weiß']], (v) => localStorageSet('gaugeStyle', v)),
+      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, style === 'material' ? 'Temperatur- und Druckanzeigen (flach)' : 'Manometer (Temperatur- und Druckanzeigen)'),
+      style === 'material'
+        ? chips(localStorageGet('gaugeStyleMaterial') === 'black' ? 'black' : 'white', [['white', 'Anzeigen hell'], ['black', 'Anzeigen dunkel']], (v) => localStorageSet('gaugeStyleMaterial', v))
+        : chips(localStorageGet('gaugeStyle') === 'white' ? 'white' : 'black', [['black', 'Zifferblatt schwarz'], ['white', 'Zifferblatt weiß']], (v) => localStorageSet('gaugeStyle', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
       chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Farben (gilt für dieses Gerät)'),
