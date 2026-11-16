@@ -22,6 +22,10 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.widget.Toast
 import android.window.OnBackInvokedDispatcher
 import kotlin.concurrent.thread
@@ -37,6 +41,10 @@ import java.util.concurrent.Executors
  */
 class MainActivity : Activity() {
     private lateinit var web: WebView
+    private lateinit var frame: BarFrame
+    /** Von der Seite gemeldete Farben der Kopfzeile und der unteren Leiste (null: Standard). */
+    private var barTop: Int? = null
+    private var barBottom: Int? = null
     private lateinit var prefs: Prefs
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var errorShown = false
@@ -54,7 +62,7 @@ class MainActivity : Activity() {
             return
         }
 
-        val frame = FrameLayout(this)
+        frame = BarFrame(this)
         frame.setBackgroundColor(getColor(R.color.surface))
         web = WebView(this)
         web.setBackgroundColor(getColor(R.color.surface))
@@ -138,8 +146,16 @@ class MainActivity : Activity() {
 
     private fun applyBarAppearance() {
         val dark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        val flags = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-        window.insetsController?.setSystemBarsAppearance(if (dark) 0 else flags, flags)
+        val bg = getColor(R.color.surface)
+        val top = barTop ?: bg
+        val bottom = barBottom ?: bg
+        if (::frame.isInitialized) frame.setBars(top, bottom)
+        // Symbole dunkel auf hellen Leisten, hell auf dunklen
+        fun light(c: Int) = if (barTop == null && barBottom == null) !dark else Color.luminance(c) > 0.5f
+        var flags = 0
+        if (light(top)) flags = flags or WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+        if (light(bottom)) flags = flags or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+        window.insetsController?.setSystemBarsAppearance(flags, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -291,6 +307,19 @@ class MainActivity : Activity() {
 
     /** Für die Web-App: „window.XeniaApp“. Anmeldung öffnen, Wecker, im Direkt-Modus HTTP zu Maschine/Mühle und Dateien speichern. */
     private inner class Bridge {
+        /** Farben für Status- und Navigationsleiste (#rrggbb), passend zu Kopfzeile und unterer Leiste der Seite. */
+        @JavascriptInterface
+        fun setBars(top: String, bottom: String) {
+            val t = runCatching { Color.parseColor(top) }.getOrNull() ?: return
+            val b = runCatching { Color.parseColor(bottom) }.getOrNull() ?: return
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                barTop = t
+                barBottom = b
+                applyBarAppearance()
+            }
+        }
+
         @JavascriptInterface
         fun mode(): String = if (direct) "direct" else prefs.mode
 
@@ -400,5 +429,26 @@ class MainActivity : Activity() {
         const val DIRECT_HOST = "xenia.invalid"
         const val DIRECT_ORIGIN = "https://$DIRECT_HOST"
         private const val REQ_FILE = 42
+    }
+}
+
+/** Rahmen um die WebView: malt die Flächen unter Status- und Navigationsleiste (das Padding) in eigenen Farben. */
+class BarFrame(context: Context) : FrameLayout(context) {
+    private val topPaint = Paint()
+    private val bottomPaint = Paint()
+
+    init { setWillNotDraw(false) }
+
+    fun setBars(top: Int, bottom: Int) {
+        topPaint.color = top
+        bottomPaint.color = bottom
+        setBackgroundColor(bottom)
+        invalidate()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (paddingTop > 0) canvas.drawRect(0f, 0f, width.toFloat(), paddingTop.toFloat(), topPaint)
+        if (paddingBottom > 0) canvas.drawRect(0f, (height - paddingBottom).toFloat(), width.toFloat(), height.toFloat(), bottomPaint)
     }
 }

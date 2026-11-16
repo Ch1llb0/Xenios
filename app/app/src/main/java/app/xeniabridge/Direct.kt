@@ -2,6 +2,7 @@ package app.xeniabridge
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
@@ -230,25 +231,37 @@ object NetworkScan {
 
     fun ownSubnet(context: Context): String? {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return null
-        val lp = cm.getLinkProperties(cm.activeNetwork) ?: return null
-        val addr = lp.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address && !it.isLoopbackAddress } ?: return null
-        val parts = addr.hostAddress?.split('.') ?: return null
-        if (parts.size != 4) return null
-        return parts.take(3).joinToString(".")
+        // WLAN bevorzugen (bei aktivem VPN ist das aktive Netz sonst das VPN), dann jedes Netz mit privater IPv4-Adresse
+        val nets = (listOfNotNull(cm.activeNetwork) + cm.allNetworks).distinct()
+        val wifiFirst = nets.sortedByDescending { cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true }
+        for (n in wifiFirst) {
+            val lp = runCatching { cm.getLinkProperties(n) }.getOrNull() ?: continue
+            val addr = lp.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address && it.isSiteLocalAddress } ?: continue
+            val parts = addr.hostAddress?.split('.') ?: continue
+            if (parts.size == 4) return parts.take(3).joinToString(".")
+        }
+        return null
     }
 
     fun scan(context: Context): List<Found> {
         val subnet = ownSubnet(context) ?: return emptyList()
-        val pool = Executors.newFixedThreadPool(32)
+        val pool = Executors.newFixedThreadPool(64)
         val found = java.util.Collections.synchronizedList(mutableListOf<Found>())
         for (i in 1..254) {
             val ip = "$subnet.$i"
             pool.execute {
                 try {
-                    val (code, text) = DirectHttp.text("http://$ip/api/v2/machine", timeoutMs = 900)
+                    // der ESP32 der Xenia antwortet im Stromsparmodus mitunter erst nach über einer Sekunde
+                    val (code, text) = DirectHttp.text("http://$ip/api/v2/machine", timeoutMs = 2500)
                     if (code == 200 && text.contains("MA_TYPE")) {
-                        val type = JSONObject(text).optInt("MA_TYPE")
-                        found += Found(ip, "machine", when (type) { 1 -> "Xenia 2K"; 2 -> "Xenia Dual Boiler"; 3 -> "Xenia Brew-by-Sync"; 4 -> "Xenia 303"; 5 -> "Xenia 2K + L"; else -> "Xenia" })
+                        val j = JSONObject(text)
+                        val type = j.optInt("MA_TYPE")
+                        // alte Firmware (4.x, z. B. DBL): eigene Modellnummern
+                        val classic = j.optInt("FW_VERSION_MAJOR", 5) in 1..4
+                        found += Found(ip, "machine", when (type) {
+                            1 -> "Xenia 2K"; 2 -> "Xenia Dual Boiler"; 3 -> if (classic) "Xenia Dual Boiler + L" else "Xenia Brew-by-Sync"
+                            4 -> "Xenia 303"; 5 -> "Xenia 2K + L"; else -> "Xenia"
+                        })
                         return@execute
                     }
                 } catch (_: Exception) { }
@@ -261,7 +274,7 @@ object NetworkScan {
             }
         }
         pool.shutdown()
-        pool.awaitTermination(60, TimeUnit.SECONDS)
+        pool.awaitTermination(90, TimeUnit.SECONDS)
         return found.sortedBy { it.ip.substringAfterLast('.').toInt() }
     }
 }

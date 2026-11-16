@@ -4,7 +4,7 @@ import net from 'node:net';
 import crypto from 'node:crypto';
 import { hashPassword, verifyPassword, passwordProblem, sessionCookie } from './auth.js';
 import { updateConfigFile, setPath, getPath, applyTimezone, isTimezone } from './config.js';
-import { XeniaClient, MA_TYPE, machineApiId, httpError } from './machine.js';
+import { XeniaClient, MA_TYPE, CLASSIC_TYPE, machineApiId, httpError } from './machine.js';
 import { GrinderHttp } from './grinder.js';
 import { ensureCert, certInfo } from './tls.js';
 import { setLogLevel, logger } from './log.js';
@@ -172,7 +172,7 @@ export async function probeDevice({ kind, url, password }, { pinned = null, inst
     try { await client.get('/api/v2/general'); apiHint = 'bbs'; } catch { /* alte API hat /general nicht */ }
     return {
       ok: true,
-      name: MA_TYPE[m.MA_TYPE] || `Xenia (Typ ${m.MA_TYPE})`,
+      name: (apiHint === 'classic' ? CLASSIC_TYPE : MA_TYPE)[m.MA_TYPE] || `Xenia (Typ ${m.MA_TYPE})`,
       detail: `Firmware ${m.FW_VERSION_MAJOR}.${m.FW_VERSION_MINOR}`,
       apiHint,
     };

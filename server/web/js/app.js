@@ -70,7 +70,31 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
   const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   const bar = palette === 'material' ? (dark ? '#1b1b21' : '#2f3e74') : (dark ? '#2b2d34' : '#383c44');
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', bar));
+  syncAppBars();
 }
+
+// Android-App: Status- und Navigationsleiste in den Farben von Kopfzeile und unterer Leiste der Seite einfärben
+let barsTimer = 0;
+export function syncAppBars() {
+  if (typeof window.XeniaApp?.setBars !== 'function') return;
+  const send = () => {
+    const color = (el) => {
+      const m = el && /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(getComputedStyle(el).backgroundColor);
+      if (!m || (m[4] !== undefined && Number(m[4]) < 0.5)) return null;
+      return '#' + [m[1], m[2], m[3]].map((x) => Math.round(Number(x)).toString(16).padStart(2, '0')).join('');
+    };
+    const page = color(document.body) || color(document.documentElement) || '#ffffff';
+    const nav = document.querySelector('.navbar');
+    const r = nav?.getBoundingClientRect();
+    const navAtBottom = r && r.width >= window.innerWidth - 2 && Math.abs(r.bottom - window.innerHeight) < 3; // breite Xenia-Ansicht: Leiste links
+    try { window.XeniaApp.setBars(color(document.querySelector('.topbar')) || page, (navAtBottom && color(nav)) || page); } catch { /* ältere App */ }
+  };
+  requestAnimationFrame(send);
+  clearTimeout(barsTimer);
+  barsTimer = setTimeout(send, 400); // nach dem Farbübergang der Seite (0,3 s)
+}
+window.addEventListener('resize', () => syncAppBars());
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme());
 // Schrift auf einer Farbfläche: schwarz oder weiß, je nach Helligkeit
 export function contrastOn(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
@@ -122,6 +146,7 @@ function buildNav() {
 
 // Aktiven Tab markieren: nach jedem Seitenwechsel UND nach jedem Neuaufbau der Leiste (Server-Zustand, Einstellungen)
 function markNav() {
+  syncAppBars();
   const here = ROUTES.find((r) => r.path === location.pathname);
   const navPath = here?.navPath || here?.back || location.pathname;
   document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === navPath ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));

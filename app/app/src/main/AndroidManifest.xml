@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Netzwerksuche: eigenes WLAN-Netz (Adresse und Präfix) ermitteln -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Uhr-Apps sichtbar machen: Name der App, die den nächsten Wecker gestellt hat -->
     <queries>
