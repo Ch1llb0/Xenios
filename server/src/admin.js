@@ -55,7 +55,7 @@ export function publicUrl(v) {
   try {
     u = new URL(String(v ?? '').trim());
   } catch {
-    throw bad('Öffentliche Adresse: z. B. https://xenios.deine-domain.de');
+    throw bad('Öffentliche Adresse: z. B. https://xenios.example.de');
   }
   if (u.protocol !== 'https:' || u.port || u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '')) {
     throw bad('Öffentliche Adresse: nur https://name.domain, ohne Port und Pfad');
@@ -428,7 +428,7 @@ export function authRoutes(route, app) {
     const kind = sock?.encrypted ? 'https' : ctx.req?.lanPort ? 'lan' : 'http';
     const label = { https: 'HTTPS', lan: 'Heimnetz-HTTP', http: 'den Zugang über den Tunnel-Port' }[kind];
     if (ctx.req && clean[`${kind}.enabled`] === false) {
-      throw bad(`Über ${label} bist du gerade verbunden. Zum Abschalten erst über einen anderen Zugang öffnen, sonst ist Xenios von hier nicht mehr erreichbar.`);
+      throw bad(`Diese Sitzung nutzt gerade ${label}. Zum Abschalten erst über einen anderen Zugang öffnen, sonst ist Xenios von hier nicht mehr erreichbar.`);
     }
     const applied = applyChanges(clean);
     return { ...view(ctx), applied };

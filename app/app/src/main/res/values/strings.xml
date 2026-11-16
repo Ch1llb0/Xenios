@@ -21,7 +21,7 @@
     <string name="sc_dashboard_short">Dashboard</string>
     <string name="sc_dashboard_long">Dashboard öffnen</string>
     <string name="setup_title">Mit Xenios verbinden</string>
-    <string name="setup_text">Cloudflare-Adresse und/oder lokale Adresse deines Servers sowie das App-Passwort. Die App erhält dafür eine eigene Anmeldung, die du in den Einstellungen unter „Angemeldete Geräte“ siehst.</string>
+    <string name="setup_text">Cloudflare-Adresse und/oder lokale Adresse des Servers sowie das App-Passwort. Die App erhält dafür eine eigene Anmeldung, die in den Einstellungen unter „Angemeldete Geräte“ erscheint.</string>
     <string name="mode_server">Mit Server (Xenios, auch von unterwegs)</string>
     <string name="mode_direct">Direkt im Heimnetz (ohne Server)</string>
     <string name="direct_text">Die App spricht Maschine und Mühle direkt im WLAN an. Das funktioniert nur zu Hause. Ohne Server gibt es keine Push-Benachrichtigungen, keine zusätzlichen Schaltzeiten und kein Einschalten vor dem Wecker.</string>
@@ -36,6 +36,7 @@
     <string name="setup_url">Server-Adresse (Cloudflare)</string>
     <string name="setup_local">Lokale Adresse im WLAN (optional)</string>
     <string name="setup_local_hint">Wird genutzt, solange das Handy im Heimnetz ist, sonst die Cloudflare-Adresse.</string>
+    <string name="server_scan">Server im WLAN suchen</string>
     <string name="setup_password">App-Passwort</string>
     <string name="setup_name">Gerätename</string>
     <string name="setup_connect">Verbinden</string>

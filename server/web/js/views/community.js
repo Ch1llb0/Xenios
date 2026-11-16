@@ -114,7 +114,7 @@ export function openCommunity(onImported) {
       h('p', { class: 'small muted community-note' },
         'Bezüge der Decent-Community auf visualizer.coffee. Übernommen wird der dort gemessene Druckverlauf als Druckstufen – ',
         'Fluss-Regelung, Ausstiegsbedingungen und Temperatur der Decent kann die Xenia per Skript nicht nachbilden. ',
-        'Mahlgrad und Dosis musst du für deine Mühle selbst finden; Verhältnis und Zeit des Originals sind ein guter Startpunkt.'));
+        'Mahlgrad und Dosis hängen von der eigenen Mühle ab; Verhältnis und Zeit des Originals sind ein guter Startpunkt.'));
     search(1);
   });
 }

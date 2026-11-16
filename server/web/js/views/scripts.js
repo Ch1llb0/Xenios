@@ -23,7 +23,7 @@ function listTab(root) {
   const gbsBox = h('div', {});
   const listEl = h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Lade Skripte …'));
   const sortBtn = h('button', { class: 'btn text', onclick: () => { sortBy = sortBy === 'name' ? 'id' : 'name'; sortBtn.lastChild.textContent = sortBy === 'name' ? 'Name' : 'ID'; paint(); } }, icon('sort', 's18'), h('span', {}, 'Name'));
-  const stopBtn = h('button', { class: 'btn danger wide big', onclick: stop }, icon('stop', 's20'), 'Skript stoppen');
+  const stopBtn = h('button', { class: 'btn danger wide big', disabled: true, onclick: stop } /* erst aktiv, wenn ein laufendes Skript erkannt ist */, icon('stop', 's20'), 'Skript stoppen');
 
   const runButtons = [];
   if (features.scriptEditor) {
@@ -270,7 +270,7 @@ async function openEditor(script, data, onSaved) {
     root.append(header,
       h('label', { class: 'field' }, h('span', {}, 'Name'), nameInput),
       h('div', { class: 'section-title' }, 'Ablauf'),
-      h('p', { class: 'muted small' }, 'Das Skript startet automatisch mit „Start“ und endet mit „Ende“. Tippe auf einen Schritt, um Werte zu ändern.'),
+      h('p', { class: 'muted small' }, 'Das Skript startet automatisch mit „Start“ und endet mit „Ende“. Ein Tipp auf einen Schritt öffnet seine Werte.'),
       listEl,
       script && script.id > 9 ? h('button', { class: 'btn text', style: { color: 'var(--danger)', 'margin-top': '24px' }, onclick: remove }, icon('del', 's18'), 'Skript löschen') : null);
     paint();

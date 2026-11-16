@@ -13,8 +13,9 @@ function shown(el) {
 }
 
 function skip(el) {
-  // Seitenbereiche direkt im <body> (App, Anmeldung, Einrichtung) wechseln ohne Zusammenklappen
-  return reduced() || !el.isConnected || el.parentElement === document.body || el.closest?.('[data-noanim]') || typeof el.animate !== 'function';
+  // Seitenbereiche direkt im <body> (App, Anmeldung, Einrichtung) wechseln ohne Zusammenklappen.
+  // Während eine Seite gerade einblendet, gilt der erste Zustand sofort (sonst springen Kacheln beim Aufbau).
+  return reduced() || (enterView?.contains(el) && el !== enterView && performance.now() < enterSettle) || !el.isConnected || el.parentElement === document.body || el.closest?.('[data-noanim]') || typeof el.animate !== 'function';
 }
 
 const COLLAPSED = { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px' };
@@ -109,6 +110,7 @@ document.addEventListener('click', (e) => {
 const ENTER = '.card, .tile, .list, .list-item, .script-item, details.fold, .section-title, .empty, .offline-banner, .chips, .kv';
 let enterView = null;
 let enterUntil = 0;
+let enterSettle = 0;
 let enterDy = 24;
 const observer = typeof MutationObserver === 'function' ? new MutationObserver((records) => {
   if (performance.now() > enterUntil || reduced()) return;
@@ -116,13 +118,14 @@ const observer = typeof MutationObserver === 'function' ? new MutationObserver((
   for (const r of records) {
     for (const node of r.addedNodes) {
       if (!(node instanceof HTMLElement) || node.parentElement === enterView || !node.matches(ENTER)) continue;
+      if (node.parentElement?.classList.contains('stagger')) continue; // blendet schon per CSS gestaffelt ein
       if (node.closest('[data-noanim]') || typeof node.animate !== 'function') continue;
       // nicht noch einmal, wenn ein umgebendes Element gerade selbst einblendet
       let p = node.parentElement, busy = false;
       while (p && p !== enterView) { if (p.__entering) { busy = true; break; } p = p.parentElement; }
       if (busy) continue;
       node.__entering = true;
-      const a = node.animate([{ opacity: 0, transform: `translateY(${enterDy}px)` }, { opacity: 1, transform: 'none' }],
+      const a = node.animate([{ opacity: 0, transform: `translateY(${enterDy}px)` }, { transform: 'none' }], // Ziel: eigene Deckkraft
         { duration: 380, delay: Math.min(n++, 8) * 30, easing: 'cubic-bezier(.05, .7, .1, 1)', fill: 'backwards' });
       a.onfinish = a.oncancel = () => { node.__entering = false; };
     }
@@ -133,7 +136,8 @@ const observer = typeof MutationObserver === 'function' ? new MutationObserver((
 export function pageEnter(view, fromAbove) {
   enterDy = fromAbove ? -18 : 24;
   view.classList.toggle('from-above', Boolean(fromAbove));
-  if (!observer) return;
+  enterSettle = performance.now() + 700;
+  if (!observer) { enterView = view; return; }
   if (enterView !== view) { observer.disconnect(); observer.observe(view, { childList: true, subtree: true }); enterView = view; }
   enterUntil = performance.now() + 2500;
 }

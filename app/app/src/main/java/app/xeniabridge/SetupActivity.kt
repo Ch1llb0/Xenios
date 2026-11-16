@@ -9,6 +9,8 @@ import android.os.Build
 import android.os.Bundle
 import android.text.Html
 import android.view.View
+import android.widget.ScrollView
+import android.graphics.Rect
 import android.view.WindowInsets
 import android.widget.Button
 import android.widget.EditText
@@ -39,11 +41,17 @@ class SetupActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup)
-        val root = findViewById<View>(R.id.scroll)
+        val root = findViewById<ScrollView>(R.id.scroll)
         root.setOnApplyWindowInsetsListener { v, insets ->
             val b = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
             v.setPadding(b.left, b.top, b.right, b.bottom)
+            // Tastatur offen: Inhalt so weit hochschieben, dass das Feld, in dem getippt wird, sichtbar bleibt
+            if (insets.isVisible(WindowInsets.Type.ime())) v.post { revealFocused(root) }
             insets
+        }
+        // auch beim Wechsel in ein anderes Feld, während die Tastatur schon offen ist
+        root.viewTreeObserver.addOnGlobalFocusChangeListener { _, now ->
+            if (now != null && root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true) root.post { revealFocused(root) }
         }
 
         val prefs = Prefs(this)
@@ -80,6 +88,33 @@ class SetupActivity : Activity() {
         modeGroup.setOnCheckedChangeListener { _, id -> showMode(id == R.id.mode_direct) }
 
         findViewById<Button>(R.id.help).setOnClickListener { showIpHelp() }
+        // Server im Heimnetz suchen und als lokale Adresse eintragen
+        findViewById<Button>(R.id.scan_server).setOnClickListener { button ->
+            if (Build.VERSION.SDK_INT >= 37 && checkSelfPermission(LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED) {
+                pendingScan = { button.performClick() }
+                requestPermissions(arrayOf(LOCAL_NETWORK), REQ_LOCAL_NETWORK)
+                return@setOnClickListener
+            }
+            button.isEnabled = false
+            (button as Button).text = "Suche Server …"
+            error.visibility = View.GONE
+            thread(name = "xenios-scan") {
+                val found = try { NetworkScan.scanServers(applicationContext) } catch (_: Exception) { emptyList() }
+                runOnUiThread {
+                    button.isEnabled = true
+                    button.setText(R.string.server_scan)
+                    when (found.size) {
+                        0 -> showError("Kein Xenios-Server im WLAN gefunden. Gefunden wird der Server über „Unverschlüsseltes HTTP“ (Server- & App-Einstellungen → Heimnetz-HTTP, Port 80 oder 8080); sonst die Adresse von Hand eintragen.")
+                        1 -> local.setText(found[0])
+                        else -> AlertDialog.Builder(this)
+                            .setTitle("Server gefunden – antippen zum Übernehmen")
+                            .setItems(found.toTypedArray()) { _, i -> local.setText(found[i]) }
+                            .show()
+                    }
+                }
+            }
+        }
+
         val scanButton = findViewById<Button>(R.id.scan)
         scanButton.setOnClickListener { button ->
             // Android 17+: Zugriff aufs Heimnetz ist eine Berechtigung, die der Nutzer erteilen muss
@@ -196,6 +231,24 @@ class SetupActivity : Activity() {
                 }
             }
         }
+    }
+
+    /** Scrollt so, dass das fokussierte Feld (mit etwas Luft darunter) über der Tastatur steht. */
+    private fun revealFocused(scroll: ScrollView) {
+        val f = currentFocus ?: return
+        val r = Rect()
+        f.getDrawingRect(r)
+        scroll.offsetDescendantRectToMyCoords(f, r)
+        val margin = (24 * resources.displayMetrics.density).toInt()
+        // r liegt in Inhaltskoordinaten (inkl. Innenabstand oben); sichtbar ist der Bereich zwischen den Innenabständen
+        val visibleTop = scroll.scrollY + scroll.paddingTop
+        val visibleBottom = scroll.scrollY + scroll.height - scroll.paddingBottom
+        val target = when {
+            r.bottom + margin > visibleBottom -> scroll.scrollY + (r.bottom + margin - visibleBottom)
+            r.top - margin < visibleTop -> scroll.scrollY - (visibleTop - (r.top - margin))
+            else -> return
+        }
+        scroll.smoothScrollTo(0, target.coerceAtLeast(0))
     }
 
     private fun showError(msg: String) {

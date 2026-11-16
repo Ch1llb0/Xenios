@@ -109,6 +109,13 @@
                 android:textColor="@color/on_surface"
                 android:textSize="12sp" />
 
+            <Button
+                android:id="@+id/scan_server"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/server_scan" />
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

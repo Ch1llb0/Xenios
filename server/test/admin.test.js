@@ -136,7 +136,7 @@ test('Server-Einstellungen: lesen, ändern, sofort wirksam; Prüfungen', async (
   // Den Zugang abschalten, über den man gerade verbunden ist (hier: Tunnel-Port/HTTP), wird abgelehnt
   r = await call('PUT', '/api/admin/config', { changes: { 'http.enabled': false } });
   assert.equal(r.status, 400);
-  assert.match(r.json.error, /gerade verbunden/);
+  assert.match(r.json.error, /nutzt gerade/);
 });
 
 test('Aktualisierung: Stand prüfen und anfordern', async () => {

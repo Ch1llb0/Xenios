@@ -226,7 +226,7 @@ export function serverView(root) {
       toggle('Zugriff von unterwegs', tunnelOn ? 'Eingeschaltet: Xenios nimmt Verbindungen des Cloudflare-Tunnels an' : 'Ausgeschaltet: Xenios ist nur im Heimnetz erreichbar', 'http.enabled', { onChange: () => paint() }),
       tunnelOn ? h('div', { class: 'collapse' },
         h('div', { class: 'divider' }),
-        h('div', { class: 'field-row' }, text('Öffentliche Adresse', 'publicUrl', { type: 'url', placeholder: 'https://xenios.deine-domain.de', parse: (v) => v.trim() || null, format: (v) => v || '' }), tTest),
+        h('div', { class: 'field-row' }, text('Öffentliche Adresse', 'publicUrl', { type: 'url', placeholder: 'https://xenios.example.de', parse: (v) => v.trim() || null, format: (v) => v || '' }), tTest),
         tBox,
         s.tunnel.docker ? tunnelPaste(s.tunnel) : null,
         h('details', { class: 'adv', open: !data.values.publicUrl }, h('summary', {}, 'Anleitung', icon('more', 's20')), tunnelGuide(s.tunnel)),

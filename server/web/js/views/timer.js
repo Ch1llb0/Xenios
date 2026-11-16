@@ -325,7 +325,7 @@ export function timerView(root) {
       h('div', { class: 'row', style: { 'margin-top': '16px' } }, h('h3', { class: 'grow', style: { margin: 0 } }, 'Handys'), checkBtn),
       ...devices,
       inApp ? h('button', { class: 'btn text', onclick: () => window.XeniaApp.showAlarms() }, icon('clock', 's18'), 'Alle Wecker in der Uhr-App ansehen') : null,
-      h('p', { class: 'muted small' }, 'Android verrät pro Handy nur den nächsten Wecker, nicht die ganze Liste. Jedes Handy meldet ihn selbst, sobald er sich ändert. „Wecker prüfen“ fragt das Handy ab, auf dem du gerade bist. Es zählt der früheste Wecker der ausgewählten Handys. Wird ein Wecker kurzfristig gestellt, schaltet der Server sofort ein. Läuft die Maschine schon, passiert nichts.'),
+      h('p', { class: 'muted small' }, 'Android verrät pro Handy nur den nächsten Wecker, nicht die ganze Liste. Jedes Handy meldet ihn selbst, sobald er sich ändert. „Wecker prüfen“ fragt das Handy ab, auf dem diese Seite gerade offen ist. Es zählt der früheste Wecker der ausgewählten Handys. Wird ein Wecker kurzfristig gestellt, schaltet der Server sofort ein. Läuft die Maschine schon, passiert nichts.'),
       wakeSave));
   }
 

@@ -205,8 +205,8 @@ function switchesTab(root) {
         h('div', { class: 'card' },
           h('h3', {}, 'Tastenbelegung'),
           h('p', { class: 'muted small' }, classic
-            ? 'Alte Xenia (DBL): Tippe auf eine Position ①–④ und wähle, was kurzes bzw. langes Drücken startet. ② (linker Schalter nach rechts, am Ein/Aus-Symbol) ist fest Ein/Aus und lässt sich nicht ändern.'
-            : 'Tippe auf einen Taster und wähle, was kurzes bzw. langes Drücken startet. Eigene Abläufe legst du unter „Skripte“ an.'),
+            ? 'Alte Xenia (DBL): Eine Position ①–④ antippen und auswählen, was kurzes bzw. langes Drücken startet. ② (linker Schalter nach rechts, am Ein/Aus-Symbol) ist fest Ein/Aus und lässt sich nicht ändern.'
+            : 'Einen Taster antippen und auswählen, was kurzes bzw. langes Drücken startet. Eigene Abläufe entstehen unter „Skripte“.'),
           h('div', { class: 'machine-wrap' }, svg),
           grid,
           editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')));

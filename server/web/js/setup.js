@@ -178,7 +178,7 @@ export function showSetup(root, { onDone }) {
   // 5. Von unterwegs: Cloudflare-Tunnel (optional)
   function tunnelStep() {
     const t = st.tunnel;
-    const url = h('input', { type: 'url', class: 'text', value: t.url, placeholder: 'https://xenios.deine-domain.de', disabled: locked('publicUrl'), autocomplete: 'off', spellcheck: 'false' });
+    const url = h('input', { type: 'url', class: 'text', value: t.url, placeholder: 'https://xenios.example.de', disabled: locked('publicUrl'), autocomplete: 'off', spellcheck: 'false' });
     url.addEventListener('input', () => { t.url = url.value.trim(); });
     const result = probeResult('tunnel');
     const test = h('button', { type: 'button', class: 'btn tonal' }, icon('cloud', 's18'), 'Testen');
@@ -318,7 +318,7 @@ export function tunnelGuide(env) {
     h('li', {}, 'Auf ', link('https://one.dash.cloudflare.com', 'one.dash.cloudflare.com'), ' unter ', h('b', {}, 'Networks → Tunnels → Create a tunnel → Cloudflared'), ' einen Tunnel „xenios“ anlegen.'),
     env.docker
       ? h('li', {}, 'Bei „Install and run a connector“ die Zeile ', h('b', {}, 'sudo cloudflared service install …'), ' kopieren. Den Befehl nicht ausführen.')
-      : h('li', {}, 'Bei „Install and run a connector“ dein Betriebssystem wählen und den angezeigten Befehl auf diesem Rechner ausführen. Er richtet cloudflared als Dienst ein.'),
+      : h('li', {}, 'Bei „Install and run a connector“ das Betriebssystem dieses Rechners wählen und den angezeigten Befehl auf diesem Rechner ausführen. Er richtet cloudflared als Dienst ein.'),
     env.docker
       ? h('li', {}, 'Die Zeile unten bei ', h('b', {}, 'Befehl aus Cloudflare'), ' einfügen und ', h('b', {}, 'Token übernehmen'), ' wählen. Den Befehl nicht ausführen. Xenios schreibt den Token und startet cloudflared.')
       : null,
@@ -330,7 +330,7 @@ export function tunnelGuide(env) {
         'In der Ausgabe steht „Tunnel-Token übernommen, starte cloudflared.“ xenios ist healthy, cloudflared läuft.')
       : null,
     h('li', {}, 'Im Tunnel ', h('b', {}, 'Add route → Published Application'), ': Subdomain und Domain wählen, als ', h('b', {}, 'Service URL'), ' genau das eintragen:', copyBlock(env.service)),
-    h('li', {}, 'Die öffentliche Adresse (z. B. https://xenios.deine-domain.de) eintragen und ', h('b', {}, 'Testen'), '.'));
+    h('li', {}, 'Die öffentliche Adresse (z. B. https://xenios.example.de) eintragen und ', h('b', {}, 'Testen'), '.'));
 }
 
 function copyBlock(text) {

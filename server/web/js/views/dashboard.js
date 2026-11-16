@@ -165,15 +165,17 @@ export function dashboardView(root) {
       ], { duration: 260, easing: 'cubic-bezier(.2, 0, 0, 1)' });
     }
   };
-  const sizes = new ResizeObserver(() => {
+  // Spaltenzahl aus der Breite; true, wenn sie sich geändert hat
+  const measureCols = () => {
     const width = grid.getBoundingClientRect().width;
+    if (!width) return false;
     const n = Math.max(1, Math.min(4, Math.floor((width + GAP) / (MIN_COL + GAP))));
-    if (n !== cols) {
-      cols = n;
-      grid.style.setProperty('--cols', String(cols));
-      place();
-    }
-  });
+    if (n === cols) return false;
+    cols = n;
+    grid.style.setProperty('--cols', String(cols));
+    return true;
+  };
+  const sizes = new ResizeObserver(() => { if (measureCols()) place(); });
   root.append(grid);
   setTopActions(h('button', { class: 'icon-btn', 'aria-label': 'Home anpassen', title: 'Home anpassen', onclick: customize }, icon('tune')));
 
@@ -196,6 +198,7 @@ export function dashboardView(root) {
       return { id: t.id, el, extra, update: t0.update, w: t.w, h: t.h };
     });
     grid.replaceChildren(built.length ? built.map((b) => b.el) : h('div', { class: 'empty' }, 'Keine Kachel ausgewählt. Oben rechts lässt sich das Dashboard anpassen.'));
+    measureCols(); // gleich in der richtigen Spaltenzahl aufbauen, nicht erst einspaltig
     place();
     update();
   }

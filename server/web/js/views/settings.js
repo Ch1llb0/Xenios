@@ -188,7 +188,7 @@ function scaleCard(features) {
       const double = h('input', { class: 'text', type: 'number', min: 1, max: 199, step: 0.5, value: sw.doubleDoseG ?? '' });
       box.replaceChildren(
         h('p', { class: 'muted small' }, classic
-          ? 'Die Xenia DBL hat keine eingebaute Waage. Gewicht und Fluss kommen von einer per Bluetooth verbundenen Waage (z. B. Bookoo), die du in der Original-Oberfläche unter „Waage“ koppelst. Ohne Waage misst die Maschine die Menge in ml.'
+          ? 'Die Xenia DBL hat keine eingebaute Waage. Gewicht und Fluss kommen von einer per Bluetooth verbundenen Waage (z. B. Bookoo), die in der Original-Oberfläche unter „Waage“ gekoppelt wird. Ohne Waage misst die Maschine die Menge in ml.'
           : 'Zielgewicht der Standardbezüge mit der internen Waage.'),
         h('div', { class: 'row' },
           h('label', { class: 'field grow' }, h('span', {}, classic ? 'Single (g bzw. ml)' : 'Einfache Dosis (g)'), single),
@@ -228,15 +228,13 @@ function navCard(unsubs) {
   const list = h('div', { class: 'list' });
   const paint = () => {
     const hidden = hiddenTabs();
-    const all = navChoices();
-    list.replaceChildren(all.map((r) => {
-      const shown = r.fixed || !hidden.has(r.path);
-      return prefRow(r.icon, r.label, r.fixed ? 'immer sichtbar' : null, switchEl({ checked: shown, disabled: Boolean(r.fixed), label: `${r.label} in der Leiste`, onChange: (on) => { setTabHidden(r.path, !on); paint(); } }));
-    }));
+    // „Einstellungen“ steht immer in der Leiste und taucht deshalb hier nicht auf
+    const all = navChoices().filter((r) => !r.fixed);
+    list.replaceChildren(all.map((r) => prefRow(r.icon, r.label, null, switchEl({ checked: !hidden.has(r.path), label: `${r.label} in der Leiste`, onChange: (on) => { setTabHidden(r.path, !on); paint(); } }))));
   };
   paint();
   unsubs.push(onPrefs((k) => { if (k === 'hiddenComponents' || k === 'features') paint(); }));
-  return h('div', {}, h('p', { class: 'muted small' }, 'Welche Seiten in der Leiste stehen (gilt für dieses Gerät). Ausgeblendete Seiten bleiben über Links erreichbar. „Einstellungen“ bleibt immer sichtbar.'), list);
+  return h('div', {}, h('p', { class: 'muted small' }, 'Welche Seiten in der Leiste stehen (gilt für dieses Gerät). Ausgeblendete Seiten bleiben über Links erreichbar; „Einstellungen“ steht immer in der Leiste.'), list);
 }
 
 // Komponenten ausblenden (je Gerät) und Funktionen ein-/ausschalten (gilt auf dem Server für alle Geräte)
@@ -322,12 +320,12 @@ function themeCard() {
     box.replaceChildren(
       h('div', { class: 'muted small' }, 'Farbvorlage (Layout, Schrift und Icons bleiben gleich)'),
       chips(style, [['material', 'Material'], ['xenia', 'Xenia']], (v) => localStorageSet('uiStyle', v)),
+      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
+      chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, style === 'material' ? 'Temperatur- und Druckanzeigen (flach)' : 'Manometer (Temperatur- und Druckanzeigen)'),
       // gleiche Reihenfolge in beiden Vorlagen: automatisch, hell, dunkel
       chips(gaugeChoice(style) || 'auto', [['auto', 'Wie Helligkeit'], ['white', style === 'material' ? 'Hell' : 'Zifferblatt weiß'], ['black', style === 'material' ? 'Dunkel' : 'Zifferblatt schwarz']],
         (v) => { if (v === 'auto') { try { localStorage.removeItem(gaugeKey(style)); } catch { /* privat */ } } else localStorageSet(gaugeKey(style), v); }),
-      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
-      chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Farben (gilt für dieses Gerät)'),
       color('accent', 'Akzent (Schaltflächen, Regler, Anzeigen)', THEME_DEFAULTS.accent[style]),
       color('activeColor', 'Aktiv (gewählter Zustand, z. B. „Ein“)', THEME_DEFAULTS.active[style]));

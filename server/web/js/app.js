@@ -82,10 +82,10 @@ export function gaugeChoice(palette) {
   return v === 'white' || v === 'black' ? v : null;
 }
 
-// Android-App: Status- und Navigationsleiste in den Farben von Kopfzeile und unterer Leiste der Seite einfärben
+// Systemleisten in den Farben der Seite: im Browser die Adressleiste (theme-color) wie die Kopfzeile,
+// in der Android-App zusätzlich die Navigationsleiste wie die untere Leiste
 let barsTimer = 0;
 export function syncAppBars() {
-  if (typeof window.XeniaApp?.setBars !== 'function') return;
   const send = () => {
     const color = (el) => {
       const m = el && /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(getComputedStyle(el).backgroundColor);
@@ -96,7 +96,10 @@ export function syncAppBars() {
     const nav = document.querySelector('.navbar');
     const r = nav?.getBoundingClientRect();
     const navAtBottom = r && r.width >= window.innerWidth - 2 && Math.abs(r.bottom - window.innerHeight) < 3; // breite Xenia-Ansicht: Leiste links
-    try { window.XeniaApp.setBars(color(document.querySelector('.topbar')) || page, (navAtBottom && color(nav)) || page); } catch { /* ältere App */ }
+    const top = color(document.querySelector('.topbar')) || page;
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', top));
+    if (typeof window.XeniaApp?.setBars !== 'function') return;
+    try { window.XeniaApp.setBars(top, (navAtBottom && color(nav)) || page); } catch { /* ältere App */ }
   };
   requestAnimationFrame(send);
   clearTimeout(barsTimer);
@@ -149,12 +152,45 @@ function navRoutes() {
 function buildNav() {
   $('back-btn').replaceChildren(icon('left'));
   const routes = navRoutes();
-  const inner = h('div', { class: `navbar-inner${routes.length > 5 ? ' many' : ''}${routes.length > 7 ? ' lots' : ''}` }, routes.map((r) =>
-    h('button', { class: 'nav-item', dataset: { path: r.path }, onclick: () => navigate(r.path) },
-      h('span', { class: 'pill' }, icon(r.icon)), h('span', { class: 'nav-label' }, r.label))));
+  const cls = `navbar-inner${routes.length > 5 ? ' many' : ''}${routes.length > 7 ? ' lots' : ''}`;
   // Auf kleinen Bildschirmen nur Symbole: Name als Tooltip und für Screenreader
-  inner.querySelectorAll('.nav-item').forEach((b, i) => { b.title = routes[i].label; b.setAttribute('aria-label', routes[i].label); });
-  $('navbar').replaceChildren(inner);
+  const make = (r) => h('button', { class: 'nav-item', dataset: { path: r.path }, title: r.label, 'aria-label': r.label, onclick: () => navigate(r.path) },
+    h('span', { class: 'pill' }, icon(r.icon)), h('span', { class: 'nav-label' }, r.label));
+  const old = $('navbar').querySelector('.navbar-inner');
+  if (!old || !old.isConnected || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    $('navbar').replaceChildren(h('div', { class: cls }, routes.map(make)));
+    markNav();
+    return;
+  }
+  // Leiste bleibt stehen: wegfallende Einträge schrumpfen weg, neue wachsen hinein, die übrigen rücken mit
+  old.className = cls;
+  const vertical = getComputedStyle(old).flexDirection.startsWith('column'); // linke Navigationsliste (breite Xenia-Ansicht)
+  const prop = vertical ? 'maxHeight' : 'maxWidth';
+  const size = (b) => `${vertical ? b.offsetHeight : b.offsetWidth}px`;
+  const ease = { duration: 280, easing: 'cubic-bezier(.2, 0, 0, 1)' };
+  const keep = new Map([...old.children].filter((b) => !b.__leaving).map((b) => [b.dataset.path, b]));
+  const want = new Set(routes.map((r) => r.path));
+  for (const [path, b] of keep) {
+    if (want.has(path)) continue;
+    b.__leaving = true;
+    b.style.pointerEvents = 'none';
+    b.style.overflow = 'hidden';
+    const a = b.animate([{ [prop]: size(b), opacity: 1 }, { [prop]: '0px', opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }], { ...ease, fill: 'forwards' });
+    a.onfinish = () => b.remove();
+  }
+  let prev = null;
+  for (const r of routes) {
+    let b = keep.get(r.path);
+    const added = !b;
+    if (added) b = make(r);
+    old.insertBefore(b, prev ? prev.nextSibling : old.firstChild);
+    if (added) {
+      b.style.overflow = 'hidden';
+      const a = b.animate([{ [prop]: '0px', opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }, { [prop]: size(b), opacity: 1 }], ease);
+      a.onfinish = () => { b.style.overflow = ''; };
+    }
+    prev = b;
+  }
   markNav();
 }
 

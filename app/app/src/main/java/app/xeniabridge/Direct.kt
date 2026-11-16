@@ -277,4 +277,29 @@ object NetworkScan {
         pool.awaitTermination(90, TimeUnit.SECONDS)
         return found.sortedBy { it.ip.substringAfterLast('.').toInt() }
     }
+
+    /** Sucht Xenios-Server im eigenen /24-Netz: /healthz antwortet mit dem Kopf X-Xenios-Instance (Heimnetz-Zugang, http). */
+    fun scanServers(context: Context): List<String> {
+        val subnet = ownSubnet(context) ?: return emptyList()
+        val pool = Executors.newFixedThreadPool(64)
+        val found = java.util.Collections.synchronizedList(mutableListOf<String>())
+        for (i in 1..254) {
+            for (port in listOf(80, 8080)) {
+                val base = if (port == 80) "http://$subnet.$i" else "http://$subnet.$i:$port"
+                pool.execute {
+                    try {
+                        val conn = URL("$base/healthz").openConnection() as HttpURLConnection
+                        try {
+                            conn.connectTimeout = 1500
+                            conn.readTimeout = 2000
+                            if (conn.responseCode == 200 && conn.getHeaderField("X-Xenios-Instance") != null) found += base
+                        } finally { conn.disconnect() }
+                    } catch (_: Exception) { }
+                }
+            }
+        }
+        pool.shutdown()
+        pool.awaitTermination(60, TimeUnit.SECONDS)
+        return found.sortedBy { it.substringAfter("://").substringBefore(':').substringAfterLast('.').toInt() }
+    }
 }
