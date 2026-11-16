@@ -29,6 +29,13 @@ const ROUTES = [
 ];
 
 const $ = (id) => document.getElementById(id);
+
+// In der Android-App rückt die App selbst um Status- und Navigationsleiste ein. Ohne viewport-fit=cover rückt die
+// WebView zusätzlich ein (doppelter Rand oben und unten). Im Browser bleibt es weg: dort führte es bei unten
+// eingeblendeter Adressleiste zu einer Leerzeile unter den Tabs.
+if (/XeniaApp\//.test(navigator.userAgent) || typeof window.XeniaApp === 'object') {
+  document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
 let current = null;      // { route, dispose }
 
 // --- Darstellung --------------------------------------------------------------
