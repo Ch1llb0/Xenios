@@ -103,6 +103,9 @@ export function dashboardView(root) {
       }
       return;
     }
+    // Seitenhöhe und Scrollposition während des Messens festhalten: sonst wird die Seite kurz kürzer und springt nach oben
+    const keepY = window.scrollY;
+    grid.style.minHeight = `${grid.offsetHeight}px`;
     const spanOf = (b) => (b.w === 0 ? cols : Math.min(b.w, cols));
     // Passen Status und Instrumente nicht nebeneinander (weniger Spalten), kommen die Instrumente nach oben
     const stB = built.find((b) => b.id === 'status' && !b.el.hidden);
@@ -131,6 +134,8 @@ export function dashboardView(root) {
         ctl.el.style.setProperty('grid-column', `${col} / span ${span}`);
       }
     }
+    grid.style.minHeight = '';
+    if (window.scrollY !== keepY) window.scrollTo(0, keepY);
   };
   // Wächst ein Inhalt nachträglich (z. B. Zeile „Zieldruck“ beim Einschalten des Dampfkessels), neu anordnen
   const refit = () => {
@@ -697,9 +702,10 @@ function liveTile({ wide, h: rows, relayout }) {
     toggle.lastChild.textContent = values.hidden ? 'Alle Werte' : 'Werte ausblenden';
     relayout?.();
     // Nach dem Auf- und Zuklappen die Kachel so in den sichtbaren Bereich holen, dass sie ihn möglichst füllt
+    // Beim Einblenden nur nach unten, beim Ausblenden nur nach oben scrollen
     const tile = toggle.closest('.tile');
-    requestAnimationFrame(() => fitIntoView(tile));
-    setTimeout(() => fitIntoView(tile), 400); // nach dem Nachladen der Werte und dem Neuanordnen
+    const dir = values.hidden ? -1 : 1;
+    requestAnimationFrame(() => fitIntoView(tile, dir));
   } }, icon('more', 's18'), h('span', {}, 'Alle Werte'));
   const row = (k, v) => [h('dt', {}, k), h('dd', {}, v)];
   return {
@@ -732,7 +738,7 @@ function liveTile({ wide, h: rows, relayout }) {
 
 // Element so scrollen, dass es zwischen Kopfleiste und unterer Leiste ganz sichtbar ist; ist es höher als der
 // verfügbare Platz, steht sein Kopf direkt unter der Kopfleiste
-function fitIntoView(el) {
+function fitIntoView(el, dir = 0) {
   if (!el) return;
   const top = (document.querySelector('.topbar')?.getBoundingClientRect().bottom || 64) + 8;
   const nav = document.getElementById('navbar')?.getBoundingClientRect();
@@ -741,6 +747,8 @@ function fitIntoView(el) {
   let dy = 0;
   if (r.height > bottom - top || r.top < top) dy = r.top - top;
   else if (r.bottom > bottom) dy = r.bottom - bottom;
+  if (dir > 0) dy = Math.max(0, dy); // nur nach unten
+  if (dir < 0) dy = Math.min(0, dy); // nur nach oben
   if (Math.abs(dy) > 2) window.scrollBy({ top: dy, behavior: 'smooth' });
 }
 
