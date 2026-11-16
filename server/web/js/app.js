@@ -71,6 +71,12 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
   syncAppBars();
 }
 
+// Android-App: Zoom sperren (im Browser bleibt Zoomen erlaubt)
+if (/XeniaApp\//.test(navigator.userAgent)) {
+  document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+  document.documentElement.classList.add('in-app');
+}
+
 // Farbvorlage: Material ist Standard
 export function uiPalette() {
   return localStorageGet('uiStyle') === 'xenia' ? 'xenia' : 'material';

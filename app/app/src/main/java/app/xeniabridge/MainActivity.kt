@@ -83,6 +83,11 @@ class MainActivity : Activity() {
             allowFileAccess = false
             allowContentAccess = false
             userAgentString = "$userAgentString XeniaApp/${BuildConfigInfo.VERSION}"
+            // Kein Zoom: weder mit zwei Fingern noch per Doppeltipp, und keine Vergrößerung über die Systemschriftgröße
+            setSupportZoom(false)
+            builtInZoomControls = false
+            displayZoomControls = false
+            textZoom = 100
         }
         web.addJavascriptInterface(Bridge(), "XeniaApp")
         web.webViewClient = Client()

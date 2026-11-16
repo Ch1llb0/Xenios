@@ -1091,3 +1091,6 @@ details.fold[open] > summary { border-bottom: 1px solid var(--outline-variant); 
 :root[data-palette="material"] .gauge:not(.mano) .g-label { fill: var(--gauge-text2); }
 :root[data-palette="material"] .gauge:not(.mano) .g-value { fill: var(--gauge-text); }
 :root[data-palette="material"] .gauge:not(.mano) .g-sub { fill: var(--gauge-text2); }
+
+/* Android-App: kein Doppeltipp-Zoom */
+html.in-app, html.in-app body { touch-action: pan-x pan-y; }
