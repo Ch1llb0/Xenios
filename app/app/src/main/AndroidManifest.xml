@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Netzwerksuche: eigenes WLAN-Netz (Adresse und Präfix) ermitteln -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Android 17+: Zugriff auf Geräte im Heimnetz (Maschine, Mühle, lokaler Server) – wird zur Laufzeit erfragt -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <!-- Uhr-Apps sichtbar machen: Name der App, die den nächsten Wecker gestellt hat -->
     <queries>

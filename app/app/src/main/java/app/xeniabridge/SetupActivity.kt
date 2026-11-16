@@ -3,6 +3,7 @@ package app.xeniabridge
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -22,6 +23,17 @@ import kotlin.concurrent.thread
  * oder „Direkt im Heimnetz“ (IP-Adressen von Maschine und Mühle, ohne Server).
  */
 class SetupActivity : Activity() {
+    private var pendingScan: (() -> Unit)? = null
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQ_LOCAL_NETWORK) return
+        val scan = pendingScan
+        pendingScan = null
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) scan?.invoke()
+        else showError("Ohne die Berechtigung „Geräte im lokalen Netzwerk“ kann die App Maschine und Mühle nicht suchen. Sie lässt sich in den Android-Einstellungen der App erteilen – oder die IPs von Hand eintragen.")
+    }
+
     private lateinit var error: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,7 +80,14 @@ class SetupActivity : Activity() {
         modeGroup.setOnCheckedChangeListener { _, id -> showMode(id == R.id.mode_direct) }
 
         findViewById<Button>(R.id.help).setOnClickListener { showIpHelp() }
-        findViewById<Button>(R.id.scan).setOnClickListener { button ->
+        val scanButton = findViewById<Button>(R.id.scan)
+        scanButton.setOnClickListener { button ->
+            // Android 17+: Zugriff aufs Heimnetz ist eine Berechtigung, die der Nutzer erteilen muss
+            if (Build.VERSION.SDK_INT >= 37 && checkSelfPermission(LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED) {
+                pendingScan = { button.performClick() }
+                requestPermissions(arrayOf(LOCAL_NETWORK), REQ_LOCAL_NETWORK)
+                return@setOnClickListener
+            }
             button.isEnabled = false
             progress.visibility = View.VISIBLE
             error.visibility = View.GONE
@@ -208,6 +227,8 @@ class SetupActivity : Activity() {
     }
 
     companion object {
+        private const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
+        private const val REQ_LOCAL_NETWORK = 7
         /** https erzwingen; http nur für Adressen im eigenen Netz. */
         fun normalize(input: String): String? {
             var s = input.trim().trimEnd('/')
