@@ -64,7 +64,8 @@ class MainActivity : Activity() {
         frame.setOnApplyWindowInsetsListener { v, insets ->
             val b = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime() or WindowInsets.Type.displayCutout())
             v.setPadding(b.left, b.top, b.right, b.bottom)
-            insets
+            // Verbraucht: sonst meldet die WebView dieselben Ränder als safe-area und die Seite rückt ein zweites Mal ein
+            WindowInsets.CONSUMED
         }
         applyBarAppearance()
 

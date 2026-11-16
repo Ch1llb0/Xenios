@@ -148,7 +148,23 @@ export function dashboardView(root) {
   const refit = () => {
     if (cols > 1 && built.some((b) => !b.el.hidden && b.el.scrollHeight > b.el.clientHeight + 1)) place();
   };
-  const relayout = () => place(); // Kachel hat ihren Inhalt verkleinert (z. B. Werte im Verlauf eingeklappt)
+  // Neu anordnen mit Animation: jede Kachel gleitet von alter zu neuer Position und Größe (nichts springt)
+  // mutate: Änderung am Inhalt, erst nach dem Messen der alten Lage (sonst ist die Kachel schon gewachsen)
+  const relayout = (mutate) => {
+    const before = new Map(built.map((b) => [b, b.el.getBoundingClientRect()]));
+    mutate?.();
+    place();
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    for (const b of built) {
+      const r0 = before.get(b);
+      const r1 = b.el.getBoundingClientRect();
+      if (b.el.hidden || !r0.height || (Math.abs(r0.top - r1.top) < 1 && Math.abs(r0.left - r1.left) < 1 && Math.abs(r0.height - r1.height) < 1)) continue;
+      b.el.animate([
+        { transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top}px)`, height: `${r0.height}px`, width: `${r0.width}px` },
+        { transform: 'none', height: `${r1.height}px`, width: `${r1.width}px` },
+      ], { duration: 260, easing: 'cubic-bezier(.2, 0, 0, 1)' });
+    }
+  };
   const sizes = new ResizeObserver(() => {
     const width = grid.getBoundingClientRect().width;
     const n = Math.max(1, Math.min(4, Math.floor((width + GAP) / (MIN_COL + GAP))));
@@ -164,7 +180,7 @@ export function dashboardView(root) {
   function build() {
     built = layout.tiles.filter((t) => t.on && tileVisible(t.id)).map((t) => {
       const def = TILES[t.id];
-      const t0 = def.build({ wide: t.w !== 1, h: t.h, arr: t.arr, relayout: () => relayout() });
+      const t0 = def.build({ wide: t.w !== 1, h: t.h, arr: t.arr, relayout: (fn) => relayout(fn) });
       const extra = h('span', { class: 'extra' });
       const open = def.link ? () => navigate(def.link) : null;
       const el = h('section', {
@@ -694,22 +710,31 @@ function grinderTile() {
 function liveTile({ wide, h: rows, relayout }) {
   const box = h('div', { class: 'chart-fit' }); // füllt die Kachel; Höhe kommt aus der gewählten Zellenzahl
   const legend = h('div', { class: 'legend muted small' }, SERIES.map((s) => [h('span', { class: `sw ${s.cls}` }), s.label]));
-  const values = h('dl', { class: 'kv live-values', hidden: true });
+  const values = h('dl', { class: 'kv live-values', hidden: true, 'data-noanim': '' }); // eigene Animation (siehe unten)
   const toggle = h('button', { class: 'tab-mini', type: 'button', 'aria-expanded': 'false', onclick: (e) => {
     e.stopPropagation();
-    // Diagramm behält seine Höhe; die Kachel bekommt für die Werte zusätzliche Zellen
-    if (values.hidden) box.style.minHeight = `${box.clientHeight}px`;
-    else box.style.minHeight = '';
-    values.hidden = !values.hidden;
-    if (!values.hidden) fill(store.machine); // sofort füllen, nicht erst mit der nächsten Statusmeldung
-    toggle.setAttribute('aria-expanded', String(!values.hidden));
-    toggle.lastChild.textContent = values.hidden ? 'Alle Werte' : 'Werte ausblenden';
-    relayout?.();
-    // Nach dem Auf- und Zuklappen die Kachel so in den sichtbaren Bereich holen, dass sie ihn möglichst füllt
-    // Beim Einblenden nur nach unten, beim Ausblenden nur nach oben scrollen
     const tile = toggle.closest('.tile');
-    const dir = values.hidden ? -1 : 1;
-    requestAnimationFrame(() => fitIntoView(tile, dir));
+    const opening = values.hidden;
+    toggle.setAttribute('aria-expanded', String(opening));
+    toggle.lastChild.textContent = opening ? 'Werte ausblenden' : 'Alle Werte';
+    const ease = { duration: 180, easing: 'cubic-bezier(.2, 0, 0, 1)' };
+    if (opening) {
+      // Diagramm behält seine Höhe; die Kachel wächst animiert, dann blenden die Werte ein
+      box.style.minHeight = `${box.clientHeight}px`;
+      fill(store.machine); // sofort füllen, nicht erst mit der nächsten Statusmeldung
+      if (relayout) relayout(() => { values.hidden = false; }); else values.hidden = false;
+      values.animate?.([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], ease);
+      setTimeout(() => fitIntoView(tile, 1), 280); // beim Einblenden nur nach unten scrollen
+    } else {
+      // erst die Werte ausblenden, dann schrumpft die Kachel animiert
+      const out = values.animate?.([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-6px)' }], ease);
+      const done = () => {
+        const hideValues = () => { values.hidden = true; box.style.minHeight = ''; };
+        if (relayout) relayout(hideValues); else hideValues();
+        setTimeout(() => fitIntoView(tile, -1), 280); // beim Ausblenden nur nach oben scrollen
+      };
+      if (out) out.onfinish = done; else done();
+    }
   } }, icon('more', 's18'), h('span', {}, 'Alle Werte'));
   const row = (k, v) => [h('dt', {}, k), h('dd', {}, v)];
   return {
