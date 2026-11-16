@@ -269,7 +269,8 @@ function componentsCard() {
     })();
   }
   return h('div', {}, h('p', { class: 'muted small' }, 'Ausgeblendete Komponenten verschwinden aus Leiste, Startseite, Dashboard und Bezügen (gilt für dieses Gerät).'),
-    h('div', { class: 'list' }, COMPONENTS.map((c) => prefRow(c.id === 'grinder' ? 'grinder' : c.id === 'scale' ? 'scale' : 'check', c.title, c.sub,
+    // Mühle nur, wenn eine eingerichtet ist (Server- & App-Einstellungen → Geräte); sonst gibt es nichts auszublenden
+    h('div', { class: 'list' }, COMPONENTS.filter((c) => c.id !== 'grinder' || store.server?.grinder?.enabled).map((c) => prefRow(c.id === 'grinder' ? 'grinder' : c.id === 'scale' ? 'scale' : 'check', c.title, c.sub,
       switchEl({ checked: !isHidden(c.id), label: `${c.title} anzeigen`, onChange: (on) => setComponentHidden(c.id, !on) })))),
     featureBox);
 }
