@@ -322,9 +322,9 @@ function themeCard() {
       chips(style, [['material', 'Material'], ['xenia', 'Xenia']], (v) => localStorageSet('uiStyle', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
       chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
-      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, style === 'material' ? 'Temperatur- und Druckanzeigen (flach)' : 'Manometer (Temperatur- und Druckanzeigen)'),
+      h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Manometer (Temperatur und Druck)'),
       // gleiche Reihenfolge in beiden Vorlagen: automatisch, hell, dunkel
-      chips(gaugeChoice(style) || 'auto', [['auto', 'Wie Helligkeit'], ['white', style === 'material' ? 'Hell' : 'Zifferblatt weiß'], ['black', style === 'material' ? 'Dunkel' : 'Zifferblatt schwarz']],
+      chips(gaugeChoice(style) || 'auto', [['auto', 'Wie Helligkeit'], ['white', 'Hell'], ['black', 'Dunkel']],
         (v) => { if (v === 'auto') { try { localStorage.removeItem(gaugeKey(style)); } catch { /* privat */ } } else localStorageSet(gaugeKey(style), v); }),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Farben (gilt für dieses Gerät)'),
       color('accent', 'Akzent (Schaltflächen, Regler, Anzeigen)', THEME_DEFAULTS.accent[style]),

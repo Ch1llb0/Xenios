@@ -6,6 +6,13 @@ import android.content.Context
 class Prefs(context: Context) {
     private val p = context.applicationContext.getSharedPreferences("xenia", Context.MODE_PRIVATE)
 
+    init { LocalTls.pin = p.getString("localPin", null) } // für Api.call ohne Context
+
+    /** SHA-256 des eigenen Zertifikats des Servers für https://<IP>:8443 (beim ersten Verbinden gemerkt). */
+    var localPin: String?
+        get() = p.getString("localPin", null)
+        set(v) { p.edit().putString("localPin", v).apply(); LocalTls.pin = v }
+
     var baseUrl: String?
         get() = p.getString("url", null)
         set(v) = p.edit().putString("url", v).apply()

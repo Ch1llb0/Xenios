@@ -75,6 +75,7 @@ object Api {
 
     private fun reachable(base: String): Boolean = try {
         val conn = URL(base.trimEnd('/') + "/healthz").openConnection() as HttpURLConnection
+        LocalTls.prepare(conn)
         try {
             conn.connectTimeout = 1200
             conn.readTimeout = 1500
@@ -88,6 +89,7 @@ object Api {
 
     fun call(base: String, method: String, path: String, body: JSONObject?, token: String?): JSONObject {
         val conn = URL(base.trimEnd('/') + path).openConnection() as HttpURLConnection
+        LocalTls.prepare(conn)
         try {
             conn.requestMethod = method
             conn.connectTimeout = 6000
@@ -208,7 +210,8 @@ object Api {
         is ApiException -> e.message ?: "Fehler"
         is java.net.UnknownHostException -> "Server nicht gefunden"
         is java.net.SocketTimeoutException -> "Zeitüberschreitung"
-        is javax.net.ssl.SSLException -> "TLS-Fehler (gültiges Zertifikat nötig, z. B. Cloudflare)"
+        is javax.net.ssl.SSLException -> "TLS-Fehler: Zertifikat ungültig oder geändert (lokale Adresse neu eintragen)"
+        is java.net.ConnectException -> "Keine Verbindung (${e.message ?: "abgelehnt"})"
         else -> e.message ?: e.javaClass.simpleName
     }
 }

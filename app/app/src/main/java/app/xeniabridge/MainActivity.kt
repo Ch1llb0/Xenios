@@ -248,6 +248,17 @@ class MainActivity : Activity() {
     }
 
     private inner class Client : WebViewClient() {
+        // Server im Heimnetz mit eigenem Zertifikat (https://IP:8443): nur genau das beim Einrichten gemerkte zulassen
+        override fun onReceivedSslError(view: WebView, handler: android.webkit.SslErrorHandler, error: android.net.http.SslError) {
+            val pin = prefs.localPin
+            val local = prefs.localUrl?.let { Uri.parse(it) }
+            val url = Uri.parse(error.url)
+            val cert = error.certificate.x509Certificate
+            val ok = !pin.isNullOrEmpty() && cert != null && local != null && url.host == local.host && url.port == local.port &&
+                LocalTls.applies(url.host) && DirectHttp.sha256Hex(cert.encoded).equals(pin, ignoreCase = true)
+            if (ok) handler.proceed() else handler.cancel()
+        }
+
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             if (isOwnUrl(request.url)) return false
             // Fremde Links im Browser öffnen

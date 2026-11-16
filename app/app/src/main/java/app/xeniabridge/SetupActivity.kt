@@ -104,7 +104,7 @@ class SetupActivity : Activity() {
                     button.isEnabled = true
                     button.setText(R.string.server_scan)
                     when (found.size) {
-                        0 -> showError("Kein Xenios-Server im WLAN gefunden. Gefunden wird der Server über „Unverschlüsseltes HTTP“ (Server- & App-Einstellungen → Heimnetz-HTTP, Port 80 oder 8080); sonst die Adresse von Hand eintragen.")
+                        0 -> showError("Kein Xenios-Server im WLAN gefunden (gesucht: HTTPS Port 8443, HTTP Port 80/8080). Gleiches WLAN? Sonst die IP des Servers von Hand eintragen.")
                         1 -> local.setText(found[0])
                         else -> AlertDialog.Builder(this)
                             .setTitle("Server gefunden – antippen zum Übernehmen")
@@ -193,19 +193,35 @@ class SetupActivity : Activity() {
             val base = if (remoteText.isEmpty()) null else normalize(remoteText)
             val localBase = if (localText.isEmpty()) null else normalizeLocal(localText)
             if (remoteText.isNotEmpty() && base == null) return@setOnClickListener done("Server-Adresse: https:// (http nur im eigenen Netz)")
-            if (localText.isNotEmpty() && localBase == null) return@setOnClickListener done("Lokale Adresse: nur Heimnetz-Adressen wie http://192.168.178.32")
+            if (localText.isNotEmpty() && localBase == null) return@setOnClickListener done("Lokale Adresse: nur Heimnetz-Adressen wie 192.168.178.32")
             if (base == null && localBase == null) return@setOnClickListener done("Bitte mindestens eine Adresse eingeben")
             val pw = password.text.toString()
             if (pw.isEmpty()) return@setOnClickListener done("Bitte das App-Passwort eingeben")
             val device = name.text.toString().trim().ifBlank { Build.MODEL }
             thread(name = "xenia-setup") {
                 try {
-                    // Im WLAN zuerst lokal anmelden, sonst über Cloudflare
+                    // Im WLAN zuerst lokal anmelden, sonst über Cloudflare. Lokal geht HTTPS mit dem eigenen Zertifikat
+                    // des Servers (Port 8443, beim ersten Kontakt gemerkt) oder unverschlüsseltes HTTP; nur eine IP
+                    // eingetragen: erst http://IP, dann https://IP:8443.
+                    val locals = buildList {
+                        if (localBase != null) {
+                            add(localBase)
+                            val u = Uri.parse(localBase)
+                            if (u.scheme == "http" && u.port == -1) add("https://${u.host}:8443")
+                        }
+                    }
                     var result: Pair<String, String>? = null
+                    var used: String? = null
+                    var usedPin: String? = null
                     var lastError: Exception? = null
-                    for (b in listOfNotNull(localBase, base)) {
+                    for (b in locals + listOfNotNull(base)) {
+                        val isLocal = b in locals
+                        val pin = if (isLocal && b.startsWith("https://")) (try { DirectHttp.fingerprint(b) } catch (e: Exception) { lastError = e; continue }) else null
+                        LocalTls.pin = pin
                         try {
                             result = Api.registerDevice(b, pw, device)
+                            used = b
+                            usedPin = pin
                             break
                         } catch (e: Api.ApiException) {
                             throw e // Server erreicht, aber z. B. falsches Passwort
@@ -220,7 +236,10 @@ class SetupActivity : Activity() {
                     if (old != null && oldBase != null) Api.logout(oldBase, old)
                     prefs.mode = "server"
                     prefs.baseUrl = base
-                    prefs.localUrl = localBase
+                    // die lokale Adresse, die wirklich geantwortet hat (ggf. https://IP:8443 statt http://IP)
+                    val localOk = if (used != null && used in locals) used else locals.firstOrNull()
+                    prefs.localUrl = localOk
+                    prefs.localPin = if (used != null && used in locals) usedPin else null
                     prefs.token = token
                     prefs.deviceName = device
                     Api.forgetChoice()

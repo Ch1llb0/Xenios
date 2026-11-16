@@ -29,7 +29,7 @@ import javax.net.ssl.X509TrustManager
 object DirectHttp {
     private const val MAX_BODY = 20 * 1024 * 1024
 
-    private fun sha256Hex(bytes: ByteArray): String =
+    fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     /** pin = null: jedes Zertifikat (erster Kontakt); sonst nur genau dieses. */
@@ -49,7 +49,7 @@ object DirectHttp {
     private var pinned: Pair<String, SSLContext>? = null
 
     @Synchronized
-    private fun contextFor(pin: String?): SSLContext {
+    fun contextFor(pin: String?): SSLContext {
         if (pin.isNullOrEmpty()) return trustFirst
         pinned?.let { if (it.first == pin) return it.second }
         return tlsContext(pin).also { pinned = pin to it }
@@ -106,6 +106,22 @@ object DirectHttp {
                 .put("headers", outHeaders)
                 .put("body", Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP))
                 .put("fingerprint", fingerprint ?: JSONObject.NULL)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Zertifikat einer https-Adresse im Heimnetz lesen (erster Kontakt, noch ohne Pin). */
+    fun fingerprint(base: String): String? {
+        val conn = URL(base.trimEnd('/') + "/healthz").openConnection() as? HttpsURLConnection ?: return null
+        try {
+            conn.sslSocketFactory = contextFor(null).socketFactory
+            conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+            conn.connectTimeout = 4000
+            conn.readTimeout = 4000
+            conn.connect()
+            val cert = conn.serverCertificates.firstOrNull() ?: return null
+            return sha256Hex(cert.encoded)
         } finally {
             conn.disconnect()
         }
@@ -226,6 +242,27 @@ object DirectMachine {
 }
 
 /** Sucht Maschine und Mühle im WLAN des Handys (nur das eigene /24-Netz). */
+/** Eigenes Zertifikat des Servers im Heimnetz (https://<IP>:8443): nur genau das gemerkte wird akzeptiert. */
+object LocalTls {
+    @Volatile var pin: String? = null
+
+    /** Nur private IPv4-Adressen, nie Cloudflare oder andere Namen. */
+    fun applies(host: String?): Boolean {
+        val n = host?.split('.')?.mapNotNull { it.toIntOrNull() } ?: return false
+        if (n.size != 4) return false
+        return n[0] == 10 || (n[0] == 192 && n[1] == 168) || (n[0] == 172 && n[1] in 16..31)
+    }
+
+    /** Für HttpURLConnection: bei https auf eine private IP mit gemerktem Zertifikat dieses akzeptieren. */
+    fun prepare(conn: HttpURLConnection) {
+        val p = pin
+        if (conn is HttpsURLConnection && !p.isNullOrEmpty() && applies(conn.url.host)) {
+            conn.sslSocketFactory = DirectHttp.contextFor(p).socketFactory
+            conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+        }
+    }
+}
+
 object NetworkScan {
     data class Found(val ip: String, val kind: String, val name: String)
 
@@ -278,17 +315,20 @@ object NetworkScan {
         return found.sortedBy { it.ip.substringAfterLast('.').toInt() }
     }
 
-    /** Sucht Xenios-Server im eigenen /24-Netz: /healthz antwortet mit dem Kopf X-Xenios-Instance (Heimnetz-Zugang, http). */
+    /** Sucht Xenios-Server im eigenen /24-Netz: /healthz antwortet mit dem Kopf X-Xenios-Instance (HTTPS 8443, HTTP 80/8080). */
     fun scanServers(context: Context): List<String> {
         val subnet = ownSubnet(context) ?: return emptyList()
         val pool = Executors.newFixedThreadPool(64)
         val found = java.util.Collections.synchronizedList(mutableListOf<String>())
         for (i in 1..254) {
-            for (port in listOf(80, 8080)) {
-                val base = if (port == 80) "http://$subnet.$i" else "http://$subnet.$i:$port"
+            for (base in listOf("https://$subnet.$i:8443", "http://$subnet.$i", "http://$subnet.$i:8080")) {
                 pool.execute {
                     try {
                         val conn = URL("$base/healthz").openConnection() as HttpURLConnection
+                        if (conn is HttpsURLConnection) {
+                            conn.sslSocketFactory = DirectHttp.contextFor(null).socketFactory // nur Erkennung; gemerkt wird beim Verbinden
+                            conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+                        }
                         try {
                             conn.connectTimeout = 1500
                             conn.readTimeout = 2000
@@ -300,6 +340,9 @@ object NetworkScan {
         }
         pool.shutdown()
         pool.awaitTermination(60, TimeUnit.SECONDS)
-        return found.sortedBy { it.substringAfter("://").substringBefore(':').substringAfterLast('.').toInt() }
+        // je Server eine Adresse, HTTPS bevorzugt
+        return found.groupBy { it.substringAfter("://").substringBefore(':') }
+            .map { (_, list) -> list.firstOrNull { it.startsWith("https") } ?: list.first() }
+            .sortedBy { it.substringAfter("://").substringBefore(':').substringAfterLast('.').toInt() }
     }
 }
