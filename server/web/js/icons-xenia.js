@@ -8,4 +8,10 @@ XENIA_ICONS.shotlog = { vb: '0 0 16 16', els: [
   ['path', { d: 'M4 1.5h8A1.5 1.5 0 0 1 13.5 3v10.5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5V3A1.5 1.5 0 0 1 4 1.5zm0 1a.5.5 0 0 0-.5.5v10.5a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5H4z' }],
   ['path', { d: 'M5 4.75h6v1H5zm0 2.5h6v1H5zm0 2.5h3.5v1H5z' }],
   ['circle', { cx: 10.75, cy: 12, r: 1.25 }],
+]};
+
+// Schalter als Umriss für Kachelköpfe (Linienstärke wie die übrigen Kachel-Symbole)
+XENIA_ICONS.toggleTile = { vb: '0 0 16 16', els: [
+  ['path', { d: 'M5 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0 1A5 5 0 1 0 5 3a5 5 0 0 0 0 10z' }],
+  ['path', { 'fill-rule': 'evenodd', d: 'M9 11c.628-.836 1-1.874 1-3a4.978 4.978 0 0 0-1-3h4a3 3 0 1 1 0 6H9zm1.657-5H13a2 2 0 1 1 0 4h-2.343A5.98 5.98 0 0 0 11 8a5.98 5.98 0 0 0-.343-2z' }],
 ] };

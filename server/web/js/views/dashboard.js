@@ -18,7 +18,7 @@ const TILES = {
   shot: { title: 'Live-Bezug', icon: 'coffee', w: 0, h: 2, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
   status: { title: 'Status', icon: 'power', w: 1, h: 2, build: statusTile },
   gauges: { title: 'Instrumente', icon: 'thermo', w: 3, h: 2, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
-  control: { title: 'Schalter', icon: 'power', w: 1, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
+  control: { title: 'Schalter', icon: 'toggleTile', w: 1, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
   lastShot: { title: 'Letzter Bezug', icon: 'coffee', w: 1, h: 1, build: lastShotTile, link: '/bezuege' },
   lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', w: 1, h: 1, build: lastGrindTile, link: '/muehle' },
   week: { title: 'Bezüge pro Tag', icon: 'event', w: 1, h: 1, build: weekTile, link: '/bezuege' },
