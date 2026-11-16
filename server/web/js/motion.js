@@ -132,6 +132,10 @@ const observer = typeof MutationObserver === 'function' ? new MutationObserver((
   }
 }) : null;
 
+// Sobald jemand tippt oder klickt, ist die Ladephase vorbei: was danach neu gezeichnet wird (z. B. Auswahlknöpfe),
+// erscheint ohne Einflug-Animation
+for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => { enterUntil = 0; enterSettle = 0; }, true);
+
 // Beim Seitenwechsel aufrufen: fromAbove für die Seiten der unteren Leiste
 export function pageEnter(view, fromAbove) {
   enterDy = fromAbove ? -18 : 24;

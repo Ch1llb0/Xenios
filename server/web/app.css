@@ -942,6 +942,9 @@ svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height
    dünner schwarzer bzw. weißer Zeiger, Messingnabe und -schrauben, keine rote Zone */
 :root[data-gauge="white"] { --gauge-face: #f3f1ea; --gauge-ink: #1c1c1c; --gauge-needle: #151515; }
 :root[data-gauge="black"] { --gauge-face: #2b2e33; --gauge-ink: #ecebe6; --gauge-needle: #f4f4f2; }
+/* direkt am Manometer, damit die Farben des dunklen Themes (spezifischere :root-Regeln) sie nicht überschreiben */
+[data-gauge="white"] .gauge.mano { --gauge-face: #f3f1ea; --gauge-ink: #1c1c1c; --gauge-needle: #151515; }
+[data-gauge="black"] .gauge.mano { --gauge-face: #2b2e33; --gauge-ink: #ecebe6; --gauge-needle: #f4f4f2; }
 .gauge.mano .g-bezel { stroke: rgba(0,0,0,.3); stroke-width: .8; }
 .gauge.mano .g-lip { fill: none; stroke: rgba(0,0,0,.45); stroke-width: 2.5; }
 .gauge.mano .g-face { fill: var(--gauge-face); stroke: none; }
