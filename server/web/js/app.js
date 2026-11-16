@@ -178,19 +178,16 @@ function buildNav() {
     const a = b.animate([{ [prop]: size(b), opacity: 1 }, { [prop]: '0px', opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }], { ...ease, fill: 'forwards' });
     a.onfinish = () => b.remove();
   }
-  let prev = null;
-  for (const r of routes) {
-    let b = keep.get(r.path);
-    const added = !b;
-    if (added) b = make(r);
-    old.insertBefore(b, prev ? prev.nextSibling : old.firstChild);
-    if (added) {
-      b.style.overflow = 'hidden';
-      const a = b.animate([{ [prop]: '0px', opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }, { [prop]: size(b), opacity: 1 }], ease);
-      a.onfinish = () => { b.style.overflow = ''; };
-    }
-    prev = b;
-  }
+  // Bleibende Einträge nicht umstellen (sonst wandert ein wegfallender ans Ende); neue vor dem nächsten bleibenden einfügen
+  routes.forEach((r, i) => {
+    if (keep.has(r.path)) return;
+    const b = make(r);
+    const next = routes.slice(i + 1).map((x) => keep.get(x.path)).find(Boolean);
+    old.insertBefore(b, next || null);
+    b.style.overflow = 'hidden';
+    const a = b.animate([{ [prop]: '0px', opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }, { [prop]: size(b), opacity: 1 }], ease);
+    a.onfinish = () => { b.style.overflow = ''; };
+  });
   markNav();
 }
 
