@@ -690,9 +690,14 @@ function liveTile({ wide, h: rows, relayout }) {
     if (values.hidden) box.style.minHeight = `${box.clientHeight}px`;
     else box.style.minHeight = '';
     values.hidden = !values.hidden;
+    if (!values.hidden) fill(store.machine); // sofort füllen, nicht erst mit der nächsten Statusmeldung
     toggle.setAttribute('aria-expanded', String(!values.hidden));
     toggle.lastChild.textContent = values.hidden ? 'Alle Werte' : 'Werte ausblenden';
     relayout?.();
+    // Nach dem Auf- und Zuklappen die Kachel so in den sichtbaren Bereich holen, dass sie ihn möglichst füllt
+    const tile = toggle.closest('.tile');
+    requestAnimationFrame(() => fitIntoView(tile));
+    setTimeout(() => fitIntoView(tile), 400); // nach dem Nachladen der Werte und dem Neuanordnen
   } }, icon('more', 's18'), h('span', {}, 'Alle Werte'));
   const row = (k, v) => [h('dt', {}, k), h('dd', {}, v)];
   return {
@@ -703,7 +708,12 @@ function liveTile({ wide, h: rows, relayout }) {
       const bw = box.clientWidth, bh = box.clientHeight;
       const size = bw > 50 && bh > 30 ? { width: Math.round(bw * 0.6), height: Math.round(bh * 0.6) } : { width: wide ? 640 : 320, height: (wide ? 200 : 150) + extraH(rows) };
       box.replaceChildren(liveChart(liveHistory, SERIES, { ...size, spanMs: 10 * 60e3 }));
-      if (m && !values.hidden) {
+      if (!values.hidden) fill(m);
+      return {};
+    },
+  };
+  function fill(m) {
+      if (m) {
         values.replaceChildren(
           ...row('Brühgruppe', `${fmt(m.temp.group)} °C (Ziel ${fmt(m.temp.groupSet)})`),
           ...row('Brühkessel', `${fmt(m.temp.boiler)} °C (Ziel ${fmt(m.temp.boilerSet)})`),
@@ -715,9 +725,21 @@ function liveTile({ wide, h: rows, relayout }) {
           ...row('Durchfluss', `${fmt(m.flow?.ml ?? m.flow?.volume, 0)} ml · ${fmt(m.flow?.rate)} ml/s`),
           ...row('Wassertank', m.tankOk === false ? 'leer' : m.tankOk ? 'ok' : '–'));
       }
-      return {};
-    },
-  };
+  }
+}
+
+// Element so scrollen, dass es zwischen Kopfleiste und unterer Leiste ganz sichtbar ist; ist es höher als der
+// verfügbare Platz, steht sein Kopf direkt unter der Kopfleiste
+function fitIntoView(el) {
+  if (!el) return;
+  const top = (document.querySelector('.topbar')?.getBoundingClientRect().bottom || 64) + 8;
+  const nav = document.getElementById('navbar')?.getBoundingClientRect();
+  const bottom = (nav && nav.top > window.innerHeight / 2 ? nav.top : window.innerHeight) - 8;
+  const r = el.getBoundingClientRect();
+  let dy = 0;
+  if (r.height > bottom - top || r.top < top) dy = r.top - top;
+  else if (r.bottom > bottom) dy = r.bottom - bottom;
+  if (Math.abs(dy) > 2) window.scrollBy({ top: dy, behavior: 'smooth' });
 }
 
 // Sollwerte: Brühgruppe, Brühkessel, Dampfdruck mit − / +; gespeichert wird 1,5 s nach dem letzten Tipp.

@@ -250,13 +250,17 @@ export function liveChart(samples, series, { width = 320, height = 150, spanMs =
     return pad.t + ih - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * ih;
   };
   const grid = [];
-  for (let i = 0; i <= 4; i++) {
-    const gy = pad.t + (ih * i) / 4;
+  // Weniger Rasterlinien bzw. Beschriftungen, wenn das Diagramm flach oder schmal ist (sonst überlappen sie)
+  const rowsY = ih >= 60 ? 4 : 2;
+  for (let i = 0; i <= rowsY; i++) {
+    const gy = pad.t + (ih * i) / rowsY;
     grid.push(h('line', { x1: pad.l, y1: gy, x2: width - pad.r, y2: gy, class: 'grid' }));
-    grid.push(h('text', { x: pad.l - 4, y: gy + 3, class: 'lbl', 'text-anchor': 'end' }, String(Math.round(110 - (90 * i) / 4))));
-    grid.push(h('text', { x: width - pad.r + 4, y: gy + 3, class: 'lbl' }, String(12 - 3 * i)));
+    grid.push(h('text', { x: pad.l - 4, y: gy + 3, class: 'lbl', 'text-anchor': 'end' }, String(Math.round(110 - (90 * i) / rowsY))));
+    grid.push(h('text', { x: width - pad.r + 4, y: gy + 3, class: 'lbl' }, String(Math.round((12 - (12 * i) / rowsY) * 10) / 10)));
   }
-  for (let m = 1; m < spanMs / 60e3; m++) {
+  const perMin = iw / (spanMs / 60e3);
+  const stepMin = [1, 2, 5, 10].find((st) => perMin * st >= 34) ?? 10; // „-10 min“ braucht etwa 30 Einheiten
+  for (let m = stepMin; m < spanMs / 60e3; m += stepMin) {
     const gx = x(now - m * 60e3);
     grid.push(h('text', { x: gx, y: height - 3, class: 'lbl', 'text-anchor': 'middle' }, `-${m} min`));
   }
