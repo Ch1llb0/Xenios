@@ -2,7 +2,7 @@
 // (eigene Seite, Kategorien wie die Seite der Maschine) und Server- & App-Einstellungen (views/server.js).
 import { h, icon, fmt, fmtInt, snackbar, switchEl, sliderRow, ago } from '../ui.js';
 import { api, store, isClassic, classicPages, refreshState } from '../api.js';
-import { logout, applyTheme, localStorageGet, localStorageSet, inAndroidApp, navigate, navChoices, THEME_DEFAULTS } from '../app.js';
+import { logout, applyTheme, localStorageGet, localStorageSet, inAndroidApp, navigate, navChoices, THEME_DEFAULTS, uiPalette, gaugeKey, gaugeChoice } from '../app.js';
 import { hiddenTabs, setTabHidden, COMPONENTS, isHidden, setComponentHidden, noSteamOn, setNoSteamOn, onPrefs } from '../prefs.js';
 
 const listButton = (ic, title, sub, onclick) => h('button', { class: 'list-item clickable as-button', onclick },
@@ -309,7 +309,7 @@ function themeCard() {
   const box = h('div', { class: 'card' });
   const paint = () => {
     const theme = localStorageGet('theme') || 'system';
-    const style = localStorageGet('uiStyle') === 'material' ? 'material' : 'xenia';
+    const style = uiPalette();
     const chips = (current, list, onPick) => h('div', { class: 'chips' }, list.map(([v, label]) =>
       h('button', { class: 'chip', 'aria-pressed': String(current === v), onclick: () => { onPick(v); applyTheme(); paint(); } }, label)));
     const color = (key, label, fallback) => {
@@ -321,11 +321,11 @@ function themeCard() {
     };
     box.replaceChildren(
       h('div', { class: 'muted small' }, 'Farbvorlage (Layout, Schrift und Icons bleiben gleich)'),
-      chips(style, [['xenia', 'Xenia'], ['material', 'Material']], (v) => localStorageSet('uiStyle', v)),
+      chips(style, [['material', 'Material'], ['xenia', 'Xenia']], (v) => localStorageSet('uiStyle', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, style === 'material' ? 'Temperatur- und Druckanzeigen (flach)' : 'Manometer (Temperatur- und Druckanzeigen)'),
-      style === 'material'
-        ? chips(localStorageGet('gaugeStyleMaterial') === 'black' ? 'black' : 'white', [['white', 'Anzeigen hell'], ['black', 'Anzeigen dunkel']], (v) => localStorageSet('gaugeStyleMaterial', v))
-        : chips(localStorageGet('gaugeStyle') === 'white' ? 'white' : 'black', [['black', 'Zifferblatt schwarz'], ['white', 'Zifferblatt weiß']], (v) => localStorageSet('gaugeStyle', v)),
+      // gleiche Reihenfolge in beiden Vorlagen: automatisch, hell, dunkel
+      chips(gaugeChoice(style) || 'auto', [['auto', 'Wie Helligkeit'], ['white', style === 'material' ? 'Hell' : 'Zifferblatt weiß'], ['black', style === 'material' ? 'Dunkel' : 'Zifferblatt schwarz']],
+        (v) => { if (v === 'auto') { try { localStorage.removeItem(gaugeKey(style)); } catch { /* privat */ } } else localStorageSet(gaugeKey(style), v); }),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
       chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Farben (gilt für dieses Gerät)'),

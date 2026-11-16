@@ -43,14 +43,13 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
   if (theme === 'system') delete root.dataset.theme;
   else root.dataset.theme = theme;
   root.dataset.style = 'xenia';
-  const palette = localStorageGet('uiStyle') === 'material' ? 'material' : 'xenia';
+  const palette = uiPalette();
   if (palette === 'material') root.dataset.palette = 'material';
   else delete root.dataset.palette;
-  // Anzeigen: Farbvorlage Xenia → Manometer (Zifferblatt schwarz/weiß), Material → flache Anzeigen (dunkel/hell).
-  // Die Wahl hell/dunkel merkt sich jede Vorlage für sich (Material standardmäßig hell, Xenia schwarz).
-  root.dataset.gauge = palette === 'material'
-    ? (localStorageGet('gaugeStyleMaterial') === 'black' ? 'black' : 'white')
-    : (localStorageGet('gaugeStyle') === 'white' ? 'white' : 'black');
+  // Anzeigen: Farbvorlage Xenia → Manometer, Material → flache Anzeigen. Hell oder dunkel merkt sich jede Vorlage
+  // für sich; ohne eigene Wahl folgen sie der Helligkeit (helle Ansicht → helle Anzeigen, dunkle → dunkle).
+  const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  root.dataset.gauge = gaugeChoice(palette) || (dark ? 'black' : 'white');
   const setColor = (name, onName, value, extra) => {
     if (!value) {
       for (const n of [name, onName, ...Object.keys(extra || {})]) root.style.removeProperty(n);
@@ -67,10 +66,20 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
     '--success': accent,
   } : null);
   setColor('--active', '--on-active', localStorageGet('activeColor'));
-  const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   const bar = palette === 'material' ? (dark ? '#1b1b21' : '#2f3e74') : (dark ? '#2b2d34' : '#383c44');
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', bar));
   syncAppBars();
+}
+
+// Farbvorlage: Material ist Standard
+export function uiPalette() {
+  return localStorageGet('uiStyle') === 'xenia' ? 'xenia' : 'material';
+}
+// Eigene Wahl der Anzeigen je Vorlage ('white' | 'black') oder null = folgt der Helligkeit
+export const gaugeKey = (palette) => (palette === 'material' ? 'gaugeStyleMaterial' : 'gaugeStyle');
+export function gaugeChoice(palette) {
+  const v = localStorageGet(gaugeKey(palette));
+  return v === 'white' || v === 'black' ? v : null;
 }
 
 // Android-App: Status- und Navigationsleiste in den Farben von Kopfzeile und unterer Leiste der Seite einfärben
