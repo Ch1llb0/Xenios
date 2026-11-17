@@ -74,6 +74,7 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
   const bar = palette === 'material' ? (dark ? '#1b1b21' : '#2f3e74') : (dark ? '#2b2d34' : '#383c44');
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', bar));
   syncAppBars();
+  sendAppTheme();
 }
 
 // Android-App: Zoom sperren (im Browser bleibt Zoomen erlaubt)
@@ -85,6 +86,58 @@ if (/XeniaApp\//.test(navigator.userAgent)) {
     if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0', 'Add', 'Subtract'].includes(e.key)) e.preventDefault();
   }, { capture: true });
   window.addEventListener('wheel', (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { capture: true, passive: false });
+}
+
+// Android-Widgets: Farben und Manometer-Design der App für hell und dunkel melden (aufgelöste Farben, #rrggbb).
+// Die Widgets zeichnen sich damit wie die Kacheln; bei „System“ wechseln sie mit der Helligkeit des Handys.
+const WIDGET_COLORS = {
+  bg: '--surface-container-high', onSurface: '--on-surface', muted: '--on-surface-variant', primary: '--primary', onPrimary: '--on-primary',
+  primaryContainer: '--primary-container', onPrimaryContainer: '--on-primary-container', secondaryContainer: '--secondary-container',
+  onSecondaryContainer: '--on-secondary-container', outline: '--outline', outlineVariant: '--outline-variant', highest: '--surface-container-highest',
+  danger: '--danger', onDanger: '--on-danger', dangerContainer: '--danger-container', success: '--success', warning: '--warning',
+};
+const GAUGE_COLORS = { face: '--gauge-face', ring: '--gauge-ring', tick: '--gauge-tick', needle: '--gauge-needle', text: '--gauge-text', ink: '--gauge-ink' };
+function hexOf(css) {
+  const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(css) || /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(css);
+  if (!m) return null;
+  const k = css.startsWith('color(') ? 255 : 1;
+  return '#' + [m[1], m[2], m[3]].map((x) => Math.max(0, Math.min(255, Math.round(Number(x) * k))).toString(16).padStart(2, '0')).join('');
+}
+let appThemeTimer = 0;
+export function sendAppTheme() {
+  if (typeof window.XeniaApp?.setTheme !== 'function') return;
+  clearTimeout(appThemeTimer);
+  appThemeTimer = setTimeout(() => {
+    const root = document.documentElement;
+    const keep = { theme: root.dataset.theme, gauge: root.dataset.gauge };
+    const palette = uiPalette();
+    root.classList.add('no-trans'); // kurzes Umschalten hell/dunkel ohne Farbübergänge (kein Flackern)
+    // Hilfselemente: Farbe über „color“ auflösen (auch color-mix); Manometer-Farben im Kontext eines Manometers
+    const probe = h('div', { style: { position: 'absolute', visibility: 'hidden', pointerEvents: 'none' } });
+    const gaugeBox = h('div', { class: `gauge${palette === 'material' ? '' : ' mano'}` });
+    probe.append(gaugeBox);
+    document.body.append(probe);
+    const read = (host, map) => Object.fromEntries(Object.entries(map).map(([k, v]) => {
+      const el = h('span', { style: { color: `var(${v})` } });
+      host.append(el);
+      const c = hexOf(getComputedStyle(el).color);
+      el.remove();
+      return [k, c];
+    }).filter(([, c]) => c));
+    const out = { mode: localStorageGet('theme') || 'system', palette, mano: palette !== 'material', noSteamOn: localStorageGet('powerNoSteam') === '1' };
+    for (const mode of ['light', 'dark']) {
+      root.dataset.theme = mode;
+      const gauge = gaugeChoice(palette) || (mode === 'dark' ? 'black' : 'white');
+      root.dataset.gauge = gauge;
+      out[mode] = { gauge, colors: read(probe, WIDGET_COLORS), gaugeColors: read(gaugeBox, GAUGE_COLORS) };
+    }
+    if (keep.theme) root.dataset.theme = keep.theme; else delete root.dataset.theme;
+    root.dataset.gauge = keep.gauge;
+    probe.remove();
+    getComputedStyle(root).color; // Stil übernehmen, bevor die Übergänge wieder gelten
+    root.classList.remove('no-trans');
+    try { window.XeniaApp.setTheme(JSON.stringify(out)); } catch { /* ältere App */ }
+  }, 300);
 }
 
 // Farbvorlage: Material ist Standard
@@ -200,6 +253,8 @@ function buildNav() {
     b.style.overflow = 'hidden';
     const a = b.animate([{ ...full(b), opacity: 1 }, { ...none, opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }], { ...ease, fill: 'forwards' });
     a.onfinish = () => b.remove();
+    // Sicherheitsnetz: läuft die Animation nicht zu Ende (App im Hintergrund, abgebrochen), trotzdem entfernen
+    setTimeout(() => { if (b.__leaving && b.isConnected) b.remove(); }, 600);
   }
   // Bleibende Einträge nicht umstellen (sonst wandert ein wegfallender ans Ende); neue vor dem nächsten bleibenden einfügen
   routes.forEach((r, i) => {

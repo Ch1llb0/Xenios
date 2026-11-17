@@ -42,8 +42,17 @@ export function setComponentHidden(id, hidden) {
 }
 
 // --- Einschalten ohne Dampfkessel (gilt für Startseite, Dashboard und App-Shortcut „Ein“) ---
-export const noSteamOn = () => get('powerNoSteam') === '1';
-export const setNoSteamOn = (on) => set('powerNoSteam', on ? '1' : null);
+// In der Android-App gilt die Einstellung auch für die Widgets: die App führt sie (Widget-Schalter ändern sie dort)
+export const noSteamOn = () => {
+  if (typeof window.XeniaApp?.getNoSteamOn === 'function') {
+    try { return window.XeniaApp.getNoSteamOn(); } catch { /* ältere App */ }
+  }
+  return get('powerNoSteam') === '1';
+};
+export const setNoSteamOn = (on) => {
+  set('powerNoSteam', on ? '1' : null);
+  try { window.XeniaApp?.setNoSteamOn?.(Boolean(on)); } catch { /* ältere App */ }
+};
 
 // Body für POST /api/machine/power zum Einschalten
 export const powerOnBody = () => (noSteamOn() ? { mode: 'on', steam: false } : { mode: 'on' });

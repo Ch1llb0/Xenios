@@ -1122,3 +1122,6 @@ a.list-item { text-decoration: none; color: inherit; }
 /* Titel-Überblendung: alter und neuer Titel in derselben Rasterzelle übereinander */
 .topbar-title { display: grid; min-width: 0; }
 .topbar-title > .tt { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Kurzzeitig ohne Übergänge (Farben für die Android-Widgets auslesen) */
+html.no-trans, html.no-trans * { transition: none !important; }
