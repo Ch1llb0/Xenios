@@ -920,6 +920,8 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
   [data-style="xenia"] .nav-item, [data-style="xenia"] .navbar-inner.many .nav-item, [data-style="xenia"] .navbar-inner.lots .nav-item { flex: none; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 9px 12px; font-size: 15px; font-weight: 400; letter-spacing: 0; }
   [data-style="xenia"] .nav-item .pill { width: 22px; height: 22px; overflow: visible; }
   [data-style="xenia"] .nav-item .pill svg { width: 18px; height: 18px; }
+  /* Linke Liste: die ganze Zeile ist markiert – das Symbol wächst dort nicht (das Federn wirkte wie ein Zucken) */
+  [data-style="xenia"] .nav-item .pill svg, [data-style="xenia"] .nav-item[aria-current="page"] .pill svg { transform: none; transition: none; }
   [data-style="xenia"] .nav-item .pill::before { display: none; }
   [data-style="xenia"] .nav-item[aria-current="page"] { background: var(--chrome-active); }
   [data-style="xenia"] .nav-item:hover { opacity: 1; }

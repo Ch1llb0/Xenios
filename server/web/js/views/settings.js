@@ -312,7 +312,7 @@ export function shotFilterCard() {
         sliderRow({ label: 'Mindestdauer', min: st.limits.min, max: st.limits.max, step: 1, value, unit: 's', digits: 0, onInput: (v) => { value = v; save.disabled = false; } }),
         h('h3', { style: { 'margin-top': '16px' } }, 'Standard-Dosis'),
         h('p', { class: 'muted small' }, 'Die Waage misst nur die Ausbeute in der Tasse. Ohne angebundene Mühle gilt diese Dosis für neue Bezüge, damit das Verhältnis berechnet wird. Am einzelnen Bezug lässt sie sich überschreiben. Leer = keine.'),
-        h('div', { class: 'field-row' }, h('label', { class: 'grow' }, 'Dosis (g)'), doseInput),
+        h('label', { class: 'field' }, h('span', {}, 'Dosis (g)'), doseInput), // Beschriftung über dem Feld wie überall
         save);
     } catch (e) {
       box.replaceChildren(h('div', { class: 'muted small' }, e.message));
