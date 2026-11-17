@@ -209,7 +209,7 @@ export function serverView(root) {
           h('code', { class: 'fp' }, s.grinderPin || 'noch keins (wird beim ersten Kontakt gemerkt)')),
         s.grinderPin ? h('button', { class: 'btn text', onclick: unpin }, 'Vergessen') : null),
       toggle('Datenbank-Download erlauben', 'Die Datenbank der Mühle enthält das WLAN-Passwort im Klartext.', 'grinder.allowDatabaseDownload'));
-    const devices = card('Geräte', 'coffee',
+    const devices = card('Geräte', 'coffeeLine',
       apiChoice(value('machine.api') === 'classic' ? 'classic' : 'bbs', (v) => { change('machine.api', v); paint(); }),
       h('div', { class: 'field-row' }, text('Adresse der Xenia', 'machine.url', { type: 'url', placeholder: 'http://192.168.178.55' }), mTest),
       mBox,

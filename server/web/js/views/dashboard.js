@@ -479,7 +479,7 @@ function statusTile() {
       const [text, cls, ic] = !m.online ? ['Offline', 'bad', 'warn']
         : m.statusKey === 'off' ? ['Aus', 'off', 'power']
         : m.statusKey === 'eco' ? ['Eco', 'off', 'eco']
-        : m.statusKey === 'brewing' ? ['Bezug läuft', 'ok', 'coffee']
+        : m.statusKey === 'brewing' ? ['Bezug läuft', 'ok', 'coffeeDrip']
         : m.statusKey === 'fault' ? ['Störung', 'bad', 'warn']
         : m.heated ? ['Bereit', 'ok', 'check'] : ['Heizt auf', 'warn', 'thermo'];
       head.className = `dash-status ${cls}`;

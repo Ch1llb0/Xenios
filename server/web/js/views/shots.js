@@ -147,13 +147,13 @@ export function shotsView(root) {
   function paintBeans(beans) {
     if (!beans.length) {
       beansBox.replaceChildren(h('section', { class: 'card' },
-        h('div', { class: 'row' }, icon('coffee', 's20'),
+        h('div', { class: 'row' }, icon('coffeeLine', 's20'),
           h('div', { class: 'grow' }, h('div', {}, 'Bohnen'), h('div', { class: 'small muted' }, 'Anlegen, dann in der Bewertung auswählen.')),
           h('button', { class: 'btn tonal', onclick: () => editBean() }, icon('add', 's18'), 'Anlegen'))));
       return;
     }
     beansBox.replaceChildren(h('section', { class: 'card' },
-      h('div', { class: 'row' }, icon('coffee', 's20'), h('div', { class: 'grow' }, h('strong', {}, 'Bohnen')),
+      h('div', { class: 'row' }, icon('coffeeLine', 's20'), h('div', { class: 'grow' }, h('strong', {}, 'Bohnen')),
         h('button', { class: 'btn text', onclick: () => editBean() }, icon('add', 's18'), 'Neu')),
       h('div', { class: 'list', style: { 'margin-top': '8px' } }, beans.map((b) => h('div', { class: 'list-item' },
         h('div', { class: 'grow' }, h('div', { class: 'title' }, b.name), b.roaster ? h('div', { class: 'sub' }, b.roaster) : null),
@@ -207,7 +207,7 @@ export function shotsView(root) {
     const amount = m.yieldG ? `${fmt(m.yieldG)} g` : s.volumeMl ? `${fmt(s.volumeMl, 0)} ml` : '–';
     const n = s.notes || {};
     return h('button', { class: 'list-item clickable as-button shot-item', type: 'button', onclick: () => openShot(s.id, { onChange: load }) },
-      h('span', { class: 'lead' }, icon(n.reference ? 'check' : 'coffee')),
+      h('span', { class: 'lead' }, icon(n.reference ? 'check' : 'coffeeLine')),
       h('div', { class: 'grow' },
         h('div', { class: 'title' }, `${time} · ${m.timeS ? `${fmt(m.timeS)} s` : '–'} · ${amount}${m.ratio ? ` · 1:${fmt(m.ratio)}` : ''}`),
         h('div', { class: 'sub' },
