@@ -237,3 +237,74 @@ export function pageEnter(view, fromAbove) {
   if (enterView !== view) { observer.disconnect(); observer.observe(view, { childList: true, subtree: true }); enterView = view; }
   enterUntil = performance.now() + 2500;
 }
+
+// --- Layout-Sprünge beim Ändern der Fenstergröße ------------------------------------------------------------------
+// Wechselt die Navigationsleiste (unten ↔ links) oder bricht ein Bereich um, springen Inhalte. Die Lage von Leiste,
+// App-Bereich und Karten wird nach jedem Bild gemerkt (ResizeObserver läuft nach dem Layout); springt etwas zwischen
+// zwei Bildern um mehr als 40 px, gleitet es von der alten an die neue Stelle. Stetiges Mitwachsen bleibt direkt.
+// Kacheln auf Home animiert das Dashboard selbst.
+const JUMP = 40;
+const tracked = () => {
+  const list = [document.getElementById('navbar'), document.querySelector('.app > .topbar'), document.getElementById('view')];
+  const view = document.getElementById('view');
+  if (view) for (const el of view.querySelectorAll(':scope > *, :scope > * > .card, .view .card, .view .list-item')) if (list.length < 80) list.push(el);
+  return list.filter((el) => el && !el.closest('.dash'));
+};
+// Lage im Dokument ohne laufende Verschiebungen (offset-Kette ignoriert transform)
+const docRect = (el) => {
+  let x = 0;
+  let y = 0;
+  for (let e = el; e; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; }
+  return { left: x, top: y, width: el.offsetWidth, height: el.offsetHeight };
+};
+let rects = new WeakMap();
+let lastWide = null;
+function remember() {
+  const next = new WeakMap();
+  for (const el of tracked()) next.set(el, docRect(el));
+  rects = next;
+}
+function onLayoutChange() {
+  if (reduced() || document.visibilityState === 'hidden') { remember(); return; }
+  const nav = document.getElementById('navbar');
+  const wide = nav ? getComputedStyle(nav).flexDirection.startsWith('column') || nav.getBoundingClientRect().height > window.innerHeight / 2 : null;
+  const switched = lastWide !== null && wide !== lastWide;
+  lastWide = wide;
+  const moved = []; // schon verschobene Bereiche: ihre Inhalte gleiten mit, nicht noch einmal einzeln
+  for (const el of tracked()) {
+    const r0 = rects.get(el);
+    if (!r0 || !el.isConnected || el.getClientRects().length === 0) continue;
+    const r1 = docRect(el);
+    const dx = r0.left - r1.left;
+    const dy = r0.top - r1.top;
+    if (el === nav && switched) {
+      // Leiste wechselt den Platz: von links bzw. von unten hereingleiten
+      nav.animate(wide ? [{ transform: 'translateX(-100%)', opacity: 0 }, { transform: 'none', opacity: 1 }]
+        : [{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 320, easing: 'cubic-bezier(.2, 0, 0, 1)' });
+      continue;
+    }
+    if (Math.abs(dx) < JUMP && Math.abs(dy) < JUMP) continue;
+    if (el.getAnimations?.().some((a) => a.playState === 'running')) continue;
+    // Inhalt eines schon verschobenen Bereichs: nur den Rest der Bewegung animieren
+    const parent = moved.find((m) => m.el.contains(el));
+    const rx = dx - (parent?.dx || 0);
+    const ry = dy - (parent?.dy || 0);
+    moved.push({ el, dx, dy });
+    if (Math.abs(rx) < JUMP && Math.abs(ry) < JUMP) continue;
+    el.animate([{ transform: `translate(${rx}px, ${ry}px)` }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.2, 0, 0, 1)' });
+  }
+  remember();
+}
+if (typeof ResizeObserver === 'function') {
+  let pending = false;
+  const ro = new ResizeObserver(() => {
+    if (pending) return;
+    pending = true;
+    queueMicrotask(() => { pending = false; onLayoutChange(); });
+  });
+  ro.observe(document.documentElement);
+  // nach Seitenwechseln und Inhaltsänderungen die Lage neu merken (ohne Animation)
+  let t = 0;
+  new MutationObserver(() => { clearTimeout(t); t = setTimeout(remember, 400); }).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(remember, 200); }, { passive: true });
+}
