@@ -11,29 +11,30 @@ import { TYPE_DE, TRIGGER_DE } from './grinder.js';
 import { ALERT_TEXT } from '../../shared/grinder-core.js';
 import { shotMetrics, scriptDuration, brewSeconds, liveTimes } from '../../shared/shot-analysis.js';
 
-// w: Spalten (0 = ganze Breite), h: Höhe in Zellen
-// Reihenfolge = Standardanordnung. Bei vier Spalten: Status | Instrumente (3 Spalten), darunter Schalter,
-// Letzter Bezug, Bezüge pro Tag, Bezugszeiten, dann der Verlauf über die ganze Breite.
+// w: Spalten (0 = ganze Breite), h: Höhe in Zellen. Reihenfolge = Standardanordnung (schmal und breit gleich):
+// Live-Bezug (immer oben), Schalter, Status, Instrumente, Verlauf, Letzter Bezug, Bezüge pro Tag, Bezugszeiten,
+// Sollwerte, Pflege. Breite Ansicht (4 Spalten): Schalter | Status nebeneinander, Instrumente und Verlauf über die
+// ganze Breite, dann Letzter Bezug (2 × 2) mit Bezüge pro Tag / Bezugszeiten und Sollwerte / Pflege rechts daneben.
 const TILES = {
   shot: { title: 'Live-Bezug', icon: 'coffeeDrip', w: 0, h: 2, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
-  status: { title: 'Status', icon: 'power', w: 1, h: 2, build: statusTile },
-  gauges: { title: 'Instrumente', icon: 'thermo', w: 3, h: 2, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
-  control: { title: 'Schalter', icon: 'toggleTile', w: 1, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
-  lastShot: { title: 'Letzter Bezug', icon: 'coffeeLine', w: 1, h: 1, build: lastShotTile, link: '/bezuege' },
-  lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', w: 1, h: 1, build: lastGrindTile, link: '/muehle' },
+  control: { title: 'Schalter', icon: 'toggleTile', w: 2, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
+  status: { title: 'Status', icon: 'power', w: 2, h: 1, build: statusTile },
+  gauges: { title: 'Instrumente', icon: 'thermo', w: 0, h: 2, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
+  live: { title: 'Verlauf (10 min)', icon: 'history', w: 0, h: 2, build: liveTile },
+  lastShot: { title: 'Letzter Bezug', icon: 'coffeeLine', w: 2, h: 2, build: lastShotTile, link: '/bezuege' },
   week: { title: 'Bezüge pro Tag', icon: 'calendarBars', w: 1, h: 1, build: weekTile, link: '/bezuege' },
   shotTimes: { title: 'Bezugszeiten', icon: 'timer', w: 1, h: 1, build: shotTimesTile, link: '/bezuege' },
-  grinds: { title: 'Mahlgewichte', icon: 'scale', w: 1, h: 1, build: grindsTile, link: '/muehle' },
-  grinder: { title: 'Mühle heute', icon: 'grinder', w: 1, h: 1, build: grinderTile, link: '/muehle' },
   targets: { title: 'Sollwerte', icon: 'thermo', w: 1, h: 1, note: 'Brühgruppe, Brühkessel und Dampfdruck einstellen', build: targetsTile },
   care: { title: 'Pflege', icon: 'check', w: 1, h: 1, build: careTile, link: '/bezuege' },
-  live: { title: 'Verlauf (10 min)', icon: 'history', w: 0, h: 2, build: liveTile },
+  lastGrind: { title: 'Letzter Mahlvorgang', icon: 'grinder', w: 1, h: 1, build: lastGrindTile, link: '/muehle' },
+  grinds: { title: 'Mahlgewichte', icon: 'scale', w: 1, h: 1, build: grindsTile, link: '/muehle' },
+  grinder: { title: 'Mühle heute', icon: 'grinder', w: 1, h: 1, build: grinderTile, link: '/muehle' },
 };
 const GRINDER_TILES = new Set(['lastGrind', 'grinds', 'grinder']);
 const KEY = 'dashboard';
-const LAYOUT_VERSION = 6; // 3: Breite/Höhe in Zellen; 4: Instrumente oben; 5: neue Standardanordnung (Status | Instrumente, Schalter unter Status)
+const LAYOUT_VERSION = 7; // 3: Breite/Höhe in Zellen; 7: neue Standardanordnung und spaltenweise Platzierung
 const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende stehen
-const MIN_COL = 280;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl
+const MIN_COL = 250;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl (breite Ansicht: 4)
 const GAP = 12;
 const WIDTHS = [[1, '1 Spalte'], [2, '2 Spalten'], [3, '3 Spalten'], [0, 'Ganze Breite']];
 const HEIGHTS = [[1, 'Höhe 1'], [2, 'Höhe 2'], [3, 'Höhe 3'], [4, 'Höhe 4']];
@@ -65,27 +66,53 @@ function loadLayout() {
     return { id: t.id, on: t.on !== false, w, h: v3 ? clampH(t.h, def.h) : def.h, ...(t.arr === 2 || t.arr === 4 ? { arr: t.arr } : {}) };
   });
   for (const id of Object.keys(TILES)) if (!tiles.some((t) => t.id === id)) tiles.push({ id, on: true, w: TILES[id].w, h: TILES[id].h });
-  // Ältere Layouts (vor Version 5): einmalig die neue Standardanordnung, ein-/ausgeblendete Kacheln bleiben
-  if (saved && Number(saved.v || 0) < 5) {
-    const on = Object.fromEntries(tiles.map((t) => [t.id, t.on]));
-    tiles.splice(0, tiles.length, ...Object.keys(TILES).map((id) => ({ id, on: on[id] !== false, w: TILES[id].w, h: TILES[id].h })));
+  // Ältere Layouts (vor Version 7): einmalig die neue Standardanordnung und -größen; ein-/ausgeblendete Kacheln
+  // und die Anordnung der Instrumente am Handy bleiben
+  if (saved && Number(saved.v || 0) < 7) {
+    const old = Object.fromEntries(tiles.map((t) => [t.id, t]));
+    tiles.splice(0, tiles.length, ...Object.keys(TILES).map((id) => ({ id, on: old[id]?.on !== false, w: TILES[id].w, h: TILES[id].h, ...(old[id]?.arr ? { arr: old[id].arr } : {}) })));
   }
-  // Vor Version 6: am Handy einmalig Instrumente, Schalter, Status nach oben (neue Standardanordnung dort)
-  if (saved && Number(saved.v || 0) < 6 && narrowScreen()) mobileOrder(tiles);
-  if (!saved && narrowScreen()) mobileOrder(tiles);
-  return { tiles, keepAwake: Boolean(saved?.keepAwake) };
+  return { tiles: shotFirst(tiles), keepAwake: Boolean(saved?.keepAwake) };
 }
 const saveLayout = (l) => localStorageSet(KEY, JSON.stringify({ ...l, v: LAYOUT_VERSION }));
 
-// Handy (eine Spalte): Standard ist Instrumente, Schalter, Status oben; alles bleibt frei verschiebbar
-const narrowScreen = () => window.innerWidth < 2 * MIN_COL + GAP + 40;
-function mobileOrder(tiles) {
-  const first = ['shot', 'gauges', 'control', 'status'];
-  tiles.sort((a, b) => {
-    const ia = first.indexOf(a.id); const ib = first.indexOf(b.id);
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-  });
+// Live-Bezug steht immer ganz oben
+function shotFirst(tiles) {
+  const i = tiles.findIndex((t) => t.id === 'shot');
+  if (i > 0) tiles.unshift(...tiles.splice(i, 1));
   return tiles;
+}
+
+// Platzierung im Raster: Kacheln über die ganze Breite beginnen einen neuen Abschnitt. Schmalere Kacheln füllen
+// einen Abschnitt (so hoch wie seine erste Kachel) spaltenweise: von links nach rechts, in jeder Spalte von oben nach
+// unten. Damit bleibt die Reihenfolge auch beim Schmalerwerden bis zur einspaltigen Ansicht sinnvoll.
+// items: [{ w, h }] (w bereits auf cols begrenzt) → [{ col, row }] (0-basiert)
+export function packTiles(items, cols) {
+  const used = [];
+  const free = (r, c, w, h) => {
+    for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (used[y]?.[x]) return false;
+    return true;
+  };
+  const take = (r, c, w, h) => {
+    for (let y = r; y < r + h; y++) { used[y] ||= []; for (let x = c; x < c + w; x++) used[y][x] = true; }
+  };
+  let bottom = 0;
+  let band = null; // { top, h }
+  return items.map(({ w, h }) => {
+    let pos = null;
+    if (w < cols && band && h <= band.h) {
+      for (let c = 0; c + w <= cols && !pos; c++) {
+        for (let r = band.top; r + h <= band.top + band.h; r++) if (free(r, c, w, h)) { pos = { col: c, row: r }; break; }
+      }
+    }
+    if (!pos) {
+      pos = { col: 0, row: bottom };
+      band = w < cols ? { top: bottom, h } : null;
+    }
+    take(pos.row, pos.col, w, h);
+    bottom = Math.max(bottom, pos.row + h);
+    return pos;
+  });
 }
 
 export function dashboardView(root) {
@@ -112,35 +139,25 @@ export function dashboardView(root) {
     const keepY = window.scrollY;
     grid.style.minHeight = `${grid.offsetHeight}px`;
     const spanOf = (b) => (b.w === 0 ? cols : Math.min(b.w, cols));
-    // Passen Status und Instrumente nicht nebeneinander (weniger Spalten), kommen die Instrumente nach oben
-    const stB = built.find((b) => b.id === 'status' && !b.el.hidden);
-    const gaB = built.find((b) => b.id === 'gauges');
-    if (gaB) gaB.el.style.order = stB && spanOf(stB) + spanOf(gaB) > cols ? '-1' : '';
+    // Platzbedarf messen: jede Kachel in ihrer Breite, eine Zelle hoch (ein Layoutdurchgang, kein Zwischenbild)
     for (const b of built) {
-      const span = spanOf(b);
-      b.el.style.setProperty('grid-column', span >= cols ? '1 / -1' : `span ${span}`);
-      b.el.style.setProperty('grid-row', 'span 1');
+      b.el.style.order = '';
+      b.el.style.setProperty('grid-column', `1 / span ${spanOf(b)}`);
+      b.el.style.setProperty('grid-row', 'auto / span 1');
     }
     for (const b of built) {
       if (b.el.hidden) continue;
       minRows[b.id] = Math.min(4, Math.max(1, Math.ceil((b.el.scrollHeight + GAP) / (CELL + GAP))));
     }
-    for (const b of built) b.el.style.setProperty('grid-row', `span ${Math.max(b.h, minH(b.id))}`);
-    // Schalter unter den Status: dieselbe Spalte und Breite (die Zeile ergibt sich, weil sie direkt dahinter folgen)
-    // Folgt „Schalter“ direkt auf „Status“ (Standard), steht er in dessen Spalte und Breite darunter
-    const si = built.findIndex((b) => b.id === 'status' && !b.el.hidden);
-    const st = built[si];
-    const ctl = built[si + 1]?.id === 'control' ? built[si + 1] : null;
-    if (ctl && st) {
-      const span = spanOf(st);
-      if (span >= cols) ctl.el.style.setProperty('grid-column', '1 / -1');
-      else {
-        const g = grid.getBoundingClientRect();
-        const colW = (g.width - (cols - 1) * GAP) / cols;
-        const col = Math.round((st.el.getBoundingClientRect().left - g.left) / (colW + GAP)) + 1;
-        ctl.el.style.setProperty('grid-column', `${col} / span ${span}`);
-      }
-    }
+    // dann fest platzieren (spaltenweise Abschnitte, siehe packTiles)
+    const shown = built.filter((b) => !b.el.hidden);
+    const spots = packTiles(shown.map((b) => ({ w: spanOf(b), h: Math.max(b.h, minH(b.id)) })), cols);
+    shown.forEach((b, i) => {
+      const w = spanOf(b);
+      const hh = Math.max(b.h, minH(b.id));
+      b.el.style.setProperty('grid-column', `${spots[i].col + 1} / span ${w}`);
+      b.el.style.setProperty('grid-row', `${spots[i].row + 1} / span ${hh}`);
+    });
     grid.style.minHeight = '';
     if (window.scrollY !== keepY) window.scrollTo(0, keepY);
   };
@@ -149,20 +166,29 @@ export function dashboardView(root) {
     if (cols > 1 && built.some((b) => !b.el.hidden && b.el.scrollHeight > b.el.clientHeight + 1)) place();
   };
   // Neu anordnen mit Animation: jede Kachel gleitet von alter zu neuer Position und Größe (nichts springt)
+  // Lage der Kacheln (dokumentbezogen), nach jeder Anordnung gemerkt: Ausgangspunkt für Animationen beim Ändern der
+  // Fenstergröße (dann ist die alte Lage beim Messen schon verloren)
+  let lastRects = new Map();
+  const rectOf = (el) => { const r = el.getBoundingClientRect(); return { left: r.left + window.scrollX, top: r.top + window.scrollY, width: r.width, height: r.height }; };
+  let snapTimer = 0;
+  const snap = () => { clearTimeout(snapTimer); snapTimer = setTimeout(() => { lastRects = new Map(built.map((b) => [b, rectOf(b.el)])); }, 300); };
+  // Neu anordnen mit Animation: jede Kachel gleitet von alter zu neuer Position und Größe (nichts springt).
   // mutate: Änderung am Inhalt, erst nach dem Messen der alten Lage (sonst ist die Kachel schon gewachsen)
-  const relayout = (mutate) => {
-    const before = new Map(built.map((b) => [b, b.el.getBoundingClientRect()]));
+  const relayout = (mutate, before = null) => {
+    const from = before || new Map(built.map((b) => [b, rectOf(b.el)]));
     mutate?.();
     place();
+    snap();
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     for (const b of built) {
-      const r0 = before.get(b);
-      const r1 = b.el.getBoundingClientRect();
-      if (b.el.hidden || !r0.height || (Math.abs(r0.top - r1.top) < 1 && Math.abs(r0.left - r1.left) < 1 && Math.abs(r0.height - r1.height) < 1)) continue;
+      const r0 = from.get(b);
+      if (!r0 || b.el.hidden || !r0.height) continue;
+      const r1 = rectOf(b.el);
+      if (Math.abs(r0.top - r1.top) < 1 && Math.abs(r0.left - r1.left) < 1 && Math.abs(r0.height - r1.height) < 1 && Math.abs(r0.width - r1.width) < 1) continue;
       b.el.animate([
         { transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top}px)`, height: `${r0.height}px`, width: `${r0.width}px` },
         { transform: 'none', height: `${r1.height}px`, width: `${r1.width}px` },
-      ], { duration: 260, easing: 'cubic-bezier(.2, 0, 0, 1)' });
+      ], { duration: 300, easing: 'cubic-bezier(.2, 0, 0, 1)' });
     }
   };
   // Spaltenzahl aus der Breite; true, wenn sie sich geändert hat
@@ -175,10 +201,15 @@ export function dashboardView(root) {
     grid.style.setProperty('--cols', String(cols));
     return true;
   };
-  const sizes = new ResizeObserver(() => { if (measureCols()) place(); });
+  // Spaltenzahl geändert (Fenster breiter/schmaler): Kacheln gleiten an ihre neuen Plätze
+  const sizes = new ResizeObserver(() => {
+    if (!measureCols()) { snap(); return; }
+    if (built.length && lastRects.size) relayout(null, lastRects); else { place(); snap(); }
+  });
   root.append(grid);
   setTopActions(h('button', { class: 'icon-btn', 'aria-label': 'Home anpassen', title: 'Home anpassen', onclick: customize }, icon('tune')));
 
+  let firstBuild = true;
   function build() {
     built = layout.tiles.filter((t) => t.on && tileVisible(t.id)).map((t) => {
       const def = TILES[t.id];
@@ -197,22 +228,35 @@ export function dashboardView(root) {
         h('header', { class: 'tile-head' }, icon(def.icon), h('span', {}, def.title), extra), h('div', { class: 'tile-body' }, t0.body));
       return { id: t.id, el, extra, update: t0.update, w: t.w, h: t.h };
     });
+    // Sichtbarkeit (z. B. Live-Bezug nur während eines Bezugs) vor dem Einfügen festlegen: nichts blitzt kurz auf
+    const ctx = { m: store.machine, g: store.grinder?.enabled && hasGrinder() ? store.grinder : null, shots, maint };
+    for (const b of built) {
+      try { b.el.hidden = (b.update(ctx) || {}).hidden === true || (awaitFresh && b.id === 'shot'); } catch { /* update() folgt */ }
+    }
+    if (firstBuild) firstBuild = false;
+    else grid.classList.remove('stagger'); // gestaffelter Einflug nur beim Öffnen der Seite
     grid.replaceChildren(built.length ? built.map((b) => b.el) : h('div', { class: 'empty' }, 'Keine Kachel ausgewählt. Oben rechts lässt sich das Dashboard anpassen.'));
     measureCols(); // gleich in der richtigen Spaltenzahl aufbauen, nicht erst einspaltig
     place();
     update();
+    snap();
   }
 
   function update() {
     const ctx = { m: store.machine, g: store.grinder?.enabled && hasGrinder() ? store.grinder : null, shots, maint };
+    let toggled = false;
     for (const b of built) {
       try {
         const r = b.update(ctx) || {};
-        b.el.hidden = r.hidden === true || (awaitFresh && b.id === 'shot');
+        const hide = r.hidden === true || (awaitFresh && b.id === 'shot');
+        if (hide !== b.el.hidden) toggled = true;
+        b.el.hidden = hide;
         b.extra.replaceChildren(r.extra ?? '');
       } catch (e) { console.error(b.id, e); }
     }
-    refit();
+    // Kachel erschienen oder verschwunden (z. B. Live-Bezug): die übrigen rücken animiert nach
+    if (toggled && built.every((b) => b.el.isConnected) && cols > 1) relayout();
+    else refit();
   }
 
   let maint = null;
@@ -255,7 +299,7 @@ export function dashboardView(root) {
         const a = layout.tiles.indexOf(t);
         const b = layout.tiles.indexOf(next);
         [layout.tiles[a], layout.tiles[b]] = [layout.tiles[b], layout.tiles[a]];
-        changed();
+        changed('move');
       };
       const pinned = false;
       return h('div', { class: 'list-item dash-cfg-row' },
@@ -271,9 +315,24 @@ export function dashboardView(root) {
             h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach oben`, disabled: i === 0, onclick: () => move(-1) }, icon('less')),
             h('button', { class: 'icon-btn', 'aria-label': `${def.title} nach unten`, disabled: i === vis.length - 1, onclick: () => move(1) }, icon('more'))]));
     }));
-    const changed = () => {
+    const changed = (kind) => {
+      shotFirst(layout.tiles);
       saveLayout(layout);
-      if (!disposed) build(); // zuerst anordnen: misst die Mindesthöhen für die neue Breite
+      if (!disposed) {
+        if (kind === 'move') {
+          // Nur die Reihenfolge: vorhandene Kacheln behalten und an die neuen Plätze gleiten lassen
+          relayout(() => {
+            const order = layout.tiles.map((t) => t.id);
+            built.sort((x, y) => order.indexOf(x.id) - order.indexOf(y.id));
+            grid.append(...built.map((b) => b.el)); // Reihenfolge im Dokument (für die einspaltige Ansicht)
+          });
+        } else {
+          // Größe/Ein-Aus: neu aufbauen, aber animiert von der bisherigen Lage aus
+          const before = new Map(built.map((b) => [b.id, rectOf(b.el)]));
+          build();
+          relayout(null, new Map(built.map((b) => [b, before.get(b.id)]).filter(([, r]) => r)));
+        }
+      }
       paint();
     };
     paint();
@@ -282,7 +341,7 @@ export function dashboardView(root) {
     sheet('Home anpassen', h('div', {},
       h('p', { class: 'muted small' }, cols === 1
         ? 'Kacheln ein- und ausblenden und ihre Reihenfolge ändern. Auf diesem schmalen Bildschirm stehen alle Kacheln untereinander, jede so hoch wie ihr Inhalt; Breite und Höhe lassen sich ab Tablet-Breite einstellen. Die Auswahl gilt für dieses Gerät.'
-        : 'Breite in Spalten, Höhe in Zellen (wie Android-Widgets); Kacheln einer Zeile sind gleich hoch. Die Auswahl gilt für dieses Gerät.'),
+        : 'Breite in Spalten, Höhe in Zellen (wie Android-Widgets). Die Reihenfolge läuft von links nach rechts; schmalere Kacheln füllen ihren Abschnitt spaltenweise von oben nach unten – so bleibt sie auch auf schmaleren Bildschirmen stimmig. Die Auswahl gilt für dieses Gerät.'),
       list,
       h('div', { class: 'section-title' }, 'Dieses Gerät'),
       h('div', { class: 'list' },
@@ -340,8 +399,7 @@ export function dashboardView(root) {
 }
 
 function loadLayoutDefaults(keepAwake) {
-  const tiles = Object.keys(TILES).map((id) => ({ id, on: true, w: TILES[id].w, h: TILES[id].h }));
-  return { tiles: narrowScreen() ? mobileOrder(tiles) : tiles, keepAwake };
+  return { tiles: Object.keys(TILES).map((id) => ({ id, on: true, w: TILES[id].w, h: TILES[id].h })), keepAwake };
 }
 
 function sizeSelect(options, value, label, onChange) {
