@@ -1095,3 +1095,13 @@ details.fold[open] > summary { border-bottom: 1px solid var(--outline-variant); 
 
 /* Android-App: kein Doppeltipp-Zoom */
 html.in-app, html.in-app body { touch-action: pan-x pan-y; }
+
+/* Zurück-Pfeil: klappt in der Breite ein und aus, der Titel gleitet mit */
+#back-btn { transition: width .26s cubic-bezier(.2, 0, 0, 1), margin .26s cubic-bezier(.2, 0, 0, 1), opacity .2s, transform .26s cubic-bezier(.2, 0, 0, 1); overflow: hidden; flex: none; }
+#back-btn.gone { width: 0; min-width: 0; padding: 0; margin: 0; opacity: 0; transform: translateX(-8px); pointer-events: none; }
+/* Fenster (Anpassen, Bohne, Dialoge) mittig im Inhaltsbereich, also rechts der linken Navigationsleiste */
+@media (min-width: 960px) {
+  [data-style="xenia"] .sheet { left: 230px; }
+  [data-style="xenia"] .dialog { left: calc(50% + 115px); }
+  [data-style="xenia"] .fullscreen { padding-left: 230px; }
+}

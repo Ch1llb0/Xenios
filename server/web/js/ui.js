@@ -177,8 +177,14 @@ export function snackbar(message, { action, onAction, duration = 3500 } = {}) {
 const openOverlays = [];
 export function closeTopOverlay() {
   const close = openOverlays.at(-1);
-  if (!close) return false;
-  close();
+  if (close) { close(); return true; }
+  // Rückfall: sichtbares Fenster direkt im Dokument suchen (Schließen-Knopf, sonst Hintergrund antippen)
+  const root = document.getElementById('sheet-root');
+  const top = [...(root?.children || [])].reverse().find((el) => el.classList.contains('show') && !el.classList.contains('scrim'));
+  if (!top) return false;
+  const btn = top.querySelector('.sheet-close, .detail-head .icon-btn, [aria-label="Schließen"], [aria-label="Zurück"]');
+  if (btn) btn.click();
+  else root.querySelector('.scrim.show')?.click();
   return true;
 }
 
@@ -248,10 +254,16 @@ export function fullscreen(build) {
   const panel = h('div', { class: 'fullscreen', role: 'dialog' }, inner);
   document.getElementById('sheet-root').append(panel);
   requestAnimationFrame(() => panel.classList.add('show'));
+  let closed = false;
   const close = () => {
+    if (closed) return;
+    closed = true;
+    const i = openOverlays.indexOf(close);
+    if (i >= 0) openOverlays.splice(i, 1);
     panel.classList.remove('show');
     setTimeout(() => panel.remove(), 200);
   };
+  openOverlays.push(close); // Zurück-Taste der App schließt auch Vollbild-Fenster (z. B. Bezug)
   build(inner, close);
   return close;
 }

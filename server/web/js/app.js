@@ -260,7 +260,8 @@ function render() {
   setTopActions();
   setTabs(null);
   $('title').textContent = route.title;
-  $('back-btn').hidden = !route.back;
+  // Zurück-Pfeil weich ein-/ausblenden (Breite), damit der Titel nicht springt
+  $('back-btn').classList.toggle('gone', !route.back);
   $('back-btn').onclick = () => navigate(route.back);
   document.title = route.title === 'Xenios' ? 'Xenios' : `${route.title} · Xenios`;
   markNav();
@@ -275,9 +276,13 @@ function render() {
   view.classList.add('enter');
   current = { route, dispose: route.view(view) };
   if (restore) {
-    // nach dem Aufbau (und noch einmal, wenn nachgeladene Inhalte die Seite verlängert haben)
-    requestAnimationFrame(() => window.scrollTo(0, restore));
-    setTimeout(() => { if (current?.route === route && window.scrollY < restore) window.scrollTo(0, restore); }, 350);
+    // Sofort an die alte Stelle, noch vor dem ersten Bild: die Seite bekommt vorübergehend genug Höhe, auch wenn ihre
+    // Inhalte erst nachladen (sonst stünde sie kurz oben und spränge dann nach unten)
+    view.style.minHeight = `${restore + window.innerHeight}px`;
+    window.scrollTo(0, restore);
+    setTimeout(() => { if (current?.route === route) view.style.minHeight = ''; }, 1500);
+  } else {
+    view.style.minHeight = '';
   }
 }
 const scrollMemory = new Map();

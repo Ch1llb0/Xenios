@@ -2,7 +2,7 @@
 // Ein Bezug öffnet die Analyse (Kurve mit Vergleich, Kennzahlen, Bewertung).
 import { h, icon, fmt, fmtInt, snackbar, sheet, confirmDialog } from '../ui.js';
 import { api, store, subscribe, hasPaddle } from '../api.js';
-import { setTopActions, navigate } from '../app.js';
+import { navigate } from '../app.js';
 import { isHidden } from '../prefs.js';
 import { shotMetrics, dialIn, brewSeconds } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
@@ -33,9 +33,12 @@ export function shotsView(root) {
   const box = h('div', {}, h('div', { class: 'empty' }, 'Lade Bezüge …'));
   const beansBox = h('div', {});
   root.append(dial, care, beansBox, box);
-  setTopActions(
-    h('button', { class: 'icon-btn', 'aria-label': 'Bohne anlegen', title: 'Bohne anlegen', onclick: () => editBean() }, icon('add')),
-    h('a', { class: 'icon-btn', href: '/api/shots.csv', download: '', 'aria-label': 'Als CSV exportieren', title: 'Als CSV exportieren' }, icon('download')));
+  // Anlegen steht unter „Bohnen“, der Export als eigene Option darunter – keine unbeschrifteten Knöpfe in der Kopfzeile
+  const csvTile = () => h('div', { class: 'list', style: { 'margin-top': '12px' } },
+    h('a', { class: 'list-item clickable as-button', href: '/api/shots.csv', download: '' },
+      h('span', { class: 'lead' }, icon('download')),
+      h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Als CSV exportieren'), h('div', { class: 'sub' }, 'Alle Bezüge als Tabelle, z. B. für Excel oder Numbers')),
+      icon('right', 's20 muted')));
   let data = { shots: [], total: 0, beans: [] };
   let filter = 'all';
   let bean = '';
@@ -149,7 +152,7 @@ export function shotsView(root) {
       beansBox.replaceChildren(h('section', { class: 'card' },
         h('div', { class: 'row' }, icon('coffeeLine', 's20'),
           h('div', { class: 'grow' }, h('div', {}, 'Bohnen'), h('div', { class: 'small muted' }, 'Anlegen, dann in der Bewertung auswählen.')),
-          h('button', { class: 'btn tonal', onclick: () => editBean() }, icon('add', 's18'), 'Anlegen'))));
+          h('button', { class: 'btn tonal', onclick: () => editBean() }, icon('add', 's18'), 'Anlegen'))), csvTile());
       return;
     }
     beansBox.replaceChildren(h('section', { class: 'card' },
@@ -158,7 +161,7 @@ export function shotsView(root) {
       h('div', { class: 'list', style: { 'margin-top': '8px' } }, beans.map((b) => h('div', { class: 'list-item' },
         h('div', { class: 'grow' }, h('div', { class: 'title' }, b.name), b.roaster ? h('div', { class: 'sub' }, b.roaster) : null),
         h('button', { class: 'icon-btn', 'aria-label': `${b.name} umbenennen`, title: 'Umbenennen', onclick: () => editBean(b) }, icon('edit', 's20')),
-        h('button', { class: 'icon-btn', 'aria-label': `${b.name} entfernen`, title: 'Aus der Liste nehmen', onclick: () => removeBean(b) }, icon('del', 's20')))))));
+        h('button', { class: 'icon-btn', 'aria-label': `${b.name} entfernen`, title: 'Aus der Liste nehmen', onclick: () => removeBean(b) }, icon('del', 's20')))))), csvTile());
   }
 
   function editBean(existing = null) {

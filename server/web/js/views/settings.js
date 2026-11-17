@@ -23,7 +23,7 @@ export function settingsView(root) {
   const direct = store.server?.mode === 'direct';
   root.append(
     h('div', { class: 'section-title' }, 'Darstellung'), themeCard(),
-    h('div', { class: 'section-title' }, 'Leiste'), navCard(unsubs),
+    h('div', { class: 'section-title' }, 'Navigationsleiste'), navCard(unsubs),
     h('div', { class: 'section-title' }, 'Komponenten & Funktionen'), componentsCard(),
     h('div', { class: 'section-title' }, 'Weitere Einstellungen'),
     h('div', { class: 'list' },
