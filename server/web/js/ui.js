@@ -89,7 +89,7 @@ const P = {
 
 // Schalter als Umriss (für Kachelköpfe, Linienstärke wie die übrigen Kachel-Symbole)
 P.toggleTile = 'M7 18q-2.5 0-4.25-1.75T1 12q0-2.5 1.75-4.25T7 6h10q2.5 0 4.25 1.75T23 12q0 2.5-1.75 4.25T17 18Zm0-2h10q1.65 0 2.825-1.175Q21 13.65 21 12q0-1.65-1.175-2.825Q18.65 8 17 8H7Q5.35 8 4.175 9.175 3 10.35 3 12q0 1.65 1.175 2.825Q5.35 16 7 16Zm10-1q1.25 0 2.125-.875T20 12q0-1.25-.875-2.125T17 9q-1.25 0-2.125.875T14 12q0 1.25.875 2.125T17 15Z';
-P.coffeeLine = P.coffee; P.calendarBars = P.event; // Fallback ohne Xenia-Symbole
+P.coffeeLine = P.coffee; P.coffeeDrip = P.coffee; P.calendarBars = P.event; // Fallback ohne Xenia-Symbole
 P.group = P.thermo; P.boiler = P.thermo; P.pid = P.tune; P.shotlog = P.list;
 
 // Im Stil „Xenia“ die Icons der Original-Oberfläche, sonst Material-Icons
@@ -173,10 +173,24 @@ export function snackbar(message, { action, onAction, duration = 3500 } = {}) {
   snackTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
 
+// Offene Fenster (oben = zuletzt geöffnet): die Zurück-Taste der App schließt zuerst das oberste
+const openOverlays = [];
+export function closeTopOverlay() {
+  const close = openOverlays.at(-1);
+  if (!close) return false;
+  close();
+  return true;
+}
+
 function overlay(panel, { onClose } = {}) {
   const root = document.getElementById('sheet-root');
   const scrim = h('div', { class: 'scrim' });
+  let closed = false;
   const close = () => {
+    if (closed) return;
+    closed = true;
+    const i = openOverlays.indexOf(close);
+    if (i >= 0) openOverlays.splice(i, 1);
     panel.classList.remove('show');
     scrim.classList.remove('show');
     setTimeout(() => { panel.remove(); scrim.remove(); }, 220);
@@ -187,6 +201,7 @@ function overlay(panel, { onClose } = {}) {
   scrim.addEventListener('click', close);
   document.addEventListener('keydown', onKey);
   root.append(scrim, panel);
+  openOverlays.push(close);
   requestAnimationFrame(() => { scrim.classList.add('show'); panel.classList.add('show'); });
   return close;
 }

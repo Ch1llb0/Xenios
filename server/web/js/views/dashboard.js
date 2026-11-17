@@ -15,7 +15,7 @@ import { shotMetrics, scriptDuration } from '../../shared/shot-analysis.js';
 // Reihenfolge = Standardanordnung. Bei vier Spalten: Status | Instrumente (3 Spalten), darunter Schalter,
 // Letzter Bezug, Bezüge pro Tag, Bezugszeiten, dann der Verlauf über die ganze Breite.
 const TILES = {
-  shot: { title: 'Live-Bezug', icon: 'coffee', w: 0, h: 2, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
+  shot: { title: 'Live-Bezug', icon: 'coffeeDrip', w: 0, h: 2, note: 'Erscheint nur während eines Bezugs, dann ganz oben', build: shotTile },
   status: { title: 'Status', icon: 'power', w: 1, h: 2, build: statusTile },
   gauges: { title: 'Instrumente', icon: 'thermo', w: 3, h: 2, note: 'Druck, Brühgruppe, Brühkessel, Dampf', build: gaugesTile },
   control: { title: 'Schalter', icon: 'toggleTile', w: 1, h: 1, note: 'Ein, Eco, Aus und Dampf direkt bedienen', build: controlTile },
@@ -208,7 +208,7 @@ export function dashboardView(root) {
     for (const b of built) {
       try {
         const r = b.update(ctx) || {};
-        b.el.hidden = r.hidden === true;
+        b.el.hidden = r.hidden === true || (awaitFresh && b.id === 'shot');
         b.extra.replaceChildren(r.extra ?? '');
       } catch (e) { console.error(b.id, e); }
     }
@@ -293,9 +293,21 @@ export function dashboardView(root) {
 
   let lastEnded = store.machine?.lastShot?.endedAt;
   let wasRunning = Boolean(store.machine?.shot?.running);
+  // App/Tab im Hintergrund: die Live-Kachel sofort (ungesehen) ausblenden. Nach dem Zurückkommen zeigt die Seite
+  // sie erst wieder, wenn frische Daten einen laufenden Bezug melden – kein veralteter Bezug, der dann wegklappt.
+  let awaitFresh = false;
+  const onVisibility = () => {
+    if (document.visibilityState !== 'hidden') return;
+    awaitFresh = true;
+    const sb = built.find((b) => b.id === 'shot');
+    if (sb && !sb.el.hidden) { sb.el.hidden = true; place(); }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
   // Neue Bezüge erkennt die Seite am Ende-Zeitpunkt des letzten Bezugs (auch nachträglich erkannte)
   const un = subscribe((part) => {
     if (part === 'event') return;
+    // frischer Gesamtstand nach dem Zurückkommen (Server: Snapshot beim Neuverbinden, Direkt-Modus: erste Abfrage)
+    if (awaitFresh && document.visibilityState === 'visible' && (part === 'all' || (store.server?.mode === 'direct' && part === 'machine'))) awaitFresh = false;
     if (part === 'server') { build(); return; }
     const m = store.machine;
     if (m?.lastShot?.endedAt && m.lastShot.endedAt !== lastEnded) {
@@ -321,6 +333,7 @@ export function dashboardView(root) {
     un();
     unPrefs();
     clearInterval(tick);
+    document.removeEventListener('visibilitychange', onVisibility);
     document.removeEventListener('visibilitychange', onVisible);
     setAwake(false);
   };

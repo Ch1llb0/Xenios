@@ -15,7 +15,8 @@ function shown(el) {
 function skip(el) {
   // Seitenbereiche direkt im <body> (App, Anmeldung, Einrichtung) wechseln ohne Zusammenklappen.
   // Während eine Seite gerade einblendet, gilt der erste Zustand sofort (sonst springen Kacheln beim Aufbau).
-  return reduced() || (enterView?.contains(el) && el !== enterView && performance.now() < enterSettle) || !el.isConnected || el.parentElement === document.body || el.closest?.('[data-noanim]') || typeof el.animate !== 'function';
+  // Im Hintergrund (App/Tab nicht sichtbar) sofort: sonst läuft die Animation erst beim Zurückkommen sichtbar nach
+  return reduced() || document.visibilityState === 'hidden' || (enterView?.contains(el) && el !== enterView && performance.now() < enterSettle) || !el.isConnected || el.parentElement === document.body || el.closest?.('[data-noanim]') || typeof el.animate !== 'function';
 }
 
 const COLLAPSED = { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px' };
@@ -158,7 +159,7 @@ function vanish(el, parent, before) {
 }
 
 function appeared(records) {
-  if (reduced()) return;
+  if (reduced() || document.visibilityState === 'hidden') return;
   // nur verschoben (in einem Durchgang entfernt und wieder eingefügt): weder ein- noch ausblenden
   const allRemoved = new Set(records.flatMap((r) => [...r.removedNodes]));
   const moved = new Set(records.flatMap((r) => [...r.addedNodes]).filter((n) => allRemoved.has(n)));

@@ -1,6 +1,6 @@
 import { pageEnter } from './motion.js'; // zuerst: animiertes Ein- und Ausblenden für die ganze App
 // App-Start: Login, Navigation, Live-Verbindung, Service Worker, Shortcuts.
-import { h, icon, snackbar } from './ui.js';
+import { h, icon, snackbar, closeTopOverlay } from './ui.js';
 import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode, hasGrinder, hasPaddle } from './api.js';
 import { dashboardView } from './views/dashboard.js';
 import { scriptsView } from './views/scripts.js';
@@ -216,6 +216,16 @@ function markNav() {
   const navPath = here?.navPath || here?.back || location.pathname;
   document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === navPath ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
 }
+
+// Zurück-Taste der Android-App: offenes Fenster schließen → Unterseite → übergeordnete Seite → Home.
+// true = erledigt; false = schon auf Home (die App geht dann in den Hintergrund).
+window.xeniosBack = () => {
+  if (closeTopOverlay()) return true;
+  const route = current?.route;
+  if (route?.back) { navigate(route.back, { replace: true }); return true; }
+  if (location.pathname !== '/') { navigate('/', { replace: true }); return true; }
+  return false;
+};
 
 export function navigate(path, { replace = false } = {}) {
   if (location.pathname !== path) history[replace ? 'replaceState' : 'pushState']({}, '', path);

@@ -95,9 +95,7 @@ class MainActivity : Activity() {
         web.setDownloadListener { url, _, contentDisposition, mimeType, _ -> download(url, contentDisposition, mimeType) }
 
         if (Build.VERSION.SDK_INT >= 33) {
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) {
-                if (web.canGoBack()) web.goBack() else finish()
-            }
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { handleBack() }
         }
 
         setCookies()
@@ -202,8 +200,20 @@ class MainActivity : Activity() {
     }
 
     @Deprecated("Nur bis Android 12; ab 13 OnBackInvokedCallback")
+    @Deprecated("Bis Android 12; ab 13 über onBackInvokedDispatcher")
     override fun onBackPressed() {
-        if (::web.isInitialized && web.canGoBack()) web.goBack() else super.onBackPressed()
+        handleBack()
+    }
+
+    /**
+     * Zurück-Taste: die Web-App entscheidet (offenes Fenster schließen → Unterseite → übergeordnete Seite → Home).
+     * Auf Home (oder ohne geladene Web-App) geht die App in den Hintergrund, statt sich zu beenden.
+     */
+    private fun handleBack() {
+        if (!::web.isInitialized) { moveTaskToBack(true); return }
+        web.evaluateJavascript("(typeof window.xeniosBack === 'function' && window.xeniosBack()) ? 'ja' : 'nein'") { r ->
+            if (r?.contains("ja") != true) moveTaskToBack(true)
+        }
     }
 
     // Activity-Result-API bräuchte AndroidX; hier reicht die klassische API
