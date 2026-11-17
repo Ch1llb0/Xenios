@@ -112,39 +112,92 @@ let enterView = null;
 let enterUntil = 0;
 let enterSettle = 0;
 let enterDy = 24;
-// Nach der Ladephase: Kacheln und Listen zeichnen sich bei jeder Statusmeldung neu. Ein neu eingefügtes Element
-// gilt nur dann als „erscheint“, wenn es kein gleichartiges entferntes Gegenstück gibt (erst gleiche Art und
-// gleicher Text, dann gleiche Art). So blenden z. B. neue Abzeichen, Zeilen oder Listeneinträge ein, beim
-// unveränderten Neuzeichnen bewegt sich nichts.
+// Nach der Ladephase: Kacheln und Listen zeichnen sich bei jeder Statusmeldung neu. Ein eingefügtes Element gilt
+// nur dann als „erscheint“, wenn es kein gleichartiges entferntes Gegenstück gibt (erst gleiche Art und gleicher
+// Text, dann gleiche Art); umgekehrt „verschwindet“ ein entferntes ohne Gegenstück. Beides läuft wie beim
+// Auf- und Zuklappen der Live-Werte: erscheinen = Fläche wächst, dann von oben einblenden; verschwinden = erst
+// ausblenden, dann schrumpft die Fläche. Unverändert neu gezeichnete Inhalte bewegen sich nicht.
 const sig = (el) => `${el.tagName}.${el.getAttribute('class') || ''}`;
 const txt = (el) => (el.textContent || '').trim().slice(0, 80);
+const LIVE = { easing: 'cubic-bezier(.2, 0, 0, 1)' };
+const FLAT = { height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px' };
+const inlineish = (el) => getComputedStyle(el).display.startsWith('inline');
+function sizeOf(el) {
+  const { opacity, ...box } = boxOf(el); // nur Höhe und Abstände
+  return box;
+}
+
+function grow(el) {
+  if (inlineish(el)) {
+    el.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { transform: 'none' }], { ...LIVE, duration: 180 });
+    return;
+  }
+  const prev = el.style.overflow;
+  el.style.overflow = 'hidden';
+  const h = el.animate([FLAT, sizeOf(el)], { ...LIVE, duration: 260 });
+  h.onfinish = h.oncancel = () => { el.style.overflow = prev; };
+  el.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { transform: 'none' }], { ...LIVE, duration: 180, delay: 80, fill: 'backwards' });
+}
+
+// Entferntes Element kurz an seinen alten Platz zurück (noch vor dem nächsten Bild), ausblenden, zusammenklappen, weg
+function vanish(el, parent, before) {
+  el.__ghost = true;
+  el.setAttribute('aria-hidden', 'true');
+  el.style.pointerEvents = 'none';
+  parent.insertBefore(el, before && before.parentNode === parent ? before : null);
+  if (el.getClientRects().length === 0) { el.remove(); return; }
+  const fade = el.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-6px)' }], { ...LIVE, duration: 150, fill: 'forwards' });
+  fade.onfinish = () => {
+    if (!el.isConnected) return;
+    if (inlineish(el)) { el.remove(); return; }
+    el.style.overflow = 'hidden';
+    const h = el.animate([sizeOf(el), FLAT], { ...LIVE, duration: 220, fill: 'forwards' });
+    h.onfinish = () => el.remove();
+  };
+  fade.oncancel = () => el.remove();
+}
+
 function appeared(records) {
   if (reduced()) return;
+  // nur verschoben (in einem Durchgang entfernt und wieder eingefügt): weder ein- noch ausblenden
+  const allRemoved = new Set(records.flatMap((r) => [...r.removedNodes]));
+  const moved = new Set(records.flatMap((r) => [...r.addedNodes]).filter((n) => allRemoved.has(n)));
   for (const r of records) {
-    if (r.type !== 'childList' || !r.addedNodes.length) continue;
-    const added = [...r.addedNodes].filter((n) => n instanceof Element);
-    if (!added.length) continue;
-    const removed = [...r.removedNodes].filter((n) => n instanceof Element);
-    const exact = new Map();
-    const loose = new Map();
-    for (const el of removed) {
-      const k = `${sig(el)}|${txt(el)}`;
-      exact.set(k, (exact.get(k) || 0) + 1);
-      loose.set(sig(el), (loose.get(sig(el)) || 0) + 1);
-    }
-    const fresh = [];
+    if (r.type !== 'childList') continue;
+    const target = r.target;
+    if (!(target instanceof Element) || target.closest('[data-noanim]')) continue;
+    const added = [...r.addedNodes].filter((n) => n instanceof Element && !n.__ghost && !moved.has(n));
+    const removed = [...r.removedNodes].filter((n) => n instanceof Element && !n.__ghost && !moved.has(n) && !n.isConnected);
+    if (!added.length && !removed.length) continue;
+    // Paare bilden: erst gleiche Art + gleicher Text, dann gleiche Art
+    const pair = new Map(); // entfernt → eingefügt
+    const used = new Set();
+    const byKey = (keyOf) => {
+      const pool = new Map();
+      for (const el of removed) if (!pair.has(el)) { const k = keyOf(el); if (!pool.has(k)) pool.set(k, []); pool.get(k).push(el); }
+      for (const el of added) {
+        if (used.has(el)) continue;
+        const list = pool.get(keyOf(el));
+        if (list?.length) { const old = list.shift(); pair.set(old, el); used.add(el); }
+      }
+    };
+    byKey((el) => `${sig(el)}|${txt(el)}`);
+    byKey(sig);
     for (const el of added) {
-      const k = `${sig(el)}|${txt(el)}`;
-      if (exact.get(k)) { exact.set(k, exact.get(k) - 1); loose.set(sig(el), loose.get(sig(el)) - 1); } else fresh.push(el);
-    }
-    for (const el of fresh) {
-      if (loose.get(sig(el)) > 0) { loose.set(sig(el), loose.get(sig(el)) - 1); continue; } // nur geänderter Inhalt
-      if (!(el instanceof HTMLElement) || typeof el.animate !== 'function' || el.closest('[data-noanim]')) continue;
+      if (used.has(el) || !(el instanceof HTMLElement) || typeof el.animate !== 'function') continue;
       if (!el.isConnected || el.hidden || el.getClientRects().length === 0) continue;
       // Effekte mit eigener Animation (Tipp-Welle, Spinner …) nicht anfassen
       if (el.classList.contains('ripple') || el.getAnimations?.().length) continue;
-      el.animate([{ opacity: 0, transform: 'translateY(-4px) scale(.98)' }, { transform: 'none' }], // Ziel: eigene Deckkraft
-        { duration: 220, easing: 'cubic-bezier(.2, 0, 0, 1)' });
+      grow(el);
+    }
+    // Verschwinden: nicht für Kacheln im Raster und nicht, wenn ein ganzer Bereich ausgetauscht wurde
+    const gone = removed.filter((el) => !pair.has(el) && el instanceof HTMLElement && !el.classList.contains('ripple') && !el.classList.contains('tile'));
+    if (!gone.length || gone.length > 6 || target.classList.contains('dash') || !target.isConnected) continue;
+    for (const el of gone) {
+      // alter Platz: vor dem eingefügten Gegenstück des nächsten gebliebenen Elements, sonst an der alten Stelle
+      const i = removed.indexOf(el);
+      const nextKept = removed.slice(i + 1).map((x) => pair.get(x)).find((x) => x && x.parentNode === target);
+      vanish(el, target, nextKept || r.nextSibling);
     }
   }
 }
