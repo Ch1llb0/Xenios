@@ -200,7 +200,6 @@ class MainActivity : Activity() {
     }
 
     @Deprecated("Nur bis Android 12; ab 13 OnBackInvokedCallback")
-    @Deprecated("Bis Android 12; ab 13 über onBackInvokedDispatcher")
     override fun onBackPressed() {
         handleBack()
     }
