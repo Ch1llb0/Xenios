@@ -34,7 +34,8 @@ const GRINDER_TILES = new Set(['lastGrind', 'grinds', 'grinder']);
 const KEY = 'dashboard';
 const LAYOUT_VERSION = 7; // 3: Breite/Höhe in Zellen; 7: neue Standardanordnung und spaltenweise Platzierung
 const FINISHED_MS = 20e3;   // so lange bleibt der Live-Bezug nach dem Ende stehen
-const MIN_COL = 250;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl (breite Ansicht: 4)
+const MIN_COL = 250;        // Mindestbreite einer Spalte (px); daraus ergibt sich die Spaltenzahl (1, 2 oder 4)
+const MAX_COL = 340;        // Höchstbreite einer Spalte: darüber bleibt das Raster schmaler und steht zentriert
 const GAP = 12;
 const WIDTHS = [[1, '1 Spalte'], [2, '2 Spalten'], [3, '3 Spalten'], [0, 'Ganze Breite']];
 const HEIGHTS = [[1, 'Höhe 1'], [2, 'Höhe 2'], [3, 'Höhe 3'], [4, 'Höhe 4']];
@@ -192,10 +193,20 @@ export function dashboardView(root) {
     }
   };
   // Spaltenzahl aus der Breite; true, wenn sie sich geändert hat
+  // Nur 1 (Handy), 2 oder 4 Spalten: so skaliert die Anordnung sauber. Reicht der Platz noch nicht für die nächste
+  // Stufe, wachsen die Spalten nur bis MAX_COL und das Raster steht zentriert im Inhaltsbereich.
+  const available = () => {
+    const host = grid.parentElement;
+    if (!host) return 0;
+    const cs = getComputedStyle(host);
+    return host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  };
   const measureCols = () => {
-    const width = grid.getBoundingClientRect().width;
+    const width = available();
     if (!width) return false;
-    const n = Math.max(1, Math.min(4, Math.floor((width + GAP) / (MIN_COL + GAP))));
+    const fit = Math.floor((width + GAP) / (MIN_COL + GAP));
+    const n = fit >= 4 ? 4 : fit >= 2 ? 2 : 1;
+    grid.style.maxWidth = n > 1 ? `${n * MAX_COL + (n - 1) * GAP}px` : '';
     if (n === cols) return false;
     cols = n;
     grid.style.setProperty('--cols', String(cols));
@@ -383,7 +394,7 @@ export function dashboardView(root) {
   const unPrefs = onPrefs((k) => { if (k === 'hiddenComponents') build(); else update(); });
 
   build();
-  sizes.observe(grid);
+  sizes.observe(root); // Breite des Inhaltsbereichs (das Raster selbst ist ggf. schmaler)
   loadShots();
   if (layout.keepAwake) setAwake(true);
   return () => {
