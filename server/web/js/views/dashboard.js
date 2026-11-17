@@ -624,10 +624,11 @@ function gaugesTile({ arr } = {}) {
     body: fit,
     update({ m }) {
       if (!m) return {};
-      pressure.update(m.pressure.pump, 'bar');
+      // Ziele immer zeigen (Druck: eingestellter Pumpendruck; Dampf auch bei ausgeschaltetem Kessel)
+      pressure.update(m.pressure.pump, m.pressure.pumpSet ? `Ziel ${fmt(m.pressure.pumpSet)} bar` : 'bar');
       temp.update(m.temp.group, m.temp.groupSet ? `Ziel ${fmt(m.temp.groupSet)} °C` : '°C');
       boiler.update(m.temp.boiler, m.temp.boilerSet ? `Ziel ${fmt(m.temp.boilerSet)} °C` : '°C');
-      steam.update(m.pressure.steam, m.steamOn ? `Ziel ${fmt(m.pressure.steamSet, 1)} bar` : 'aus');
+      steam.update(m.pressure.steam, m.pressure.steamSet ? `${m.steamOn ? '' : 'aus · '}Ziel ${fmt(m.pressure.steamSet, 1)} bar` : (m.steamOn ? 'bar' : 'aus'));
       return {};
     },
   };

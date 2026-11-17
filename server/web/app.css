@@ -1013,7 +1013,7 @@ svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height
 .gauge-fit > .dash-gauges { position: absolute; inset: 0; display: grid; gap: 8px 6px; margin: 0; align-content: center; justify-items: center; }
 .dash-gauges .gauge svg { width: var(--gsize, 120px); height: var(--gsize, 120px); max-width: none; }
 .dash-gauges .gauge-title { font-size: 12px; margin-bottom: 2px; white-space: nowrap; }
-.dash-gauges.tiny .gauge-foot .gs { display: none; }
+.dash-gauges.tiny .gauge-foot .gs { font-size: 9px; } /* Ziel bleibt immer sichtbar */
 .dash-gauges.tiny .gauge-foot .gv { font-size: 13px; }
 
 /* Dashboard: laufendes Skript bzw. letzte Störung in „Status“ */

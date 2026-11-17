@@ -72,8 +72,10 @@ export function createGauge({ title, min, max, majorStep, minorStep, redFrom = n
       value,
       sub);
   }
-  // Manometer: Messwert und Ziel unter dem Instrument (echte Manometer haben keine Ziffern)
-  const foot = mano ? h('div', { class: 'gauge-foot' }, h('span', { class: 'gv' }, '–'), h('span', { class: 'gs' }, '')) : null;
+  // Unter dem Instrument: Manometer zeigen Messwert und Ziel (echte Manometer haben keine Ziffern), flache Anzeigen
+  // das Ziel – in beiden Designs immer lesbar groß statt winzig im Zifferblatt
+  const foot = mano ? h('div', { class: 'gauge-foot' }, h('span', { class: 'gv' }, '–'), h('span', { class: 'gs' }, ''))
+    : h('div', { class: 'gauge-foot flat' }, h('span', { class: 'gs' }, ''));
   const el = h('div', { class: `gauge${mano ? ' mano' : ''}` }, h('div', { class: 'gauge-title' }, title), svg, foot);
   el.update = (v, subText) => {
     const n = Number(v);
@@ -87,7 +89,8 @@ export function createGauge({ title, min, max, majorStep, minorStep, redFrom = n
       foot.lastChild.textContent = st;
     } else {
       value.textContent = txt;
-      sub.textContent = st;
+      sub.textContent = unit; // im Zifferblatt nur die Einheit, das Ziel steht darunter
+      foot.lastChild.textContent = subText === unit ? '' : (subText || '');
     }
     svg.setAttribute('aria-label', `${title}: ${txt} ${unit} ${subText || ''}`);
   };
