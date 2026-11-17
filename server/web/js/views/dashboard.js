@@ -634,23 +634,39 @@ function gaugesTile({ arr } = {}) {
   };
 }
 
-function lastShotTile({ wide, h: rows }) {
-  const box = h('div', {});
+function lastShotTile({ wide }) {
+  // Kurve füllt den Platz der gewählten Höhe (wie der Verlauf), statt selbst eine Höhe vorzugeben – sonst wüchse die
+  // Kachel über die eingestellte Höhe hinaus
+  const head = h('div', {});
+  const fit = h('div', { class: 'chart-fit' });
+  let curve = null;
+  const draw = () => {
+    if (!curve) return fit.replaceChildren();
+    const bw = fit.clientWidth;
+    const bh = fit.clientHeight;
+    const size = bw > 50 && bh > 30 ? { width: Math.round(bw * 0.7), height: Math.round(bh * 0.7) } : { width: wide ? 560 : 320, height: wide ? 160 : 130 };
+    fit.replaceChildren(shotChart(curve, { ...size, minSeconds: 20 }));
+  };
   return {
-    body: box,
+    body: [head, fit],
     update({ m }) {
       const ls = m?.lastShot;
       if (!ls) {
-        box.replaceChildren(h('div', { class: 'empty' }, 'Noch kein Bezug'));
+        curve = null;
+        head.replaceChildren(h('div', { class: 'empty' }, 'Noch kein Bezug'));
+        draw();
         return {};
       }
       const met = shotMetrics(ls);
       const ratio = met.ratio;
       const amount = met.yieldG ? [fmt(met.yieldG), 'g'] : ls.volumeMl ? [fmt(ls.volumeMl, 0), 'ml'] : ['–', ''];
-      box.replaceChildren(
+      head.replaceChildren(
         h('div', { class: 'dash-kpis' }, kpi('Zeit', fmt(met.timeS), 's'), kpi('Menge', amount[0], amount[1], 'w'),
           ratio ? kpi('Verhältnis', `1:${fmt(ratio)}`, '') : kpi('Max. Druck', fmt(ls.maxPressure), 'bar', 'pu')),
-        ls.curve?.length > 1 ? shotChart(ls.curve, { width: wide ? 560 : 320, height: (wide ? 160 : 130) + extraH(rows), minSeconds: 20 }) : h('p', { class: 'muted small' }, 'Keine Kurve (Bezug nachträglich erkannt)'));
+        ls.curve?.length > 1 ? null : h('p', { class: 'muted small' }, 'Keine Kurve (Bezug nachträglich erkannt)'));
+      curve = ls.curve?.length > 1 ? ls.curve : null;
+      draw();
+      if (curve && !fit.clientHeight) requestAnimationFrame(draw); // erst nach dem Einfügen messbar
       return { extra: `${ls.notes?.rating ? `${'★'.repeat(ls.notes.rating)} · ` : ''}${ago(ls.endedAt)}${ls.estimated ? ' · nachträglich' : ''}` };
     },
   };
