@@ -1105,3 +1105,12 @@ html.in-app, html.in-app body { touch-action: pan-x pan-y; }
   [data-style="xenia"] .dialog { left: calc(50% + 115px); }
   [data-style="xenia"] .fullscreen { padding-left: 230px; }
 }
+
+/* Auswahl-Fenster der App (statt System-Dialog für <select>) */
+.pick-list { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px; }
+.pick-opt { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; border: 0; background: none; color: var(--on-surface);
+  font: 400 15px/1.35 'Open Sans', system-ui, sans-serif; text-align: left; border-radius: 14px; hyphens: auto; -webkit-hyphens: auto; overflow-wrap: break-word; }
+.pick-opt .ck { width: 22px; flex: none; color: var(--primary); display: grid; place-items: center; }
+.pick-opt.sel { background: var(--secondary-container); color: var(--on-secondary-container); font-weight: 600; }
+.pick-opt.sel .ck { color: inherit; }
+.pick-opt:disabled { opacity: .45; }

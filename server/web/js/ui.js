@@ -329,3 +329,39 @@ function wheel(count, selected) {
   requestAnimationFrame(() => go(value, false));
   return { el, get value() { return value; } };
 }
+
+// --- Auswahllisten in der Android-App --------------------------------------------------------------------------
+// Android öffnet <select> als System-Dialog (fremde Schrift, schlechte Abstände, Umbruch ohne Trennung). In der App
+// öffnet jede Auswahlliste stattdessen ein Fenster von unten in der Gestaltung der App. Im Browser bleibt es nativ.
+function openSelectSheet(select) {
+  const label = select.getAttribute('aria-label') || select.closest('label, .field')?.querySelector('span, .label')?.textContent || select.title || 'Auswählen';
+  let close = () => {};
+  const opts = [...select.options].filter((o) => !o.hidden);
+  const list = h('div', { class: 'pick-list', role: 'listbox' }, opts.map((o) => h('button', {
+    class: `pick-opt${o.selected ? ' sel' : ''}`, type: 'button', role: 'option', 'aria-selected': String(o.selected), disabled: o.disabled,
+    onclick: () => {
+      if (select.value !== o.value) {
+        select.value = o.value;
+        select.dispatchEvent(new Event('input', { bubbles: true }));
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      close();
+    },
+  }, h('span', { class: 'ck' }, o.selected ? icon('check', 's18') : null), o.textContent)));
+  close = sheet(label, list);
+  requestAnimationFrame(() => list.querySelector('.sel')?.scrollIntoView({ block: 'nearest' }));
+}
+if (/XeniaApp\//.test(navigator.userAgent)) {
+  const intercept = (e) => {
+    const select = e.target.closest?.('select');
+    if (!select || select.disabled || select.multiple) return;
+    e.preventDefault();
+    if (e.type === 'keydown' && ![' ', 'Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    select.focus({ preventScroll: true });
+    if (e.type !== 'mousedown' || e.button === 0) openSelectSheet(select);
+  };
+  document.addEventListener('mousedown', intercept, true);
+  document.addEventListener('keydown', intercept, true);
+  // der Tipp selbst darf die System-Liste nicht mehr öffnen
+  document.addEventListener('click', (e) => { if (e.target.closest?.('select')) e.preventDefault(); }, true);
+}
