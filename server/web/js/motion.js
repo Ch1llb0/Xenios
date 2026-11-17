@@ -146,7 +146,10 @@ function vanish(el, parent, before) {
   el.setAttribute('aria-hidden', 'true');
   el.style.pointerEvents = 'none';
   parent.insertBefore(el, before && before.parentNode === parent ? before : null);
-  if (el.getClientRects().length === 0) { el.remove(); return; }
+  // Schon unsichtbar oder mit eigener Abgangs-Animation (CSS-Klasse): nicht ein zweites Mal ausblenden
+  const cs = getComputedStyle(el);
+  if (el.getClientRects().length === 0 || Number(cs.opacity) < 0.05 || el.offsetHeight < 2
+    || el.getAnimations?.().some((a) => typeof CSSAnimation === 'function' && a instanceof CSSAnimation)) { el.remove(); return; }
   const fade = el.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-6px)' }], { ...LIVE, duration: 150, fill: 'forwards' });
   fade.onfinish = () => {
     if (!el.isConnected) return;
@@ -156,6 +159,53 @@ function vanish(el, parent, before) {
     h.onfinish = () => el.remove();
   };
   fade.oncancel = () => el.remove();
+}
+
+// Paare aus entfernten und eingefügten Geschwistern: erst gleiche Art + gleicher Text, dann gleiche Art
+function pairUp(removed, added) {
+  const pair = new Map(); // entfernt → eingefügt
+  const used = new Set();
+  const byKey = (keyOf) => {
+    const pool = new Map();
+    for (const el of removed) if (!pair.has(el)) { const k = keyOf(el); if (!pool.has(k)) pool.set(k, []); pool.get(k).push(el); }
+    for (const el of added) {
+      if (used.has(el)) continue;
+      const list = pool.get(keyOf(el));
+      if (list?.length) { const old = list.shift(); pair.set(old, el); used.add(el); }
+    }
+  };
+  byKey((el) => `${sig(el)}|${txt(el)}`);
+  byKey(sig);
+  return { pair, used };
+}
+
+// Abgleich einer Ebene: Neues wächst herein, Weggefallenes klappt weg; gleichartige Paare werden (bis zur Tiefe 3)
+// auch innen verglichen – so blendet z. B. ein neuer Eintrag in einer komplett neu gezeichneten Karte ein.
+function reconcile(target, removed, added, nextSibling, depth) {
+  const { pair, used } = pairUp(removed, added);
+  for (const el of added) {
+    if (used.has(el) || !(el instanceof HTMLElement) || typeof el.animate !== 'function') continue;
+    if (!el.isConnected || el.hidden || el.getClientRects().length === 0) continue;
+    // Effekte mit eigener Animation (Tipp-Welle, Spinner …) nicht anfassen
+    if (el.classList.contains('ripple') || el.getAnimations?.().length) continue;
+    grow(el);
+  }
+  // Verschwinden: nicht für Kacheln im Raster und nicht, wenn ein ganzer Bereich ausgetauscht wurde
+  const gone = removed.filter((el) => !pair.has(el) && el instanceof HTMLElement && !el.classList.contains('ripple') && !el.classList.contains('tile'));
+  if (gone.length && gone.length <= 6 && !target.classList.contains('dash') && target.isConnected) {
+    for (const el of gone) {
+      // alter Platz: vor dem Gegenstück des nächsten gebliebenen Elements, sonst an der alten Stelle
+      const i = removed.indexOf(el);
+      const nextKept = removed.slice(i + 1).map((x) => pair.get(x)).find((x) => x && x.parentNode === target);
+      vanish(el, target, nextKept || nextSibling);
+    }
+  }
+  if (depth >= 3) return;
+  for (const [old, now] of pair) {
+    if (old === now || !(now instanceof HTMLElement) || now.closest('[data-noanim]')) continue;
+    if (txt(old) === txt(now) && old.childElementCount === now.childElementCount) continue; // unverändert
+    reconcile(now, [...old.children], [...now.children], null, depth + 1);
+  }
 }
 
 function appeared(records) {
@@ -170,36 +220,7 @@ function appeared(records) {
     const added = [...r.addedNodes].filter((n) => n instanceof Element && !n.__ghost && !moved.has(n));
     const removed = [...r.removedNodes].filter((n) => n instanceof Element && !n.__ghost && !moved.has(n) && !n.isConnected);
     if (!added.length && !removed.length) continue;
-    // Paare bilden: erst gleiche Art + gleicher Text, dann gleiche Art
-    const pair = new Map(); // entfernt → eingefügt
-    const used = new Set();
-    const byKey = (keyOf) => {
-      const pool = new Map();
-      for (const el of removed) if (!pair.has(el)) { const k = keyOf(el); if (!pool.has(k)) pool.set(k, []); pool.get(k).push(el); }
-      for (const el of added) {
-        if (used.has(el)) continue;
-        const list = pool.get(keyOf(el));
-        if (list?.length) { const old = list.shift(); pair.set(old, el); used.add(el); }
-      }
-    };
-    byKey((el) => `${sig(el)}|${txt(el)}`);
-    byKey(sig);
-    for (const el of added) {
-      if (used.has(el) || !(el instanceof HTMLElement) || typeof el.animate !== 'function') continue;
-      if (!el.isConnected || el.hidden || el.getClientRects().length === 0) continue;
-      // Effekte mit eigener Animation (Tipp-Welle, Spinner …) nicht anfassen
-      if (el.classList.contains('ripple') || el.getAnimations?.().length) continue;
-      grow(el);
-    }
-    // Verschwinden: nicht für Kacheln im Raster und nicht, wenn ein ganzer Bereich ausgetauscht wurde
-    const gone = removed.filter((el) => !pair.has(el) && el instanceof HTMLElement && !el.classList.contains('ripple') && !el.classList.contains('tile'));
-    if (!gone.length || gone.length > 6 || target.classList.contains('dash') || !target.isConnected) continue;
-    for (const el of gone) {
-      // alter Platz: vor dem eingefügten Gegenstück des nächsten gebliebenen Elements, sonst an der alten Stelle
-      const i = removed.indexOf(el);
-      const nextKept = removed.slice(i + 1).map((x) => pair.get(x)).find((x) => x && x.parentNode === target);
-      vanish(el, target, nextKept || r.nextSibling);
-    }
+    reconcile(target, removed, added, r.nextSibling, 0);
   }
 }
 

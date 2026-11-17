@@ -135,6 +135,9 @@ export function serverView(root) {
   }
   // Kategorien eingeklappt; welche offen sind, merkt sich die Seite über Neuzeichnen hinweg
   const openCards = new Set();
+  // Sprung von außen (z. B. „Bezüge unter … s ausgeblendet“): Kategorie offen anzeigen und dorthin scrollen
+  const jumpTo = location.hash === '#aufzeichnung' ? 'Aufzeichnung' : null;
+  if (jumpTo) openCards.add(jumpTo);
   const card = (head, ic, ...kids) => {
     const { title, badge } = typeof head === 'string' ? { title: head } : head;
     const d = h('details', { class: 'card fold setting-card', open: openCards.has(title) },
@@ -331,6 +334,11 @@ export function serverView(root) {
     paintPush(pushBox);
     const notify = card('Benachrichtigungen', 'bell', pushBox);
     const recording = card('Aufzeichnung', 'shotlog', shotFilterCard());
+    if (jumpTo && !recording.__jumped) {
+      recording.__jumped = true;
+      history.replaceState(history.state, '', location.pathname); // nur einmal springen
+      setTimeout(() => recording.scrollIntoView({ block: 'start', behavior: 'smooth' }), 450);
+    }
     const account = card('Konto', 'logout',
       inAndroidApp() ? h('button', { class: 'btn outlined wide', style: { 'margin-bottom': '8px' }, onclick: () => window.XeniaApp.reauth() }, icon('wifi', 's18'), 'App-Verbindung ändern') : null,
       h('button', { class: 'btn outlined wide', onclick: logout }, icon('logout', 's18'), 'Abmelden'));
@@ -352,8 +360,7 @@ export function serverView(root) {
           try {
             const r = await api(`/api/sessions/${encodeURIComponent(x.id)}`, { method: 'DELETE' });
             if (r.self) return logout();
-            row.classList.add('leaving');
-            setTimeout(() => row.remove(), 280);
+            row.remove(); // blendet wie überall aus und klappt zusammen (motion.js)
           } catch (ex) { snackbar(ex.message); }
         } }, icon('close', 's20')))));
     } catch (e) {

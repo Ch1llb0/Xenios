@@ -34,7 +34,7 @@ export function shotsView(root) {
   const beansBox = h('div', {});
   root.append(dial, care, beansBox, box);
   // Anlegen steht unter „Bohnen“, der Export als eigene Option darunter – keine unbeschrifteten Knöpfe in der Kopfzeile
-  const csvTile = () => h('div', { class: 'list', style: { 'margin-top': '12px' } },
+  const csvTile = () => h('div', { class: 'list', style: { 'margin-top': '12px', 'margin-bottom': '24px' } },
     h('a', { class: 'list-item clickable as-button', href: '/api/shots.csv', download: '' },
       h('span', { class: 'lead' }, icon('download')),
       h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Als CSV exportieren'), h('div', { class: 'sub' }, 'Alle Bezüge als Tabelle, z. B. für Excel oder Numbers')),
@@ -137,7 +137,7 @@ export function shotsView(root) {
           kpi('Heute', fmtInt(today)), kpi('7 Tage', fmtInt(week)), kpi('Gesamt', fmtInt(total)),
           kpi('Ø Zeit', avgTime ? `${fmt(avgTime / 1000)} s` : '–'), kpi('Ø Verhältnis', avgRatio ? `1:${fmt(avgRatio)}` : '–')),
         h('p', { class: 'muted small' }, 'Einen Bezug antippen für Kurve, Vergleich, Kennzahlen und Bewertung. Die Dosis kommt automatisch von der Mühle, wenn kurz vorher gemahlen wurde.'),
-        data.minShotS ? h('button', { class: 'btn text', onclick: () => navigate(store.server?.mode === 'direct' ? '/einstellungen' : '/server') }, icon('tune', 's18'), `Bezüge unter ${fmtInt(data.minShotS)} s ausgeblendet`) : null),
+        data.minShotS ? h('button', { class: 'btn text', onclick: () => navigate(store.server?.mode === 'direct' ? '/einstellungen#aufzeichnung' : '/server#aufzeichnung') }, icon('tune', 's18'), `Bezüge unter ${fmtInt(data.minShotS)} s ausgeblendet`) : null),
       h('div', { class: 'row filter-row' }, h('div', { class: 'chips grow' }, chip('all', 'Alle'), chip('rated', 'Bewertet'), chip('ref', 'Referenzen')), beanSel),
       visible.length ? null : h('div', { class: 'empty' }, 'Keine Bezüge für diesen Filter.'),
       ...groups.flatMap((g) => [

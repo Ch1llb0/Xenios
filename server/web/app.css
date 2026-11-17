@@ -642,7 +642,6 @@ code.fp { font: 11px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywh
 .sessions { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .session { display: flex; align-items: center; gap: 12px; padding: 8px 4px 8px 10px; border-radius: 12px; background: var(--surface-container-low); overflow: hidden; }
 .session.current { box-shadow: inset 0 0 0 1px var(--primary-container); }
-.session.leaving { animation: leave .28s var(--ease-emph) forwards; }
 .list-item.as-button { border: 0; width: 100%; text-align: left; color: inherit; font: inherit; }
 .savebar, .view.enter > .savebar { animation: savebar-in .38s var(--ease-spring) both; animation-delay: 0s; }
 .savebar { align-items: center; padding: 6px 6px 6px 18px; }
@@ -1114,3 +1113,6 @@ html.in-app, html.in-app body { touch-action: pan-x pan-y; }
 .pick-opt.sel { background: var(--secondary-container); color: var(--on-secondary-container); font-weight: 600; }
 .pick-opt.sel .ck { color: inherit; }
 .pick-opt:disabled { opacity: .45; }
+
+/* Links als Listeneintrag (z. B. CSV-Export) wie Knöpfe darstellen */
+a.list-item { text-decoration: none; color: inherit; }

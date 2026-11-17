@@ -31,10 +31,21 @@ export function settingsView(root) {
       direct ? null : listButton('shield', 'Server- & App-Einstellungen', 'Geräte, Zugriff von unterwegs, Zeit, Sicherheit, Benachrichtigungen, Aufzeichnung, Konto', () => navigate('/server')),
       direct && inAndroidApp() ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null),
     // Direkt-Modus: ohne Server-Seite gehört die Aufzeichnung hierher, als Kategorie wie dort
-    direct ? h('div', { style: { 'margin-top': '12px' } }, fold('Aufzeichnung', 'shotlog', shotFilterCard())) : null,
+    direct ? recordingFold() : null,
     direct ? h('div', { class: 'card low muted small', style: { 'margin-top': '12px' } }, 'Direkt-Modus: Die App spricht Maschine und Mühle ohne Server im Heimnetz an. Server-Einstellungen gibt es dabei nicht.') : null,
     h('p', { class: 'muted small', style: { 'text-align': 'center', 'margin-top': '24px' } }, `Xenios ${store.server?.version || ''}`));
   return () => unsubs.forEach((u) => u());
+}
+
+// Direkt-Modus: Kategorie „Aufzeichnung“; nach einem Sprung (#aufzeichnung) offen und im Blick
+function recordingFold() {
+  const f = fold('Aufzeichnung', 'shotlog', shotFilterCard());
+  if (location.hash === '#aufzeichnung') {
+    f.open = true;
+    history.replaceState(history.state, '', location.pathname);
+    setTimeout(() => f.scrollIntoView({ block: 'start', behavior: 'smooth' }), 450);
+  }
+  return h('div', { style: { 'margin-top': '12px' } }, f);
 }
 
 // --- Maschinen-Einstellungen: Kategorien wie die Seite der Maschine, eingeklappt ------------------------------
