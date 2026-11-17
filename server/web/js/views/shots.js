@@ -34,7 +34,7 @@ export function shotsView(root) {
   const beansBox = h('div', {});
   root.append(dial, care, beansBox, box);
   // Anlegen steht unter „Bohnen“, der Export als eigene Option darunter – keine unbeschrifteten Knöpfe in der Kopfzeile
-  const csvTile = () => h('div', { class: 'list', style: { 'margin-top': '12px', 'margin-bottom': '24px' } },
+  const csvTile = () => h('div', { class: 'list', style: { 'margin-top': '12px', 'margin-bottom': '12px' } }, // gleicher Abstand oben (Bohnen) und unten (Statistik)
     h('a', { class: 'list-item clickable as-button', href: '/api/shots.csv', download: '' },
       h('span', { class: 'lead' }, icon('download')),
       h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Als CSV exportieren'), h('div', { class: 'sub' }, 'Alle Bezüge als Tabelle, z. B. für Excel oder Numbers')),
