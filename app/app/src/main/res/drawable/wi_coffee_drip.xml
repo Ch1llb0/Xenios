@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Erzeugt aus den Symbolen der Web-App (icons-xenia.js: coffeeDrip) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M2.5 6h9v3.5A3.5 3.5 0 0 1 8 13H6A3.5 3.5 0 0 1 2.5 9.5V6zm1 1v2.5A2.5 2.5 0 0 0 6 12h2a2.5 2.5 0 0 0 2.5-2.5V7h-7z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.5 7h1a1.75 1.75 0 0 1 0 3.5h-1v-1h1a.75.75 0 0 0 0-1.5h-1V7zM2 14h10a.5.5 0 0 1 0 1H2a.5.5 0 0 1 0-1z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.5 9.5h7A2.5 2.5 0 0 1 8 12H6a2.5 2.5 0 0 1-2.5-2.5z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7 2c.6.95 1.05 1.55 1.05 2.15a1.05 1.05 0 0 1-2.1 0C5.95 3.55 6.4 2.95 7 2z" />
+</vector>

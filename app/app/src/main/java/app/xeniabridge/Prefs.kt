@@ -76,4 +76,20 @@ class Prefs(context: Context) {
         get() = listOfNotNull(localUrl?.takeIf { it.isNotBlank() }, baseUrl?.takeIf { it.isNotBlank() })
 
     fun clearToken() = p.edit().remove("token").apply()
+
+    /** Farben und Manometer-Design der App für die Widgets (JSON von der Web-App, hell und dunkel) */
+    var widgetTheme: String?
+        get() = p.getString("widgetTheme", null)
+        set(v) = p.edit().putString("widgetTheme", v).apply()
+
+    /** Einschalten ohne Dampfkessel (gilt für App, Widgets und Shortcut „Ein“); null = noch nie gesetzt */
+    var noSteamOn: Boolean
+        get() = p.getBoolean("noSteamOn", false)
+        set(v) = p.edit().putBoolean("noSteamOn", v).putBoolean("noSteamOnSet", true).apply()
+    val noSteamOnSet: Boolean get() = p.getBoolean("noSteamOnSet", false)
+
+    /** Letzte Widget-Daten (/api/widget), um bei Farbwechseln ohne Netz neu zu zeichnen */
+    var widgetCache: String?
+        get() = p.getString("widgetCache", null)
+        set(v) = p.edit().putString("widgetCache", v).apply()
 }

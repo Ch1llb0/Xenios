@@ -348,6 +348,26 @@ class MainActivity : Activity() {
 
     /** Für die Web-App: „window.XeniaApp“. Anmeldung öffnen, Wecker, im Direkt-Modus HTTP zu Maschine/Mühle und Dateien speichern. */
     private inner class Bridge {
+        /** Farben und Manometer-Design der App für die Widgets (JSON, hell und dunkel); Widgets neu zeichnen */
+        @JavascriptInterface
+        fun setTheme(json: String) {
+            if (json.length > 20_000) return
+            val changed = prefs.widgetTheme != json
+            prefs.widgetTheme = json
+            // „Ohne Dampf einschalten“ einmalig aus der Web-App übernehmen; danach führt die App die Einstellung
+            if (!prefs.noSteamOnSet) runCatching { prefs.noSteamOn = org.json.JSONObject(json).optBoolean("noSteamOn") }
+            if (changed) Widgets.redrawAll(applicationContext)
+        }
+
+        @JavascriptInterface
+        fun getNoSteamOn(): Boolean = prefs.noSteamOn
+
+        @JavascriptInterface
+        fun setNoSteamOn(on: Boolean) {
+            prefs.noSteamOn = on
+            Widgets.redrawAll(applicationContext)
+        }
+
         /** Farben für Status- und Navigationsleiste (#rrggbb), passend zu Kopfzeile und unterer Leiste der Seite. */
         @JavascriptInterface
         fun setBars(top: String, bottom: String) {

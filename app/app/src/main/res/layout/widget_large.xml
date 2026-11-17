@@ -1,207 +1,120 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Großes Widget (4×2): Status, drei Messwerte, nächstes geplantes Einschalten, Ein/Eco/Aus. Nur RemoteViews-taugliche Views. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Erzeugt (widgets_gen): Bild des Widgets und deckungsgleiche Klickflächen -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/widget_bg_off"
-    android:orientation="vertical"
-    android:padding="10dp">
-
+    android:layout_height="match_parent">
+    <ImageView
+        android:id="@+id/img"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY" />
     <LinearLayout
-        android:id="@+id/header"
+        android:id="@+id/ov_large"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:contentDescription="@null"
-            android:src="@drawable/ic_power" />
-
-        <TextView
-            android:id="@+id/status"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="Kaffeemaschine"
-            android:textColor="@color/widget_text"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <ImageView
-            android:id="@+id/refresh"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:contentDescription="Aktualisieren"
-            android:padding="6dp"
-            android:src="@drawable/ic_refresh" />
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp">
+        <FrameLayout
+            android:id="@+id/head"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="18" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="4" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="46" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="4" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="18" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="8" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="36"
+            android:orientation="horizontal">
+            <FrameLayout
+                android:id="@+id/btn_on"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
+            <FrameLayout
+                android:id="@+id/btn_eco"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp" />
+            <FrameLayout
+                android:id="@+id/btn_off"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp" />
+        </LinearLayout>
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="8" />
+        <FrameLayout
+            android:id="@+id/tg_steam"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="26" />
+        <FrameLayout
+            android:id="@+id/tg_nosteam"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="26" />
     </LinearLayout>
-
     <LinearLayout
+        android:id="@+id/ov_large_live"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:orientation="horizontal">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/v_group"
-                android:layout_width="match_parent"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:layout_height="wrap_content"
-                android:text="–"
-                android:textColor="@color/widget_text"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/k_group"
-                android:layout_width="match_parent"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:layout_height="wrap_content"
-                android:text="Brühgruppe"
-                android:textColor="@color/widget_text_dim"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/v_boiler"
-                android:layout_width="match_parent"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:layout_height="wrap_content"
-                android:text="–"
-                android:textColor="@color/widget_text"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/k_boiler"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Brühkessel"
-                android:textColor="@color/widget_text_dim"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/v_steam"
-                android:layout_width="match_parent"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:layout_height="wrap_content"
-                android:text="–"
-                android:textColor="@color/widget_text"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Dampf"
-                android:textColor="@color/widget_text_dim"
-                android:textSize="11sp" />
-        </LinearLayout>
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+        <FrameLayout
+            android:id="@+id/live_head"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="18" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="4" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="60" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="6" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="60" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="8" />
+        <FrameLayout
+            android:id="@+id/live_stop"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="36" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/next"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="–"
-        android:textColor="@color/widget_text_dim"
-        android:textSize="12sp" />
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:minHeight="6dp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/btn_on"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/widget_btn"
-            android:gravity="center"
-            android:text="Ein"
-            android:textColor="@color/widget_text"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btn_on_ns"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="6dp"
-            android:contentDescription="Ein ohne Dampf"
-            android:layout_weight="1"
-            android:background="@drawable/widget_btn"
-            android:gravity="center"
-            android:text="Ein&#10;ohne D"
-            android:textColor="@color/widget_text"
-            android:textSize="11sp"
-            android:lineSpacingMultiplier="0.9"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btn_eco"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_btn"
-            android:gravity="center"
-            android:text="Eco"
-            android:textColor="@color/widget_text"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btn_off"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_btn"
-            android:gravity="center"
-            android:text="Aus"
-            android:textColor="@color/widget_text"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-</LinearLayout>
+</FrameLayout>

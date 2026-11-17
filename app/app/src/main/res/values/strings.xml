@@ -1,14 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Xenios</string>
-    <string name="widget_power">Kaffeemaschine Ein/Aus</string>
-    <string name="widget_status">Kaffeemaschine</string>
-    <string name="widget_wide">Kaffeemaschine schmal</string>
-    <string name="widget_wide_desc">Status, Temperatur und Ein/ohne Dampf/Eco/Aus in einer Zeile</string>
-    <string name="widget_large">Kaffeemaschine groß</string>
-    <string name="widget_large_desc">Status, Temperaturen, Dampf, nächstes Einschalten und Ein/ohne Dampf/Eco/Aus</string>
+    <string name="widget_power">Xenios – Ein/Aus</string>
     <string name="widget_power_desc">Maschine mit einem Tipp ein- oder ausschalten</string>
-    <string name="widget_status_desc">Status, Temperatur und Ein/ohne Dampf/Eco/Aus</string>
+    <string name="widget_switch">Xenios – Schalter</string>
+    <string name="widget_switch_desc">Ein, Eco, Aus, Dampfkessel und Ohne Dampf einschalten</string>
+    <string name="widget_large">Xenios – Kaffeemaschine groß</string>
+    <string name="widget_large_desc">Status und Schalter; während eines Bezugs die Live-Ansicht mit Stopp</string>
+    <string name="widget_gauges">Xenios – Instrumente</string>
+    <string name="widget_gauges_desc">Druck, Brühgruppe, Brühkessel und Dampfkessel mit Zielen</string>
+    <string name="widget_targets">Xenios – Sollwerte</string>
+    <string name="widget_targets_desc">Brühgruppe, Brühkessel und Dampfdruck einstellen</string>
+    <string name="widget_care">Xenios – Pflege</string>
+    <string name="widget_care_desc">Wann der nächste Backflush fällig ist</string>
+    <string name="widget_history">Xenios – Verlauf (10 min)</string>
+    <string name="widget_history_desc">Temperaturen und Drücke der letzten 10 Minuten</string>
+    <string name="widget_lastshot">Xenios – Letzter Bezug</string>
+    <string name="widget_lastshot_desc">Bezugszeit, Ausbeute, Verhältnis und Kurve</string>
+    <string name="widget_shots">Xenios – Bezüge</string>
+    <string name="widget_shots_desc">Letzter Bezug und Bezüge pro Tag</string>
+    <string name="widget_shotslarge">Xenios – Bezüge groß</string>
+    <string name="widget_shotslarge_desc">Letzter Bezug, Bezüge pro Tag und Bezugszeiten</string>
     <string name="tile_label">Kaffeemaschine</string>
     <string name="sc_on_short">Einschalten</string>
     <string name="sc_on_long">Maschine einschalten</string>

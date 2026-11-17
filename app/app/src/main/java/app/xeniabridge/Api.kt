@@ -28,6 +28,8 @@ object Api {
         /** Nächstes geplantes Einschalten (Wecker oder Server-Zeitplan) in ms, mit Grund. */
         val nextAt: Long? = null,
         val nextReason: String? = null,
+        /** Vollständige Antwort von /api/widget (Bezüge, Verlauf, laufender Bezug …); im Direkt-Modus null */
+        val raw: org.json.JSONObject? = null,
     ) {
         /** Eingeschaltet im Sinne von „nicht Aus/Eco“ (an, Bezug, Nachlauf, Paddle, Störung). */
         val isOn: Boolean get() = online && status != null && status != "off" && status != "eco"
@@ -159,11 +161,29 @@ object Api {
             steamSet = dbl("steamSet"),
             nextAt = o.optJSONObject("next")?.optLong("at")?.takeIf { it > 0 },
             nextReason = o.optJSONObject("next")?.optString("reason"),
+            raw = o,
         )
     }
 
+    /** Dampfkessel ein/aus (nur mit Server) */
+    fun steam(context: Context, on: Boolean) {
+        request(context, "POST", "/api/machine/steam", JSONObject().put("on", on))
+    }
+
+    /** Laufendes Skript bzw. laufenden Bezug stoppen (nur mit Server) */
+    fun stopScript(context: Context) {
+        request(context, "POST", "/api/machine/scripts/stop", JSONObject())
+    }
+
+    /** Sollwert setzen, z. B. BG_SET_TEMP (nur mit Server) */
+    fun setTarget(context: Context, key: String, value: Double) {
+        request(context, "POST", "/api/machine/settings", JSONObject().put("changes", JSONObject().put(key, value)))
+    }
+
     /** mode: "on" | "off" | "eco" | "on_nosteam" (ein, nur Brühkessel – ohne Dampfkessel) */
-    fun power(context: Context, mode: String) {
+    fun power(context: Context, mode0: String) {
+        // „Ein“ wie in der App: mit der Einstellung „Ohne Dampf einschalten“ ohne Dampfkessel
+        val mode = if (mode0 == "on" && Prefs(context).noSteamOn) MODE_ON_NO_STEAM else mode0
         if (Prefs(context).direct) return DirectMachine.power(context, mode)
         val body = if (mode == MODE_ON_NO_STEAM) JSONObject().put("mode", "on").put("steam", false) else JSONObject().put("mode", mode)
         serverOrDirect(context, { request(context, "POST", "/api/machine/power", body); Unit }) { DirectMachine.power(context, mode) }

@@ -64,13 +64,13 @@
         </receiver>
 
         <receiver
-            android:name=".StatusWidget"
+            android:name=".SwitchWidget"
             android:exported="false"
-            android:label="@string/widget_status">
+            android:label="@string/widget_switch">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_status_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_switch_info" />
         </receiver>
 
         <receiver
@@ -84,13 +84,73 @@
         </receiver>
 
         <receiver
-            android:name=".WideWidget"
+            android:name=".GaugesWidget"
             android:exported="false"
-            android:label="@string/widget_wide">
+            android:label="@string/widget_gauges">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_wide_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_gauges_info" />
+        </receiver>
+
+        <receiver
+            android:name=".TargetsWidget"
+            android:exported="false"
+            android:label="@string/widget_targets">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_targets_info" />
+        </receiver>
+
+        <receiver
+            android:name=".CareWidget"
+            android:exported="false"
+            android:label="@string/widget_care">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_care_info" />
+        </receiver>
+
+        <receiver
+            android:name=".HistoryWidget"
+            android:exported="false"
+            android:label="@string/widget_history">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_history_info" />
+        </receiver>
+
+        <receiver
+            android:name=".LastShotWidget"
+            android:exported="false"
+            android:label="@string/widget_lastshot">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_lastshot_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ShotsWidget"
+            android:exported="false"
+            android:label="@string/widget_shots">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_shots_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ShotsLargeWidget"
+            android:exported="false"
+            android:label="@string/widget_shotslarge">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_shotslarge_info" />
         </receiver>
 
         <!-- Nächsten Wecker an den Server melden (Wecker-Automatik) -->
