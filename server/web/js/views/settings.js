@@ -313,6 +313,7 @@ export function shotFilterCard() {
         h('h3', { style: { 'margin-top': '16px' } }, 'Standard-Dosis'),
         h('p', { class: 'muted small' }, 'Die Waage misst nur die Ausbeute in der Tasse. Ohne angebundene Mühle gilt diese Dosis für neue Bezüge, damit das Verhältnis berechnet wird. Am einzelnen Bezug lässt sie sich überschreiben. Leer = keine.'),
         h('label', { class: 'field' }, h('span', {}, 'Dosis (g)'), doseInput), // Beschriftung über dem Feld wie überall
+        h('div', { style: { height: '12px' } }), // Abstand zum Speichern-Knopf wie bei den übrigen Formularen
         save);
     } catch (e) {
       box.replaceChildren(h('div', { class: 'muted small' }, e.message));

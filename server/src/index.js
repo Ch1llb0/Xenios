@@ -22,6 +22,7 @@ import { JsonStore } from './store.js';
 import { securityHeaders, sendJson, readJson, readBuffer, makeStatic } from './http-util.js';
 import { packBackup, applyBackupFiles, refreshLiveConfig, BACKUP_MAX } from './backup.js';
 import { ensureCert, certFingerprint } from './tls.js';
+import { LiveHistory, widgetExtras } from './widget.js';
 
 const log = logger('server');
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
@@ -68,8 +69,11 @@ export function createApp(cfg, hooks = {}) {
     for (const s of streams) send(s, event, data);
   }
   let lastMachineJson = '';
+  // Verlauf der letzten 10 Minuten für das Widget „Verlauf“ (der Server fragt die Maschine ohnehin ab)
+  const liveHistory = new LiveHistory();
   machine.on('state', () => {
     const snap = machine.snapshot();
+    liveHistory.add(snap);
     const json = JSON.stringify(snap);
     if (json !== lastMachineJson) {
       lastMachineJson = json;
@@ -184,6 +188,8 @@ export function createApp(cfg, hooks = {}) {
       boiler: m.temp?.boiler ?? null, boilerSet: m.temp?.boilerSet ?? null, steamSet: m.pressure?.steamSet ?? null,
       shot: Boolean(m.shot?.running), at: Date.now(),
       next: nextPlannedOn(),
+      // Für die erweiterten Widgets (Instrumente, Bezüge, Pflege, Verlauf, laufender Bezug)
+      ...widgetExtras({ m, shots: machine.listedShots().slice(0, 60), maintenance: machine.maintenance(), history: liveHistory }),
       // Für den Notbetrieb der App, falls der Server ausfällt: dann spricht sie die Maschine direkt im Heimnetz an
       machine: directMachine(),
     };
