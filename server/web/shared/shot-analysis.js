@@ -63,27 +63,71 @@ export function profileSteps(p) {
   steps.push({ op: 6, args: [] });
   return steps;
 }
+// Zeiten eines Bezugs. Wie an der Xenia zählt als Bezugszeit nur die eigentliche Extraktion: das Vorbrühen (Phase mit
+// niedrigem Druck am Anfang) wird von der Gesamtzeit abgezogen. Vorbrühen = Zeit bis zum ersten Mal ≥ 4 bar, wenn
+// das mindestens 3 s dauert (kürzer ist es nur der normale Druckaufbau). Erster Tropfen = 1 g mehr auf der Waage als
+// bisher am wenigsten (so auch bei nicht genau tarierter Waage). Neue Bezüge speichern die Werte; ältere werden aus
+// der Kurve berechnet, ohne Kurve gilt die Gesamtzeit.
+const MAIN_BAR = 4;
+const PRE_MIN_S = 3;
+export function shotPhases(shot) {
+  const totalMs = Number.isFinite(shot?.timeMs) ? shot.timeMs : null;
+  if (Number.isFinite(shot?.brewMs)) {
+    return { totalMs, preMs: shot.preinfusionMs || 0, brewMs: shot.brewMs, firstDropMs: Number.isFinite(shot.firstDropMs) ? shot.firstDropMs : null };
+  }
+  const c = (shot?.curve || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
+  let preS = 0;
+  let firstS = null;
+  if (c.length) {
+    const reach = c.find((p) => p[1] >= MAIN_BAR)?.[0];
+    if (reach != null && reach >= PRE_MIN_S) preS = reach;
+    let min = Infinity;
+    for (const p of c) {
+      const w = Number(p[2]);
+      if (p[2] == null || !Number.isFinite(w)) continue;
+      if (w - min >= 1) { firstS = p[0]; break; }
+      min = Math.min(min, w);
+    }
+  }
+  const preMs = Math.round(preS * 1000);
+  return { totalMs, preMs, brewMs: totalMs !== null ? Math.max(0, totalMs - preMs) : null, firstDropMs: firstS !== null ? Math.round(firstS * 1000) : null };
+}
+// Bezugszeit in Sekunden (ohne Vorbrühen) für Listen, Kacheln und Statistik
+export function brewSeconds(shot) {
+  const b = shotPhases(shot).brewMs;
+  return b ? b / 1000 : null;
+}
+// Laufender Bezug: im Vorbrühen dessen Dauer, danach die Bezugszeit ab Ende des Vorbrühens
+export function liveTimes(shot) {
+  const t = (shot?.timeMs || 0) / 1000;
+  const c = (shot?.curve || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
+  const reach = c.find((p) => p[1] >= MAIN_BAR)?.[0];
+  if (reach == null) return t >= PRE_MIN_S ? { pre: true, preS: t, brewS: 0 } : { pre: false, preS: 0, brewS: t };
+  const preS = reach >= PRE_MIN_S ? reach : 0;
+  return { pre: false, preS, brewS: Math.max(0, t - preS) };
+}
+
 // Kennzahlen aus der Kurve und den Notizen
 export function shotMetrics(shot) {
   const c = (shot?.curve || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
   const yieldG = shot?.notes?.yieldG ?? shot?.weight ?? null;
-  const doseG = shot?.notes?.doseG ?? shot?.dose?.g ?? null;
-  const firstAt = (pred) => c.find(pred)?.[0] ?? null;
-  // Vorbrühen: bis der Druck erstmals 4 bar erreicht; erster Tropfen: ab 1 g auf der Waage
-  const preinfusionS = firstAt((p) => p[1] >= 4);
-  const firstDropS = firstAt((p) => p[2] >= 1);
-  const main = c.filter((p) => p[1] >= 4);
+  const doseG = shot?.notes?.doseG ?? shot?.dose?.g ?? shot?.doseDefaultG ?? null;
+  const ph = shotPhases(shot);
+  const main = c.filter((p) => p[1] >= MAIN_BAR);
   const avgPressure = main.length ? main.reduce((s, p) => s + p[1], 0) / main.length : null;
   const end = c[c.length - 1];
-  const flowStart = firstDropS ?? preinfusionS;
+  const firstDropS = ph.firstDropMs !== null ? ph.firstDropMs / 1000 : null;
+  const flowStart = firstDropS ?? (ph.preMs ? ph.preMs / 1000 : null);
   const avgFlow = end && flowStart !== null && end[0] - flowStart > 2 && end[2] > 0 ? end[2] / (end[0] - flowStart) : null;
   const round = (v, d = 1) => (v === null || !Number.isFinite(v) ? null : Math.round(v * 10 ** d) / 10 ** d);
   return {
-    timeS: shot?.timeMs ? round(shot.timeMs / 1000) : null,
+    timeS: ph.brewMs ? round(ph.brewMs / 1000) : null, // Bezugszeit ohne Vorbrühen
+    totalS: ph.totalMs ? round(ph.totalMs / 1000) : null,
     yieldG: round(yieldG),
     doseG: round(doseG),
+    doseAssumed: shot?.notes?.doseG == null && shot?.dose?.g == null && shot?.doseDefaultG != null,
     ratio: doseG && yieldG ? round(yieldG / doseG) : null,
-    preinfusionS: round(preinfusionS),
+    preinfusionS: ph.preMs ? round(ph.preMs / 1000) : null,
     firstDropS: round(firstDropS),
     avgPressure: round(avgPressure),
     maxPressure: shot?.maxPressure ?? null,

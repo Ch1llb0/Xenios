@@ -2,7 +2,7 @@
 // Läuft im Server (Node) und in der Android-App im Direkt-Modus (Browser): Speicher, Logger und fetch werden übergeben.
 import { Emitter, MemoryStore } from './emitter.js';
 import { logger } from './log.js';
-import { dialIn, STRENGTH } from './shot-analysis.js';
+import { dialIn, STRENGTH, shotPhases } from './shot-analysis.js';
 import { MACHINE_API, CLASSIC_SETTING_FIELDS, machineApiId, normalizeLive } from './machine-api.js';
 
 export { MACHINE_API, CLASSIC_SETTING_FIELDS, machineApiId } from './machine-api.js';
@@ -577,13 +577,21 @@ export class Machine extends Emitter {
       curve: curve.slice(0, 300),
       ...(s.shot.script ? { script: s.shot.script } : {}),
     };
+    // Vorbrühen, Bezugszeit (ohne Vorbrühen) und ersten Tropfen festhalten – bleiben auch, wenn die Kurve später entfällt
+    const ph = shotPhases({ timeMs, curve });
+    shot.preinfusionMs = ph.preMs;
+    shot.brewMs = ph.brewMs;
+    shot.firstDropMs = ph.firstDropMs;
+    // Dosis: die Waage misst nur die Ausbeute; ohne Mühle gilt die eingestellte Standard-Dosis (änderbar am Bezug)
+    const defDose = this.defaultDoseG;
+    if (defDose) shot.doseDefaultG = defDose;
     s.shot = { running: false, timeMs: 0, startedAt: null, curve: [] };
     // Zu kurze Pumpvorgänge (Spülen, Backflush, Fehlbezug) erscheinen weder im Protokoll noch als „letzter Bezug“
     if (timeMs >= this.minShotMs) {
       s.lastShot = shot;
       shot.no = (s.counters?.extractions ?? null) !== null ? s.counters.extractions + this._liveStarts.length : null;
       this._log(shot);
-      const parts = [`${fmt(timeMs / 1000)} s`];
+      const parts = [`${fmt((shot.brewMs ?? timeMs) / 1000)} s`];
       if (shot.weight) parts.push(`${fmt(shot.weight)} g`);
       else if (shot.volumeMl) parts.push(`${fmt(shot.volumeMl, 0)} ml`);
       if (shot.maxPressure) parts.push(`max. ${fmt(shot.maxPressure)} bar`);
@@ -789,14 +797,32 @@ export class Machine extends Emitter {
     return Number.isFinite(v) && v >= MIN_SHOT_LIMITS.min && v <= MIN_SHOT_LIMITS.max ? Math.round(v * 1000) : MIN_SHOT_MS;
   }
 
-  shotSettings() {
-    return { minShotS: this.minShotMs / 1000, limits: MIN_SHOT_LIMITS, defaultMinShotS: MIN_SHOT_MS / 1000 };
+  // Standard-Dosis (g) für neue Bezüge ohne Mühle; null = keine
+  get defaultDoseG() {
+    const v = Number(this.history.data.settings?.defaultDoseG);
+    return Number.isFinite(v) && v >= 3 && v <= 40 ? v : null;
   }
 
-  setShotSettings({ minShotS }) {
-    const v = Number(minShotS);
-    if (!Number.isFinite(v) || v < MIN_SHOT_LIMITS.min || v > MIN_SHOT_LIMITS.max) throw httpError(400, `Mindestdauer muss zwischen ${MIN_SHOT_LIMITS.min} und ${MIN_SHOT_LIMITS.max} s liegen`);
-    this.history.data.settings = { ...(this.history.data.settings || {}), minShotS: Math.round(v) };
+  shotSettings() {
+    return { minShotS: this.minShotMs / 1000, limits: MIN_SHOT_LIMITS, defaultMinShotS: MIN_SHOT_MS / 1000, defaultDoseG: this.defaultDoseG };
+  }
+
+  setShotSettings({ minShotS, defaultDoseG } = {}) {
+    const next = { ...(this.history.data.settings || {}) };
+    if (minShotS !== undefined) {
+      const v = Number(minShotS);
+      if (!Number.isFinite(v) || v < MIN_SHOT_LIMITS.min || v > MIN_SHOT_LIMITS.max) throw httpError(400, `Mindestdauer muss zwischen ${MIN_SHOT_LIMITS.min} und ${MIN_SHOT_LIMITS.max} s liegen`);
+      next.minShotS = Math.round(v);
+    }
+    if (defaultDoseG !== undefined) {
+      if (defaultDoseG === null || defaultDoseG === '') delete next.defaultDoseG;
+      else {
+        const d = Number(defaultDoseG);
+        if (!Number.isFinite(d) || d < 3 || d > 40) throw httpError(400, 'Standard-Dosis muss zwischen 3 und 40 g liegen');
+        next.defaultDoseG = Math.round(d * 10) / 10;
+      }
+    }
+    this.history.data.settings = next;
     this.history.save();
     const last = this.listedShots()[0] || null;
     if (!this.state.shot.running) this.state.lastShot = last;
@@ -819,14 +845,17 @@ export class Machine extends Emitter {
   shotsCsv() {
     const cell = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
     const text = (v) => (v ? `"${String(v).replace(/"/g, '""').replace(/[\r\n]+/g, ' ')}"` : '');
-    const rows = [['Nr', 'Ende', 'Dauer (s)', 'Gewicht (g)', 'Menge (ml)', 'Max. Druck (bar)', 'Brühgruppe (°C)', 'Live erfasst',
+    const rows = [['Nr', 'Ende', 'Bezugszeit (s)', 'Vorbrühen (s)', 'Gesamt (s)', 'Erster Tropfen (s)', 'Gewicht (g)', 'Menge (ml)', 'Max. Druck (bar)', 'Brühgruppe (°C)', 'Live erfasst',
       'Dosis (g)', 'Verhältnis 1:', 'Rezept Mühle', 'Skript', 'Bohne', 'Mahlgrad', 'Bewertung', 'Geschmack', 'Stärke', 'Notiz']];
     for (const s of this.listedShots()) {
       const n = s.notes || {};
       const yieldG = n.yieldG ?? s.weight;
-      const ratio = s.dose?.g && yieldG ? Math.round((yieldG / s.dose.g) * 10) / 10 : null;
-      rows.push([s.no ?? '', s.endedAt, cell(s.timeMs ? Math.round(s.timeMs / 100) / 10 : null), cell(s.weight), cell(s.volumeMl), cell(s.maxPressure), cell(s.groupTemp), s.estimated ? 'nein' : 'ja',
-        cell(s.dose?.g), cell(ratio), s.dose?.recipe ?? '', text(s.script?.title), text(n.bean), text(n.grind), n.rating ?? '', TASTE[n.taste] ?? '', STRENGTH[n.strength] ?? '', text(n.text)]);
+      const doseG = n.doseG ?? s.dose?.g ?? s.doseDefaultG ?? null;
+      const ratio = doseG && yieldG ? Math.round((yieldG / doseG) * 10) / 10 : null;
+      const ph = shotPhases(s);
+      const sec = (ms) => (ms ? Math.round(ms / 100) / 10 : null);
+      rows.push([s.no ?? '', s.endedAt, cell(sec(ph.brewMs)), cell(sec(ph.preMs)), cell(sec(s.timeMs)), cell(sec(ph.firstDropMs)), cell(s.weight), cell(s.volumeMl), cell(s.maxPressure), cell(s.groupTemp), s.estimated ? 'nein' : 'ja',
+        cell(doseG), cell(ratio), s.dose?.recipe ?? '', text(s.script?.title), text(n.bean), text(n.grind), n.rating ?? '', TASTE[n.taste] ?? '', STRENGTH[n.strength] ?? '', text(n.text)]);
     }
     return '﻿' + rows.map((r) => r.join(';')).join('\r\n') + '\r\n';
   }

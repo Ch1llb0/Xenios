@@ -296,8 +296,8 @@ test('Bezugs-Protokoll: nachträglich erkannte Bezüge, CSV, bleibt nach Neustar
   r = await fetch(`${base}/api/shots.csv`, { headers: { Cookie: cookie } });
   assert.equal(r.status, 200);
   const csv = await r.text();
-  assert.match(csv, /Nr;Ende;Dauer/);
-  assert.match(csv, /;27,5;36,2;/);
+  assert.match(csv, /Nr;Ende;Bezugszeit \(s\);Vorbrühen \(s\);Gesamt \(s\);Erster Tropfen \(s\)/);
+  assert.match(csv, /;27,5;;27,5;;36,2;/, 'nachträglich erkannt: ohne Kurve gilt die Gesamtzeit');
   // Neustart: Protokoll aus der Datei, letzter Bezug sofort sichtbar
   m.history.flush();
   const { Machine } = await import('../src/machine.js');

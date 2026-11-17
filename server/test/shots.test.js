@@ -135,4 +135,16 @@ test('Mindestdauer einstellbar: kürzere Bezüge werden weder protokolliert noch
   m._applyLive(diag(1, 12000));
   assert.equal(m.history.data.shots.length, 4);
   assert.throws(() => m.setShotSettings({ minShotS: 99 }), /zwischen/);
+  // Standard-Dosis: wird neuen Bezügen mitgegeben, Mindestdauer bleibt
+  m.setShotSettings({ defaultDoseG: 18 });
+  assert.equal(m.shotSettings().defaultDoseG, 18);
+  assert.equal(m.shotSettings().minShotS, 10);
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 15000));
+  const last = m.history.data.shots[0];
+  assert.equal(last.doseDefaultG, 18);
+  assert.equal(last.brewMs, 15000, 'ohne Vorbrühen: Bezugszeit = Gesamtzeit');
+  assert.throws(() => m.setShotSettings({ defaultDoseG: 99 }), /Standard-Dosis/);
+  m.setShotSettings({ defaultDoseG: null });
+  assert.equal(m.shotSettings().defaultDoseG, null);
 });

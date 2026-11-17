@@ -112,10 +112,12 @@ export function sparkline(curve, { height = 64 } = {}) {
   );
 }
 
-export function ring(progress, label) {
+export function ring(progress, label, sub = null) {
   const c = 2 * Math.PI * 40;
   const fg = h('circle', { cx: 48, cy: 48, r: 40, class: 'fg', 'stroke-dasharray': c.toFixed(1), 'stroke-dashoffset': (c * (1 - Math.min(1, progress))).toFixed(1) });
-  return h('svg', { class: 'ring', viewBox: '0 0 96 96' }, h('circle', { cx: 48, cy: 48, r: 40, class: 'bg' }), fg, h('text', { x: 48, y: 48 }, label));
+  // optional kleine zweite Zeile (z. B. „Vorbrühen“)
+  return h('svg', { class: 'ring', viewBox: '0 0 96 96' }, h('circle', { cx: 48, cy: 48, r: 40, class: 'bg' }), fg,
+    h('text', { x: 48, y: sub ? 43 : 48 }, label), sub ? h('text', { x: 48, y: 63, class: 'sub' }, sub) : null);
 }
 
 // Bezugskurve mit Achsen: Druck (bar, links) und Gewicht (g, rechts) über die Bezugszeit.

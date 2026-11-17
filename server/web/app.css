@@ -277,6 +277,7 @@ input[type="range"]::-moz-range-thumb { width: 4px; height: 32px; border: 0; bor
 .ring .bg { stroke: var(--secondary-container); }
 .ring .fg { stroke: var(--primary); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .9s linear; }
 .ring text { fill: var(--on-surface); font-size: 20px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.ring text.sub { fill: var(--on-surface-variant); font-size: 11px; font-weight: 500; }
 .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .kpi { background: var(--surface-container-low); border-radius: var(--radius-m); padding: 8px 10px; }
 .kpi .k { font-size: 11px; color: var(--on-surface-variant); }

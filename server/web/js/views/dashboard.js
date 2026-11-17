@@ -9,7 +9,7 @@ import { navigate, setTopActions, localStorageGet, localStorageSet } from '../ap
 import { liveHistory, SERIES } from '../live.js';
 import { TYPE_DE, TRIGGER_DE } from './grinder.js';
 import { ALERT_TEXT } from '../../shared/grinder-core.js';
-import { shotMetrics, scriptDuration } from '../../shared/shot-analysis.js';
+import { shotMetrics, scriptDuration, brewSeconds, liveTimes } from '../../shared/shot-analysis.js';
 
 // w: Spalten (0 = ganze Breite), h: Höhe in Zellen
 // Reihenfolge = Standardanordnung. Bei vier Spalten: Status | Instrumente (3 Spalten), darunter Schalter,
@@ -370,13 +370,15 @@ function shotTile({ wide, h: rows }) {
       const recent = !running && ls?.endedAt && !ls.estimated && Date.now() - Date.parse(ls.endedAt) < FINISHED_MS;
       if (!running && !recent) return { hidden: true };
       const curve = running ? m.shot.curve : ls.curve;
-      const secs = running ? (m.shot.timeMs || 0) / 1000 : (ls.timeMs || 0) / 1000;
+      // Bezugszeit wie an der Xenia: ohne Vorbrühen; während des Vorbrühens dessen Dauer
+      const lt = running ? liveTimes(m.shot) : null;
+      const secs = running ? (lt.pre ? lt.preS : lt.brewS) : (brewSeconds(ls) || 0);
       chart.replaceChildren(shotChart(curve, { live: running, width: wide ? 560 : 320, height: Math.max(140, (wide ? 220 : 160) + extraH(rows) - CELL) }));
       const p = running ? m.pressure.pump : ls.maxPressure;
       const w = running ? m.scale.weight : ls.weight;
       const flow = running ? (m.scale.rate || m.flow.rate) : null;
       side.replaceChildren(
-        ring(secs / 30, `${fmt(secs, 0)} s`),
+        ring(lt?.pre ? 0 : secs / 30, `${fmt(secs, 0)} s`, lt?.pre ? 'Vorbrühen' : null),
         h('div', { class: 'dash-kpis' },
           kpi(running ? 'Druck' : 'Max. Druck', fmt(p), 'bar', 'pu'),
           kpi('Gewicht', w ? fmt(w) : running ? fmt(0) : '–', 'g', 'w'),
@@ -587,7 +589,7 @@ function lastShotTile({ wide, h: rows }) {
       const ratio = met.ratio;
       const amount = met.yieldG ? [fmt(met.yieldG), 'g'] : ls.volumeMl ? [fmt(ls.volumeMl, 0), 'ml'] : ['–', ''];
       box.replaceChildren(
-        h('div', { class: 'dash-kpis' }, kpi('Zeit', fmt(ls.timeMs / 1000), 's'), kpi('Menge', amount[0], amount[1], 'w'),
+        h('div', { class: 'dash-kpis' }, kpi('Zeit', fmt(met.timeS), 's'), kpi('Menge', amount[0], amount[1], 'w'),
           ratio ? kpi('Verhältnis', `1:${fmt(ratio)}`, '') : kpi('Max. Druck', fmt(ls.maxPressure), 'bar', 'pu')),
         ls.curve?.length > 1 ? shotChart(ls.curve, { width: wide ? 560 : 320, height: (wide ? 160 : 130) + extraH(rows), minSeconds: 20 }) : h('p', { class: 'muted small' }, 'Keine Kurve (Bezug nachträglich erkannt)'));
       return { extra: `${ls.notes?.rating ? `${'★'.repeat(ls.notes.rating)} · ` : ''}${ago(ls.endedAt)}${ls.estimated ? ' · nachträglich' : ''}` };
@@ -655,14 +657,14 @@ function shotTimesTile() {
   return {
     body: box,
     update({ shots }) {
-      const list = shots.filter((s) => !s.estimated && s.timeMs > 0).slice(0, 12).reverse();
+      const list = shots.filter((s) => !s.estimated && brewSeconds(s) > 0).slice(0, 12).reverse();
       if (!list.length) {
         box.replaceChildren(h('div', { class: 'empty' }, 'Noch keine Bezüge mit Zeit'));
         return {};
       }
-      const avg = list.reduce((a, s) => a + s.timeMs, 0) / list.length / 1000;
+      const avg = list.reduce((a, s) => a + brewSeconds(s), 0) / list.length;
       box.replaceChildren(barChart(list.map((s, i) => ({
-        value: s.timeMs / 1000,
+        value: brewSeconds(s),
         label: new Date(s.endedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
         cls: i === list.length - 1 ? 'now' : '',
       })), { unit: 's' }));

@@ -280,21 +280,28 @@ export function shotFilterCard() {
     try {
       const st = await api('/api/shots/settings');
       let value = st.minShotS;
+      let dose = st.defaultDoseG ?? null;
       const save = h('button', { class: 'btn filled wide', disabled: true, onclick: async () => {
         save.disabled = true;
         try {
-          const r = await api('/api/shots/settings', { method: 'PUT', body: { minShotS: value } });
+          const r = await api('/api/shots/settings', { method: 'PUT', body: { minShotS: value, defaultDoseG: dose } });
           value = r.minShotS;
-          snackbar(value ? `Bezüge unter ${value} s werden aussortiert` : 'Alle Bezüge werden gelistet');
+          dose = r.defaultDoseG;
+          snackbar('Aufzeichnung gespeichert');
         } catch (e) {
           snackbar(e.message);
           save.disabled = false;
         }
       } }, 'Speichern');
+      const doseInput = h('input', { type: 'number', class: 'text', min: 3, max: 40, step: 0.1, inputmode: 'decimal', placeholder: 'keine', value: dose ?? '', 'aria-label': 'Standard-Dosis in Gramm',
+        oninput: () => { const v = doseInput.value.trim().replace(',', '.'); dose = v === '' ? null : Number(v); save.disabled = false; } });
       box.replaceChildren(
         h('h3', {}, 'Kurze Bezüge aussortieren'),
         h('p', { class: 'muted small' }, `Pumpvorgänge kürzer als die Mindestdauer (Backflush, Spülen, Fehler) werden nicht protokolliert und nicht gelistet. Bewertete Bezüge bleiben sichtbar. Standard: ${st.defaultMinShotS} s.`),
         sliderRow({ label: 'Mindestdauer', min: st.limits.min, max: st.limits.max, step: 1, value, unit: 's', digits: 0, onInput: (v) => { value = v; save.disabled = false; } }),
+        h('h3', { style: { 'margin-top': '16px' } }, 'Standard-Dosis'),
+        h('p', { class: 'muted small' }, 'Die Waage misst nur die Ausbeute in der Tasse. Ohne angebundene Mühle gilt diese Dosis für neue Bezüge, damit das Verhältnis berechnet wird. Am einzelnen Bezug lässt sie sich überschreiben. Leer = keine.'),
+        h('div', { class: 'field-row' }, h('label', { class: 'grow' }, 'Dosis (g)'), doseInput),
         save);
     } catch (e) {
       box.replaceChildren(h('div', { class: 'muted small' }, e.message));

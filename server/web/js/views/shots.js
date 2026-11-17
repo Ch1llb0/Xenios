@@ -4,7 +4,7 @@ import { h, icon, fmt, fmtInt, snackbar, sheet, confirmDialog } from '../ui.js';
 import { api, store, subscribe, hasPaddle } from '../api.js';
 import { setTopActions, navigate } from '../app.js';
 import { isHidden } from '../prefs.js';
-import { shotMetrics, dialIn } from '../../shared/shot-analysis.js';
+import { shotMetrics, dialIn, brewSeconds } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
 import { openShot, quickRate, adviceNote } from './shot-detail.js';
 
@@ -111,7 +111,7 @@ export function shotsView(root) {
       const v = recent.map(f).filter((x) => Number.isFinite(x) && x > 0);
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
     };
-    const avgTime = avg((s) => s.timeMs);
+    const avgTime = avg((s) => (brewSeconds(s) || 0) * 1000); // Bezugszeit ohne Vorbrühen
     const avgRatio = avg((s) => shotMetrics(s).ratio);
 
     const beans = data.beans?.length ? data.beans : [...new Set(shots.map((s) => s.notes?.bean).filter(Boolean))].map((n) => ({ name: n }));
@@ -209,7 +209,7 @@ export function shotsView(root) {
     return h('button', { class: 'list-item clickable as-button shot-item', type: 'button', onclick: () => openShot(s.id, { onChange: load }) },
       h('span', { class: 'lead' }, icon(n.reference ? 'check' : 'coffee')),
       h('div', { class: 'grow' },
-        h('div', { class: 'title' }, `${time} · ${s.timeMs ? `${fmt(s.timeMs / 1000)} s` : '–'} · ${amount}${m.ratio ? ` · 1:${fmt(m.ratio)}` : ''}`),
+        h('div', { class: 'title' }, `${time} · ${m.timeS ? `${fmt(m.timeS)} s` : '–'} · ${amount}${m.ratio ? ` · 1:${fmt(m.ratio)}` : ''}`),
         h('div', { class: 'sub' },
           [s.maxPressure ? `max. ${fmt(s.maxPressure)} bar` : null, m.doseG ? `${fmt(m.doseG)} g Dosis` : null, s.script?.title || null, n.bean || null, s.no ? `Nr. ${fmtInt(s.no)}` : null].filter(Boolean).join(' · '),
           n.rating ? h('span', { class: 'mini-stars', 'aria-label': `${n.rating} Sterne` }, ` ${'★'.repeat(n.rating)}`) : null,

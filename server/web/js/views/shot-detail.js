@@ -135,16 +135,17 @@ function paint(root, d, close, onChange) {
   function paintFacts() {
     const m = shotMetrics(shot);
     const k = (label, v, unit = '') => h('div', { class: 'kpi' }, h('div', { class: 'k' }, label), h('div', { class: 'v' }, v ?? '–', v !== null && v !== undefined && unit ? h('span', { class: 'muted small' }, ` ${unit}`) : null));
-    kpiBox.replaceChildren(
-      k('Zeit', m.timeS !== null ? fmt(m.timeS) : null, 's'),
+    kpiBox.replaceChildren(...[
+      k('Bezugszeit', m.timeS !== null ? fmt(m.timeS) : null, 's'), // ohne Vorbrühen, wie an der Xenia
       k('Ausbeute', m.yieldG !== null ? fmt(m.yieldG) : null, 'g'),
-      k('Dosis', m.doseG !== null ? fmt(m.doseG) : null, 'g'),
+      k(m.doseAssumed ? 'Dosis (Standard)' : 'Dosis', m.doseG !== null ? fmt(m.doseG) : null, 'g'),
       k('Verhältnis', m.ratio !== null ? `1:${fmt(m.ratio)}` : null),
       k('Vorbrühen', m.preinfusionS !== null ? fmt(m.preinfusionS) : null, 's'),
+      m.preinfusionS !== null ? k('Gesamt', m.totalS !== null ? fmt(m.totalS) : null, 's') : null,
       k('Erster Tropfen', m.firstDropS !== null ? fmt(m.firstDropS) : null, 's'),
       k('Ø Druck', m.avgPressure !== null ? fmt(m.avgPressure) : null, 'bar'),
       k('Max. Druck', m.maxPressure !== null ? fmt(m.maxPressure) : null, 'bar'),
-      k('Ø Fluss', m.avgFlow !== null ? fmt(m.avgFlow) : null, 'g/s'));
+      k('Ø Fluss', m.avgFlow !== null ? fmt(m.avgFlow) : null, 'g/s')].filter(Boolean));
     const g = shot.dose;
     grindBox.replaceChildren(g
       ? h('div', { class: 'row' }, icon('grinder', 's20'),
