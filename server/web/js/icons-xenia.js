@@ -15,3 +15,15 @@ XENIA_ICONS.toggleTile = { vb: '0 0 16 16', els: [
   ['path', { d: 'M5 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0 1A5 5 0 1 0 5 3a5 5 0 0 0 0 10z' }],
   ['path', { 'fill-rule': 'evenodd', d: 'M9 11c.628-.836 1-1.874 1-3a4.978 4.978 0 0 0-1-3h4a3 3 0 1 1 0 6H9zm1.657-5H13a2 2 0 1 1 0 4h-2.343A5.98 5.98 0 0 0 11 8a5.98 5.98 0 0 0-.343-2z' }],
 ] };
+
+// Kalender mit Säulen für die Kachel „Bezüge pro Tag“ (Umriss wie die übrigen Kachel-Symbole)
+XENIA_ICONS.calendarBars = { vb: '0 0 16 16', els: [
+  ['path', { d: 'M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z' }],
+  ['path', { d: 'M3.5 11h1.5v2h-1.5zm2.75-3h1.5v5h-1.5zm2.75 1.5h1.5V13H9zm2.75-3h1.5V13h-1.5z' }],
+] };
+
+// Tasse als Umriss für die untere Leiste (passend zu den übrigen Leisten-Symbolen)
+XENIA_ICONS.coffeeLine = { vb: '0 0 16 16', els: [
+  ['path', { 'fill-rule': 'evenodd', d: 'M2.5 2.5h9V8A3.5 3.5 0 0 1 8 11.5H6A3.5 3.5 0 0 1 2.5 8V2.5zm1 1V8A2.5 2.5 0 0 0 6 10.5h2A2.5 2.5 0 0 0 10.5 8V3.5h-7z' }],
+  ['path', { d: 'M11.5 4h1a2 2 0 0 1 0 4h-1V7h1a1 1 0 0 0 0-2h-1V4zM2 12.5h11a.5.5 0 0 1 0 1H2a.5.5 0 0 1 0-1z' }],
+] };

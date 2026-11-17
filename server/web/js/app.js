@@ -17,9 +17,9 @@ import { hiddenTabs, onPrefs, powerOnBody } from './prefs.js';
 const ROUTES = [
   // Home ist das Dashboard (frühere eigene Startseite entfällt; /dashboard leitet hierher)
   { path: '/', label: 'Home', icon: 'home', view: dashboardView, title: 'Xenios', wide: true },
-  { path: '/bezuege', label: 'Bezüge', icon: 'coffee', view: shotsView, title: 'Bezüge' },
+  { path: '/bezuege', label: 'Bezüge', icon: 'coffeeLine', view: shotsView, title: 'Bezüge' },
   { path: '/skripte', label: 'Skripte', icon: 'list', view: scriptsView, title: 'Skripte' },
-  { path: '/steuerung', label: 'Schalter', icon: 'toggle', view: controlsView, title: 'Schalter', feature: 'settings' },
+  { path: '/steuerung', label: 'Schalter', icon: 'toggleTile', view: controlsView, title: 'Schalter', feature: 'settings' },
   { path: '/paddle', label: 'Paddle', icon: 'speed', view: paddleView, title: 'Paddle', feature: 'paddle' },
   { path: '/timer', label: 'Timer', icon: 'event', view: timerView, title: 'Timer' },
   { path: '/muehle', label: 'Mühle', icon: 'grinder', view: grinderView, title: 'Mühle' },
