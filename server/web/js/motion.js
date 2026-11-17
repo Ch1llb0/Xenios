@@ -112,8 +112,46 @@ let enterView = null;
 let enterUntil = 0;
 let enterSettle = 0;
 let enterDy = 24;
+// Nach der Ladephase: Kacheln und Listen zeichnen sich bei jeder Statusmeldung neu. Ein neu eingefügtes Element
+// gilt nur dann als „erscheint“, wenn es kein gleichartiges entferntes Gegenstück gibt (erst gleiche Art und
+// gleicher Text, dann gleiche Art). So blenden z. B. neue Abzeichen, Zeilen oder Listeneinträge ein, beim
+// unveränderten Neuzeichnen bewegt sich nichts.
+const sig = (el) => `${el.tagName}.${el.getAttribute('class') || ''}`;
+const txt = (el) => (el.textContent || '').trim().slice(0, 80);
+function appeared(records) {
+  if (reduced()) return;
+  for (const r of records) {
+    if (r.type !== 'childList' || !r.addedNodes.length) continue;
+    const added = [...r.addedNodes].filter((n) => n instanceof Element);
+    if (!added.length) continue;
+    const removed = [...r.removedNodes].filter((n) => n instanceof Element);
+    const exact = new Map();
+    const loose = new Map();
+    for (const el of removed) {
+      const k = `${sig(el)}|${txt(el)}`;
+      exact.set(k, (exact.get(k) || 0) + 1);
+      loose.set(sig(el), (loose.get(sig(el)) || 0) + 1);
+    }
+    const fresh = [];
+    for (const el of added) {
+      const k = `${sig(el)}|${txt(el)}`;
+      if (exact.get(k)) { exact.set(k, exact.get(k) - 1); loose.set(sig(el), loose.get(sig(el)) - 1); } else fresh.push(el);
+    }
+    for (const el of fresh) {
+      if (loose.get(sig(el)) > 0) { loose.set(sig(el), loose.get(sig(el)) - 1); continue; } // nur geänderter Inhalt
+      if (!(el instanceof HTMLElement) || typeof el.animate !== 'function' || el.closest('[data-noanim]')) continue;
+      if (!el.isConnected || el.hidden || el.getClientRects().length === 0) continue;
+      // Effekte mit eigener Animation (Tipp-Welle, Spinner …) nicht anfassen
+      if (el.classList.contains('ripple') || el.getAnimations?.().length) continue;
+      el.animate([{ opacity: 0, transform: 'translateY(-4px) scale(.98)' }, { transform: 'none' }], // Ziel: eigene Deckkraft
+        { duration: 220, easing: 'cubic-bezier(.2, 0, 0, 1)' });
+    }
+  }
+}
+
 const observer = typeof MutationObserver === 'function' ? new MutationObserver((records) => {
-  if (performance.now() > enterUntil || reduced()) return;
+  if (performance.now() > enterUntil) { appeared(records); return; }
+  if (reduced()) return;
   let n = 0;
   for (const r of records) {
     for (const node of r.addedNodes) {
