@@ -32,7 +32,7 @@ function listTab(root) {
   let tools = null;
   if (features.scriptEditor) {
     const fileInput = h('input', { type: 'file', accept: '.script,application/json,text/plain', hidden: true, onchange: () => importFile(fileInput) });
-    tools = h('div', { class: 'list', style: { 'margin-bottom': '12px' } },
+    tools = h('div', { class: 'list' },
       entry('add', 'Skript erstellen', 'Schritte selbst zusammenstellen', () => navigate('/skripte/neu')),
       entry('profile', 'Druckprofil erstellen', 'Vorbrühen, Hauptdruck und Abfall per Regler', () => navigate('/skripte/profil')),
       directMode ? null : entry('explore', 'Profile entdecken', 'Bewährte Profile von visualizer.coffee übernehmen', () => navigate('/skripte/entdecken')),
@@ -60,8 +60,8 @@ function listTab(root) {
     h('div', { style: { height: '12px' } }),
     stopBtn,
     gbsBox,
+    tools ? h('div', { style: { 'margin-top': '16px' } }, tools) : null,
     h('div', { class: 'section-title with-action' }, h('span', {}, 'Alle Skripte'), sortBtn),
-    tools,
     listEl,
   );
 
