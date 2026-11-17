@@ -3,7 +3,7 @@ import { pageEnter } from './motion.js'; // zuerst: animiertes Ein- und Ausblend
 import { h, icon, snackbar, closeTopOverlay } from './ui.js';
 import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode, hasGrinder, hasPaddle } from './api.js';
 import { dashboardView } from './views/dashboard.js';
-import { scriptsView } from './views/scripts.js';
+import { scriptsView, scriptNewView, scriptEditView, profileBuilderView, discoverView } from './views/scripts.js';
 import { controlsView, paddleView } from './views/controls.js';
 import { shotsView } from './views/shots.js';
 import { timerView } from './views/timer.js';
@@ -26,6 +26,10 @@ const ROUTES = [
   // Einstellungen: immer in der Leiste, lässt sich nicht ausblenden
   { path: '/einstellungen', label: 'Einstellungen', icon: 'settings', view: settingsView, title: 'Einstellungen', fixed: true },
   { path: '/einstellungen/maschine', label: 'Maschine', icon: 'settings', view: machineSettingsView, title: 'Maschinen-Einstellungen', nav: false, back: '/einstellungen' },
+  { path: '/skripte/neu', label: 'Skript erstellen', icon: 'add', view: scriptNewView, title: 'Skript erstellen', nav: false, back: '/skripte' },
+  { path: '/skripte/bearbeiten', label: 'Skript bearbeiten', icon: 'edit', view: scriptEditView, title: 'Skript bearbeiten', nav: false, back: '/skripte' },
+  { path: '/skripte/profil', label: 'Druckprofil erstellen', icon: 'profile', view: profileBuilderView, title: 'Druckprofil erstellen', nav: false, back: '/skripte' },
+  { path: '/skripte/entdecken', label: 'Profile entdecken', icon: 'explore', view: discoverView, title: 'Profile entdecken', nav: false, back: '/skripte' },
   { path: '/server', label: 'Server', icon: 'shield', view: serverView, title: 'Server- & App-Einstellungen', nav: false, back: '/einstellungen' },
 ];
 

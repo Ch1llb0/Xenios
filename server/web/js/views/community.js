@@ -6,8 +6,8 @@ import { shotChart } from '../gauge.js';
 
 const SUGGEST = ['Blooming', 'Londinium', 'Adaptive', 'Allongé', 'Extractamundo', 'Gentle', 'Cremina', 'Turbo'];
 
-export function openCommunity(onImported) {
-  fullscreen((root, close) => {
+export function openCommunity(onImported, host = fullscreen) {
+  host((root, close) => {
     const details = new Map(); // ID → Promise des umgerechneten Profils
     let page = 1;
     let busy = false;
@@ -102,7 +102,8 @@ export function openCommunity(onImported) {
     }
 
     root.append(
-      h('div', { class: 'row', style: { margin: '4px 0 12px' } },
+      // Als Unterseite stehen Titel und Zurück-Pfeil schon in der Kopfzeile
+      host.page ? null : h('div', { class: 'row', style: { margin: '4px 0 12px' } },
         h('div', { class: 'grow' }, h('strong', {}, 'Profile entdecken')),
         h('button', { class: 'btn grey', onclick: close }, 'Schließen')),
       h('form', { class: 'card community-search', onsubmit: (e) => { e.preventDefault(); search(1); } },
