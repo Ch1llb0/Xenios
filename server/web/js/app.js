@@ -177,7 +177,14 @@ function buildNav() {
   old.className = cls;
   const vertical = getComputedStyle(old).flexDirection.startsWith('column'); // linke Navigationsliste (breite Xenia-Ansicht)
   const prop = vertical ? 'maxHeight' : 'maxWidth';
-  const size = (b) => `${vertical ? b.offsetHeight : b.offsetWidth}px`;
+  // Größe samt Innenabstand: sonst bleibt der Eintrag beim Schrumpfen am Innenabstand hängen und springt dann
+  const pads = vertical ? ['paddingTop', 'paddingBottom'] : ['paddingLeft', 'paddingRight'];
+  const minProp = vertical ? 'minHeight' : 'minWidth';
+  const full = (b) => {
+    const cs = getComputedStyle(b);
+    return { [prop]: `${vertical ? b.offsetHeight : b.offsetWidth}px`, [pads[0]]: cs[pads[0]], [pads[1]]: cs[pads[1]], [minProp]: '0px', boxSizing: 'border-box' };
+  };
+  const none = { [prop]: '0px', [pads[0]]: '0px', [pads[1]]: '0px', [minProp]: '0px', boxSizing: 'border-box' };
   const ease = { duration: 280, easing: 'cubic-bezier(.2, 0, 0, 1)' };
   const keep = new Map([...old.children].filter((b) => !b.__leaving).map((b) => [b.dataset.path, b]));
   const want = new Set(routes.map((r) => r.path));
@@ -186,7 +193,7 @@ function buildNav() {
     b.__leaving = true;
     b.style.pointerEvents = 'none';
     b.style.overflow = 'hidden';
-    const a = b.animate([{ [prop]: size(b), opacity: 1 }, { [prop]: '0px', opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }], { ...ease, fill: 'forwards' });
+    const a = b.animate([{ ...full(b), opacity: 1 }, { ...none, opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }], { ...ease, fill: 'forwards' });
     a.onfinish = () => b.remove();
   }
   // Bleibende Einträge nicht umstellen (sonst wandert ein wegfallender ans Ende); neue vor dem nächsten bleibenden einfügen
@@ -196,7 +203,7 @@ function buildNav() {
     const next = routes.slice(i + 1).map((x) => keep.get(x.path)).find(Boolean);
     old.insertBefore(b, next || null);
     b.style.overflow = 'hidden';
-    const a = b.animate([{ [prop]: '0px', opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }, { [prop]: size(b), opacity: 1 }], ease);
+    const a = b.animate([{ ...none, opacity: 0, transform: vertical ? 'translateX(-12px)' : 'translateY(12px)' }, { ...full(b), opacity: 1 }], ease);
     a.onfinish = () => { b.style.overflow = ''; };
   });
   markNav();
