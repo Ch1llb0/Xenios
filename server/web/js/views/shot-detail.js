@@ -7,6 +7,7 @@ import { shotChart } from '../gauge.js';
 import { targetCurve, shotMetrics, STRENGTH } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
 import { TYPE_DE } from './grinder.js';
+import { navigate } from '../app.js';
 
 const ADVICE_ICON = { finer: 'tune', coarser: 'tune', keep: 'check', longer: 'scale', shorter: 'scale', puck: 'warn' };
 const TASTE_SHORT = { sour: 'sauer', balanced: 'ausgewogen', bitter: 'bitter' };
@@ -73,25 +74,35 @@ function choice(options, value, onPick, cls = '') {
   return box;
 }
 
-export function openShot(id, { onChange } = {}) {
-  return fullscreen(async (root, close) => {
-    root.replaceChildren(head(close, 'Bezug'), h('div', { class: 'empty' }, h('span', { class: 'spinner' }), ' Lade …'));
+export function openShot(id, { onChange, host = fullscreen } = {}) {
+  const page = Boolean(host.page);
+  return host(async (root, close) => {
+    root.replaceChildren(head(close, 'Bezug', null, page), h('div', { class: 'empty' }, h('span', { class: 'spinner' }), ' Lade …'));
     try {
       const d = await api(`/api/shots/${encodeURIComponent(id)}`);
-      paint(root, d, close, onChange);
+      paint(root, d, close, onChange, page);
     } catch (e) {
-      root.replaceChildren(head(close, 'Bezug'), h('div', { class: 'empty' }, e.message));
+      root.replaceChildren(head(close, 'Bezug', null, page), h('div', { class: 'empty' }, e.message));
     }
   });
 }
 
-function head(close, title, sub = null) {
+// Als Unterseite steht der Zurück-Pfeil schon in der Kopfzeile: dann nur Datum und Kurzinfo
+function head(close, title, sub = null, page = false) {
   return h('div', { class: 'row detail-head' },
-    h('button', { class: 'icon-btn', 'aria-label': 'Zurück', onclick: close }, icon('left')),
+    page ? null : h('button', { class: 'icon-btn', 'aria-label': 'Zurück', onclick: close }, icon('left')),
     h('div', { class: 'grow' }, h('div', { class: 'title' }, title), sub ? h('div', { class: 'small muted' }, sub) : null));
 }
 
-function paint(root, d, close, onChange) {
+// Unterseite „Bezug“ (/bezuege/bezug?id=…): Zurück-Pfeil, Zurück-Taste, Animation und Scrollposition wie überall
+export function shotPageView(root) {
+  const id = new URLSearchParams(location.search).get('id');
+  const host = (build) => build(root, () => navigate('/bezuege', { replace: true }));
+  host.page = true;
+  openShot(id, { host });
+}
+
+function paint(root, d, close, onChange, page = false) {
   let shot = d.shot;
   let advice = d.advice;
   const show = { compare: true, reference: true, target: true };
@@ -196,7 +207,7 @@ function paint(root, d, close, onChange) {
   } }, icon('check', 's18'), 'Speichern');
 
   root.replaceChildren(
-    head(close, title, sub),
+    head(close, title, sub, page),
     h('div', { class: 'stagger detail' },
       h('section', { class: 'card' }, chartBox, legend),
       kpiBox,
@@ -265,7 +276,7 @@ export async function quickRate(id, { taste = null, onChange } = {}) {
       body.replaceChildren(
         adviceNote(r.advice, shot.dose?.recipe) || h('p', { class: 'muted' }, 'Gespeichert.'),
         h('div', { class: 'row quick-actions' },
-          h('button', { class: 'btn text', onclick: () => { close(); openShot(shot.id, { onChange }); } }, 'Details'),
+          h('button', { class: 'btn text', onclick: () => { close(); navigate(`/bezuege/bezug?id=${encodeURIComponent(shot.id)}`); } }, 'Details'),
           h('span', { class: 'grow' }),
           h('button', { class: 'btn filled', onclick: close }, 'Fertig')));
     } catch (e) {

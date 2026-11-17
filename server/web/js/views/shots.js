@@ -6,7 +6,7 @@ import { navigate } from '../app.js';
 import { isHidden } from '../prefs.js';
 import { shotMetrics, dialIn, brewSeconds } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
-import { openShot, quickRate, adviceNote } from './shot-detail.js';
+import { quickRate, adviceNote } from './shot-detail.js';
 
 // Backflush starten (direkte Pumpensteuerung, auch aus dem Skripte-Tab): erst nachfragen, dann mit Stopp in der Meldung.
 // Er trägt sich nach dem Lauf selbst als erledigt ein.
@@ -209,7 +209,7 @@ export function shotsView(root) {
     const m = shotMetrics(s);
     const amount = m.yieldG ? `${fmt(m.yieldG)} g` : s.volumeMl ? `${fmt(s.volumeMl, 0)} ml` : '–';
     const n = s.notes || {};
-    return h('button', { class: 'list-item clickable as-button shot-item', type: 'button', onclick: () => openShot(s.id, { onChange: load }) },
+    return h('button', { class: 'list-item clickable as-button shot-item', type: 'button', onclick: () => navigate(`/bezuege/bezug?id=${encodeURIComponent(s.id)}`) },
       h('span', { class: 'lead' }, icon(n.reference ? 'check' : 'coffeeLine')),
       h('div', { class: 'grow' },
         h('div', { class: 'title' }, `${time} · ${m.timeS ? `${fmt(m.timeS)} s` : '–'} · ${amount}${m.ratio ? ` · 1:${fmt(m.ratio)}` : ''}`),
