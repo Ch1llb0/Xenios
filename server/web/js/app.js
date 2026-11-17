@@ -232,6 +232,29 @@ window.xeniosBack = () => {
   return false;
 };
 
+// Titel der Kopfzeile überblenden (z. B. „Bezüge“ ↔ „Bezug“): alter und neuer Titel liegen übereinander,
+// der alte blendet aus, der neue ein
+function setTitle(text) {
+  const el = $('title');
+  if (el.dataset.text === text) return;
+  el.dataset.text = text;
+  const now = h('span', { class: 'tt' }, text);
+  const old = [...el.childNodes];
+  el.append(now);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || !old.some((n) => n.textContent.trim())) {
+    old.forEach((n) => n.remove());
+    return;
+  }
+  const ease = { duration: 240, easing: 'cubic-bezier(.2, 0, 0, 1)' };
+  for (const n of old) {
+    if (!(n instanceof HTMLElement)) { n.remove(); continue; }
+    n.getAnimations().forEach((a) => a.cancel());
+    const a = n.animate([{ opacity: 1 }, { opacity: 0 }], { ...ease, fill: 'forwards' });
+    a.onfinish = () => n.remove();
+  }
+  now.animate([{ opacity: 0 }, { opacity: 1 }], ease);
+}
+
 export function navigate(path, { replace = false } = {}) {
   if (location.pathname !== path) history[replace ? 'replaceState' : 'pushState']({}, '', path);
   render();
@@ -264,7 +287,7 @@ function render() {
   $('app').classList.toggle('wide', Boolean(route.wide));
   setTopActions();
   setTabs(null);
-  $('title').textContent = route.title;
+  setTitle(route.title);
   // Zurück-Pfeil weich ein-/ausblenden (Breite), damit der Titel nicht springt
   $('back-btn').classList.toggle('gone', !route.back);
   $('back-btn').onclick = () => navigate(route.back);

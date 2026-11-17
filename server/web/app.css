@@ -1116,3 +1116,7 @@ html.in-app, html.in-app body { touch-action: pan-x pan-y; }
 
 /* Links als Listeneintrag (z. B. CSV-Export) wie Knöpfe darstellen */
 a.list-item { text-decoration: none; color: inherit; }
+
+/* Titel-Überblendung: alter und neuer Titel in derselben Rasterzelle übereinander */
+.topbar-title { display: grid; min-width: 0; }
+.topbar-title > .tt { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
