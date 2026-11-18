@@ -86,6 +86,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
     private val bold: Typeface = Typeface.create("sans-serif", Typeface.BOLD)
 
     fun px(dp: Float) = dp * s
+    // Hinweis: bei Farbverläufen (shader) muss die Farbe deckend sein – Android übernimmt ihre Deckkraft für den Verlauf
     private fun fill(color: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; this.color = color }
     private fun stroke(color: Int, wDp: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; this.color = color; strokeWidth = px(wDp); strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
 
@@ -274,7 +275,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
         val (ccx, ccy) = P(100.0, 100.0)
         if (t.mano) {
             // Chromring, Lippe, Zifferblatt
-            val bez = fill(0).apply {
+            val bez = fill(0xFF000000.toInt()).apply {
                 shader = LinearGradient(px(ccx - 98 * u), px(ccy - 98 * u), px(ccx + 98 * u), px(ccy + 98 * u),
                     intArrayOf(0xFFFFFFFF.toInt(), 0xFFB9BCC0.toInt(), 0xFFF4F5F6.toInt(), 0xFF8D9196.toInt(), 0xFFE9EBED.toInt()),
                     floatArrayOf(0f, .22f, .45f, .7f, 1f), Shader.TileMode.CLAMP)
@@ -310,7 +311,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
             text(unit, ccx, P(0.0, 74.0).second, 11f * u, ink, 0, Paint.Align.CENTER)
             sc.brand?.let { text(it, ccx, P(0.0, 128.0).second, 8.5f * u, ink, 2, Paint.Align.CENTER) }
             val gold = { x: Float, y: Float, rr: Float ->
-                fill(0).apply { shader = RadialGradient(px(x - rr * .2f), px(y - rr * .3f), px(rr * 1.4f), intArrayOf(0xFFF3D98A.toInt(), 0xFFC9A13B.toInt(), 0xFF8A6A1C.toInt()), floatArrayOf(0f, .6f, 1f), Shader.TileMode.CLAMP) }
+                fill(0xFF000000.toInt()).apply { shader = RadialGradient(px(x - rr * .2f), px(y - rr * .3f), px(rr * 1.4f), intArrayOf(0xFFF3D98A.toInt(), 0xFFC9A13B.toInt(), 0xFF8A6A1C.toInt()), floatArrayOf(0f, .6f, 1f), Shader.TileMode.CLAMP) }
             }
             for (sx in listOf(89.0, 111.0)) { val (x, y) = P(sx, 141.0); c.drawCircle(px(x), px(y), px(3.6f * u), gold(x, y, 3.6f * u)) }
         }
@@ -327,7 +328,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
         path.close()
         c.drawPath(path, fill(needleC))
         if (t.mano) {
-            c.drawCircle(px(ccx), px(ccy), px(7.5f * u), fill(0).apply { shader = RadialGradient(px(ccx - 2 * u), px(ccy - 2 * u), px(10 * u), intArrayOf(0xFFF3D98A.toInt(), 0xFFC9A13B.toInt(), 0xFF8A6A1C.toInt()), floatArrayOf(0f, .6f, 1f), Shader.TileMode.CLAMP) })
+            c.drawCircle(px(ccx), px(ccy), px(7.5f * u), fill(0xFF000000.toInt()).apply { shader = RadialGradient(px(ccx - 2 * u), px(ccy - 2 * u), px(10 * u), intArrayOf(0xFFF3D98A.toInt(), 0xFFC9A13B.toInt(), 0xFF8A6A1C.toInt()), floatArrayOf(0f, .6f, 1f), Shader.TileMode.CLAMP) })
             c.drawCircle(px(ccx), px(ccy), px(2.2f * u), fill(0xFF6B5214.toInt()))
         } else {
             c.drawCircle(px(ccx), px(ccy), px(7f * u), fill(needleC))
