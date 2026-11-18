@@ -50,7 +50,7 @@ object Widgets {
     private class Kind(val cls: Class<*>, val layout: Int, val w: Int, val h: Int)
 
     private val KINDS = listOf(
-        Kind(PowerWidget::class.java, R.layout.widget_power, 140, 70),
+        Kind(PowerWidget::class.java, R.layout.widget_power, 140, 90),
         Kind(SwitchWidget::class.java, R.layout.widget_switch, 300, 150),
         Kind(LargeWidget::class.java, R.layout.widget_large, 300, 230),
         Kind(GaugesWidget::class.java, R.layout.widget_gauges, 300, 150),
@@ -345,18 +345,20 @@ object Widgets {
     }
 
     private fun drawPower(p: WidgetPainter, s: Api.State) {
-        val pad = WidgetSpecs.PAD
-        val r = RectF(pad, pad, p.wDp - pad, p.hDp - pad)
-        val d = min(46f, r.height())
+        val rows = p.layout("power")
+        // Titel wie bei den anderen Widgets („Xenios – Ein/Aus“, bei wenig Platz nur „Ein/Aus“)
+        rows["head"]?.let { p.head(it, R.drawable.wi_power, "Ein/Aus") }
+        val r = rows["body"] ?: return
+        val d = min(40f, r.height())
         val on = s.isOn || s.isEco
         p.roundRect(RectF(r.left, r.centerY() - d / 2, r.left + d, r.centerY() + d / 2), d / 2, if (on) p.t.primary else p.t.highest)
-        p.icon(R.drawable.wi_power, r.left + d / 2 - 12, r.centerY() - 12, 24f, if (on) p.t.onPrimary else p.t.onSurface)
+        p.icon(R.drawable.wi_power, r.left + d / 2 - 11, r.centerY() - 11, 22f, if (on) p.t.onPrimary else p.t.onSurface)
         val tx = RectF(r.left + d + 10, r.top, r.right, r.bottom)
         val sub = if (s.online && !s.isOff && s.group != null) "${fmt(s.group)} °C" else null
         if (sub == null) p.textMid(stateLabel(s), tx, 14f, p.t.onSurface, 1)
         else {
-            p.textMid(stateLabel(s), RectF(tx.left, tx.top, tx.right, tx.centerY() + 2), 14f, p.t.onSurface, 1)
-            p.textMid(sub, RectF(tx.left, tx.centerY() + 2, tx.right, tx.bottom - 6), 11.5f, p.t.muted)
+            p.textMid(stateLabel(s), RectF(tx.left, tx.top, tx.right, tx.centerY() + 1), 14f, p.t.onSurface, 1)
+            p.textMid(sub, RectF(tx.left, tx.centerY() + 1, tx.right, tx.bottom), 11.5f, p.t.muted)
         }
     }
 
