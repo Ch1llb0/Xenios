@@ -570,7 +570,8 @@ export class Machine extends Emitter {
       endedAt: new Date().toISOString(),
       startedAt: s.shot.startedAt,
       timeMs,
-      weight: s.scale.weight || null,
+      // Ausbeute: höchster Wert der Waage während des Bezugs – setzt sie am Ende schon zurück, bleibt er erhalten
+      weight: round(Math.max(s.scale.weight || 0, ...curve.map((p) => Number(p[2]) || 0)), 1) || null,
       volumeMl: s.flow.ml || s.flow.volume || null,
       maxPressure: round(maxPressure, 1),
       groupTemp: s.temp.group,
