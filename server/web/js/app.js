@@ -277,15 +277,18 @@ function markNav() {
   document.querySelectorAll('.nav-item').forEach((b) => (b.dataset.path === navPath ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
 }
 
-// Zurück-Taste der Android-App: offenes Fenster schließen → Unterseite → übergeordnete Seite → Home.
-// true = erledigt; false = schon auf Home (die App geht dann in den Hintergrund).
-window.xeniosBack = () => {
+// Zurück (Android-Taste, Pfeil in der Kopfzeile): offenes Fenster schließen → vorige Seite im Verlauf (an die
+// gemerkte Scrollposition) → … Ohne Verlauf (z. B. aus einem Widget geöffnet): übergeordnete Seite, dann Home.
+// true = erledigt; false = schon auf Home ohne Verlauf (die App geht dann in den Hintergrund).
+function goBack() {
   if (closeTopOverlay()) return true;
+  if ((history.state?.d || 0) > 0) { history.back(); return true; }
   const route = current?.route;
   if (route?.back) { navigate(route.back, { replace: true }); return true; }
   if (location.pathname !== '/') { navigate('/', { replace: true }); return true; }
   return false;
-};
+}
+window.xeniosBack = goBack;
 
 // Titel der Kopfzeile überblenden (z. B. „Bezüge“ ↔ „Bezug“): alter und neuer Titel liegen übereinander,
 // der alte blendet aus, der neue ein
@@ -311,7 +314,14 @@ function setTitle(text) {
 }
 
 export function navigate(path, { replace = false } = {}) {
-  if (location.pathname !== path) history[replace ? 'replaceState' : 'pushState']({}, '', path);
+  const here = location.pathname + location.search + location.hash;
+  if (here !== path) {
+    const d = history.state?.d || 0;
+    // Scrollposition der verlassenen Seite im Verlauf merken (für „Zurück“)
+    if (!replace) history.replaceState({ ...(history.state || {}), d, y: window.scrollY }, '');
+    history[replace ? 'replaceState' : 'pushState']({ d: replace ? d : d + 1, y: 0 }, '', path);
+  }
+  restoreY = null;
   render();
 }
 
@@ -334,10 +344,9 @@ function render() {
   const want = ROUTES.find((r) => r.path === location.pathname);
   if (want && !routeAvailable(want)) return navigate('/', { replace: true });
   const route = ROUTES.find((r) => r.path === location.pathname) || ROUTES.find((r) => r.path === '/');
-  // Scrollposition einer Seite merken, wenn man in eine ihrer Unterseiten wechselt (z. B. Einstellungen → Server)
-  const prev = current?.route;
-  if (prev && route.back === prev.path) scrollMemory.set(prev.path, window.scrollY);
-  const restore = prev && prev.back === route.path ? scrollMemory.get(route.path) : null;
+  // Zurück im Verlauf: an die gemerkte Stelle der Seite
+  const restore = restoreY;
+  restoreY = null;
   current?.dispose?.();
   $('app').classList.toggle('wide', Boolean(route.wide));
   setTopActions();
@@ -345,7 +354,7 @@ function render() {
   setTitle(route.title);
   // Zurück-Pfeil weich ein-/ausblenden (Breite), damit der Titel nicht springt
   $('back-btn').classList.toggle('gone', !route.back);
-  $('back-btn').onclick = () => navigate(route.back);
+  $('back-btn').onclick = () => goBack();
   document.title = route.title === 'Xenios' ? 'Xenios' : `${route.title} · Xenios`;
   markNav();
   const view = $('view');
@@ -368,7 +377,17 @@ function render() {
     view.style.minHeight = '';
   }
 }
-const scrollMemory = new Map();
+// Ziel-Scrollposition beim Zurückgehen im Verlauf (popstate)
+let restoreY = null;
+// Scrollposition laufend im aktuellen Verlaufseintrag halten (auch für den Zurück-Knopf des Browsers)
+let scrollSaveTimer = 0;
+window.addEventListener('scroll', () => {
+  clearTimeout(scrollSaveTimer);
+  scrollSaveTimer = setTimeout(() => {
+    if (history.state && typeof history.state === 'object') history.replaceState({ ...history.state, y: window.scrollY }, '');
+  }, 200);
+}, { passive: true });
+if (typeof history.state?.d !== 'number') history.replaceState({ ...(history.state || {}), d: 0, y: 0 }, '');
 
 // Aufgeklappte Kategorie (details.fold): passt sie unterhalb ihres Kopfes nicht mehr auf den Bildschirm, so weit
 // hochscrollen, dass der Kopf direkt unter der Kopfleiste steht. Nachgeladener Inhalt wird kurz danach berücksichtigt.
@@ -385,7 +404,7 @@ document.addEventListener('toggle', (e) => {
   requestAnimationFrame(fit);
   setTimeout(fit, 450);
 }, true);
-window.addEventListener('popstate', render);
+window.addEventListener('popstate', (e) => { restoreY = e.state?.y || null; render(); });
 
 // Leiste neu aufbauen, sobald sich die verfügbaren Seiten ändern (Funktionen, Mühle, Firmware der Maschine erkannt)
 let navSig = '';
@@ -488,7 +507,7 @@ async function handleShortcut() {
   const params = new URLSearchParams(location.search);
   const action = params.get('do');
   if (!action) return;
-  history.replaceState({}, '', location.pathname);
+  history.replaceState({ ...(history.state || {}), d: history.state?.d || 0 }, '', location.pathname);
   try {
     if (action === 'on') {
       const body = powerOnBody();
