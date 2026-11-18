@@ -405,13 +405,19 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
         val top = r.top + 12; val bottom = r.bottom - 12
         val slot = r.width() / values.size
         val bw = min(26f, slot * 0.62f)
+        // Beschriftung nur so oft, dass sie sich nicht überlappt; gezählt von der letzten (aktuellen) Säule aus
+        val labelW = values.maxOf { measure(it.first, 8f) } + 4
+        val stride = max(1, Math.ceil((labelW / slot).toDouble()).toInt())
+        val valueW = values.maxOf { measure(fmtShort(it.second) + unit, 8.5f, 1) } + 3
+        val valueStride = max(1, Math.ceil((valueW / slot).toDouble()).toInt())
         values.forEachIndexed { k, (label, v) ->
             val cx = r.left + slot * (k + 0.5f)
             val h = ((bottom - top) * v / vMax).toFloat()
             val last = k == values.lastIndex
             if (h > 0) roundRect(RectF(cx - bw / 2, bottom - h, cx + bw / 2, bottom), 3f, if (last) t.primary else withAlpha(t.primary, 0.45f))
-            text(fmtShort(v) + unit, cx, bottom - h - 3, 8.5f, t.onSurface, 1, Paint.Align.CENTER)
-            if (values.size <= 8 || k % 2 == 0 || last) text(label, cx, r.bottom - 1, 8f, t.muted, 0, Paint.Align.CENTER)
+            // Werte über den Säulen ebenfalls ohne Überlappung (bei schmalen Säulen ausgedünnt)
+            if ((values.lastIndex - k) % valueStride == 0) text(fmtShort(v) + unit, cx, bottom - h - 3, 8.5f, t.onSurface, 1, Paint.Align.CENTER)
+            if ((values.lastIndex - k) % stride == 0) text(label, cx, r.bottom - 1, 8f, t.muted, 0, Paint.Align.CENTER)
         }
     }
 

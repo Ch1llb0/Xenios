@@ -465,7 +465,7 @@ object Widgets {
             val gw = (body.width() - gap * 3) / 4
             RectF(body.left + k * (gw + gap), body.top, body.left + k * (gw + gap) + gw, body.bottom)
         }
-        val live = s.online && !s.isOff
+        val live = s.online // wie die Home-Kachel: Werte auch bei ausgeschalteter Maschine
         val pump = d.raw?.optDouble("pump")?.takeIf { !it.isNaN() }
         val pumpSet = d.raw?.optDouble("pumpSet")?.takeIf { !it.isNaN() }
         p.gauge(cell(0), "Druck", if (live) pump else null, 1, "bar", pumpSet?.let { "Ziel ${fmt(it)} bar" },
