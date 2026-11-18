@@ -203,21 +203,59 @@ object Widgets {
             for (id in m.getAppWidgetIds(ComponentName(context, k.cls))) {
                 try {
                     m.updateAppWidget(id, views(context, m, id, k, d, theme))
-                } catch (_: Exception) { /* ein Widget darf die anderen nicht aufhalten */ }
+                } catch (e: Exception) {
+                    // Fehler sichtbar machen statt leer zu bleiben (ein Widget darf die anderen nicht aufhalten)
+                    runCatching { m.updateAppWidget(id, errorViews(context, k, theme, "Widget-Fehler: ${e.javaClass.simpleName} ${e.message ?: ""}")) }
+                }
             }
         }
     }
 
+    /**
+     * Ab Android 12 meldet der Startbildschirm alle Größen, in denen das Widget erscheinen kann (hoch-/querformat,
+     * beim Ändern der Größe). Für jede wird ein eigenes, passendes Bild gezeichnet – nichts wird gestreckt.
+     */
     private fun views(context: Context, m: AppWidgetManager, id: Int, k: Kind, d: Data, theme: WidgetTheme): RemoteViews {
         val o = m.getAppWidgetOptions(id)
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            val all: List<android.util.SizeF>? = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                o.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, android.util.SizeF::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                o.getParcelableArrayList<android.util.SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+            }
+            val sizes = all?.filter { it.width > 0 && it.height > 0 }?.distinct()?.take(4)
+            if (!sizes.isNullOrEmpty()) {
+                val limit = if (sizes.size > 1) 380_000f else 600_000f
+                return RemoteViews(sizes.associateWith { sized(context, k, d, theme, it.width.roundToInt(), it.height.roundToInt(), limit) })
+            }
+        }
         var w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
         var h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
         if (w <= 0 || h <= 0) { w = k.w; h = k.h }
+        return sized(context, k, d, theme, w, h, 600_000f)
+    }
+
+    private fun painter(context: Context, theme: WidgetTheme, w: Int, h: Int, maxPx: Float): WidgetPainter {
         // Pixeldichte, aber Bitmap begrenzen (Widgets dürfen nur wenig Speicher übertragen)
         var scale = context.resources.displayMetrics.density
-        val maxPx = 600_000f
         if (w * h * scale * scale > maxPx) scale = sqrt(maxPx / (w * h))
-        val p = WidgetPainter(context, theme, w.toFloat(), h.toFloat(), scale)
+        return WidgetPainter(context, theme, w.toFloat(), h.toFloat(), scale)
+    }
+
+    private fun errorViews(context: Context, k: Kind, theme: WidgetTheme, msg: String): RemoteViews {
+        val p = painter(context, theme, k.w, k.h, 300_000f)
+        p.card()
+        val pad = WidgetSpecs.PAD
+        p.textMid(msg, RectF(pad, pad, p.wDp - pad, p.hDp - pad), 10f, p.t.danger, 0, Paint.Align.CENTER)
+        val rv = RemoteViews(context.packageName, k.layout)
+        rv.setImageViewBitmap(R.id.img, p.bitmap)
+        rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_REFRESH))
+        return rv
+    }
+
+    private fun sized(context: Context, k: Kind, d: Data, theme: WidgetTheme, w: Int, h: Int, maxPx: Float): RemoteViews {
+        val p = painter(context, theme, w, h, maxPx)
         p.card()
         val rv = RemoteViews(context.packageName, k.layout)
         val s = d.s
@@ -295,6 +333,9 @@ object Widgets {
     }
 
     private fun fmt(v: Double?, digits: Int = 1) = WidgetPainter.fmt(v, digits)
+
+    /** Zusatzdaten fehlen: Direkt-Modus (kein Server) oder Server zu alt (vor 2.12.13) */
+    private fun missing(d: Data, what: String) = if (d.raw == null) "$what nur mit Server" else "Server aktualisieren (ab 2.12.13)"
 
     private fun drawError(p: WidgetPainter, d: Data) {
         val pad = WidgetSpecs.PAD
@@ -410,8 +451,18 @@ object Widgets {
         r["head"]?.let { p.head(it, R.drawable.wi_thermo, "Instrumente") }
         val body = r["body"] ?: return
         val gap = 6f
-        val gw = (body.width() - gap * 3) / 4
-        fun cell(k: Int) = RectF(body.left + k * (gw + gap), body.top, body.left + k * (gw + gap) + gw, body.bottom)
+        // eher quadratisch: 2 × 2 wie im Dashboard, sonst 1 × 4
+        val grid2 = body.width() / body.height() < 2.4f
+        fun cell(k: Int): RectF = if (grid2) {
+            val cw = (body.width() - gap) / 2
+            val ch = (body.height() - gap) / 2
+            val x = body.left + (k % 2) * (cw + gap)
+            val y = body.top + (k / 2) * (ch + gap)
+            RectF(x, y, x + cw, y + ch)
+        } else {
+            val gw = (body.width() - gap * 3) / 4
+            RectF(body.left + k * (gw + gap), body.top, body.left + k * (gw + gap) + gw, body.bottom)
+        }
         val live = s.online && !s.isOff
         val pump = d.raw?.optDouble("pump")?.takeIf { !it.isNaN() }
         val pumpSet = d.raw?.optDouble("pumpSet")?.takeIf { !it.isNaN() }
@@ -446,7 +497,7 @@ object Widgets {
         val pad = WidgetSpecs.PAD
         val r = RectF(pad, pad, p.wDp - pad, p.hDp - pad)
         val care = d.raw?.optJSONObject("care")
-        if (care == null) { p.textMid("Pflege nur mit Server", r, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
+        if (care == null) { p.textMid(missing(d, "Pflege"), r, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
         val interval = max(1, care.optInt("intervalDays", 7))
         val since = if (care.isNull("daysSince")) null else care.optInt("daysSince")
         val left = since?.let { interval - it }
@@ -462,7 +513,7 @@ object Widgets {
         r["head"]?.let { p.head(it, R.drawable.wi_history, "Verlauf (10 min)") }
         val body = r["body"] ?: return
         val h = d.raw?.optJSONArray("history")
-        if (h == null) { p.textMid("Verlauf nur mit Server", body, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
+        if (h == null) { p.textMid(missing(d, "Verlauf"), body, 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
         p.historyChart(body, curveOf(h))
     }
 
@@ -481,7 +532,7 @@ object Widgets {
         val ls = d.raw?.optJSONObject("lastShot")
         val kpi = r["kpi"] ?: return
         val body = r["body"] ?: return
-        if (ls == null) { p.textMid(if (d.raw == null) "Bezüge nur mit Server" else "Noch kein Bezug", RectF(kpi.left, kpi.top, kpi.right, body.bottom), 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
+        if (ls == null) { p.textMid(if (d.raw?.has("days") == true) "Noch kein Bezug" else missing(d, "Bezüge"), RectF(kpi.left, kpi.top, kpi.right, body.bottom), 11.5f, p.t.muted, 0, Paint.Align.CENTER); return }
         val time = ls.optDouble("timeS").takeIf { !it.isNaN() }
         val tw = p.textMid(if (time != null) "${fmt(time, 0)} s" else "–", kpi, 22f, p.t.onSurface, 1)
         val parts = listOfNotNull(ls.optDouble("yieldG").takeIf { !it.isNaN() }?.let { "${fmt(it)} g" }, ls.optDouble("ratio").takeIf { !it.isNaN() }?.let { "1:${fmt(it)}" })
@@ -497,7 +548,7 @@ object Widgets {
         val total = dayVals.sumOf { it.second }.roundToInt()
         val avg = if (timeVals.isNotEmpty()) timeVals.sumOf { it.second } / timeVals.size else null
         r["head"]?.let { p.head(it, R.drawable.wi_calendar_bars, "Bezüge", if (large) avg?.let { a -> "Ø ${fmt(a, 0)} s" } else "$total in 7 Tagen") }
-        if (d.raw == null) { r["body"]?.let { p.textMid("Bezüge nur mit Server", it, 11.5f, p.t.muted, 0, Paint.Align.CENTER) }; return }
+        if (d.raw?.has("days") != true) { (r["body"] ?: r["top"])?.let { p.textMid(missing(d, "Bezüge"), it, 11.5f, p.t.muted, 0, Paint.Align.CENTER) }; return }
         val ls = d.raw?.optJSONObject("lastShot")
         if (!large) {
             val body = r["body"] ?: return

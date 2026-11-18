@@ -259,9 +259,11 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
         val titleH = 14f
         val footH = if (t.mano) 28f else 14f
         val size = max(10f, min(r.width(), r.height() - titleH - footH))
-        textMid(title, RectF(r.left, r.top, r.right, r.top + titleH), 10f, t.muted, 0, Paint.Align.CENTER)
+        // senkrecht mittig im Feld (Titel, Instrument und Zeilen darunter als Block)
+        val oy = max(0f, (r.height() - titleH - size - footH) / 2)
+        textMid(title, RectF(r.left, r.top + oy, r.right, r.top + oy + titleH), 10f, t.muted, 0, Paint.Align.CENTER)
         val cx = r.centerX()
-        val top = r.top + titleH
+        val top = r.top + oy + titleH
         val u = size / 200f // dp je SVG-Einheit
         fun P(x: Double, y: Double) = Pair(cx - size / 2 + (x * u).toFloat(), top + (y * u).toFloat())
         fun ang(v: Double) = 135.0 + (min(sc.max, max(sc.min, v)) - sc.min) / (sc.max - sc.min) * 270.0
