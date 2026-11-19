@@ -232,6 +232,7 @@ function buildNav() {
   if (!old || !old.isConnected || matchMedia('(prefers-reduced-motion: reduce)').matches) {
     $('navbar').replaceChildren(h('div', { class: cls }, routes.map(make)));
     markNav();
+    requestAnimationFrame(fitNavLabels);
     return;
   }
   // Leiste bleibt stehen: wegfallende Einträge schrumpfen weg, neue wachsen hinein, die übrigen rücken mit
@@ -270,7 +271,20 @@ function buildNav() {
     a.onfinish = () => { b.style.overflow = ''; };
   });
   markNav();
+  setTimeout(fitNavLabels, 320); // nach dem Ein-/Ausblenden der Einträge
 }
+
+// Passt ein voller Name nicht in seinen Platz (Schrift, Schriftgröße des Systems), Kurzformen zeigen
+function fitNavLabels() {
+  const inner = $('navbar')?.querySelector('.navbar-inner');
+  if (!inner) return;
+  inner.classList.remove('use-short');
+  if (getComputedStyle(inner).flexDirection.startsWith('column')) return; // breite Xenia-Ansicht: Liste links
+  const over = [...inner.querySelectorAll('.nav-label')].some((l) => l.scrollWidth > l.clientWidth + 1);
+  inner.classList.toggle('use-short', over);
+}
+window.addEventListener('resize', () => requestAnimationFrame(fitNavLabels));
+document.fonts?.ready?.then(() => fitNavLabels());
 
 // Aktiven Tab markieren: nach jedem Seitenwechsel UND nach jedem Neuaufbau der Leiste (Server-Zustand, Einstellungen)
 function markNav() {
