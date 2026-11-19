@@ -74,6 +74,26 @@ object Widgets {
     /** Nach Farb- oder Einstellungswechsel in der App: alle Widgets neu laden und zeichnen */
     fun redrawAll(context: Context) = refreshAll(context)
 
+    /** Bildschirm an / entsperrt: Widgets sofort auf den aktuellen Stand bringen (nur solange der Prozess lebt) */
+    private var screenReceiver: android.content.BroadcastReceiver? = null
+    fun watchScreen(context: Context) {
+        if (screenReceiver != null) return
+        val app = context.applicationContext
+        val r = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                if (hasWidgets(app)) refreshAll(app)
+            }
+        }
+        val f = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 33) app.registerReceiver(r, f, Context.RECEIVER_NOT_EXPORTED) else app.registerReceiver(r, f)
+            screenReceiver = r
+        }
+    }
+
     private fun hasWidgets(context: Context): Boolean {
         val m = AppWidgetManager.getInstance(context)
         return KINDS.any { m.getAppWidgetIds(ComponentName(context, it.cls)).isNotEmpty() }
@@ -109,13 +129,18 @@ object Widgets {
         }
     }
 
-    /** Beim Bezug und Aufheizen öfter nachsehen, ohne Live-Zustand bald erneut versuchen (sonst nur alle 30 min). */
+    /**
+     * Nächste Aktualisierung planen: beim Bezug alle 5 s, beim Aufheizen alle 30 s, eingeschaltet jede Minute, sonst alle
+     * 5 min. Der Wecker weckt das Handy nicht (ELAPSED_REALTIME): bei ausgeschaltetem Bildschirm fällt nichts an, beim
+     * Einschalten wird die fällige Aktualisierung sofort nachgeholt.
+     */
     private fun scheduleFollowUp(context: Context, s: Api.State, fails: Int) {
         val delay = when {
             !s.online -> retryDelay(fails)
-            s.shot -> 10_000L
-            s.isOn && !s.heated -> 120_000L
-            else -> return
+            s.shot -> 5_000L
+            s.isOn && !s.heated -> 30_000L
+            s.isOn -> 60_000L
+            else -> 300_000L
         }
         schedule(context, delay)
     }
