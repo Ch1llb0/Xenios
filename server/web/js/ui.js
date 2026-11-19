@@ -153,6 +153,7 @@ export function sliderRow({ label, min, max, step = 1, value, unit = '', digits 
   const paint = () => {
     const pct = ((cur - min) / (max - min)) * 100;
     input.style.setProperty('--fill', `${pct}%`);
+    input.style.setProperty('--fill-px', `${pct * 0.04}px`); // Griff (4 px) liegt bei pct % der um seine Breite gekürzten Spur
     out.textContent = `${fmt(cur, digits)}${unit ? ' ' + unit : ''}`;
   };
   input.addEventListener('input', () => {

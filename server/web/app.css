@@ -233,7 +233,7 @@ select, select.text, option {
 .error { color: var(--danger); min-height: 1.2em; margin: 4px 0; }
 
 /* Schieberegler */
-.slider-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 6px 0; }
+.slider-row { display: grid; grid-template-columns: 1fr auto; gap: 10px 12px; align-items: center; padding: 6px 0; }
 .slider-row .label { font-size: 13px; color: var(--on-surface-variant); }
 .slider-row .value { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
 /* Wert antippbar (Eingabe per Tastatur): dezent als Feld erkennbar */
@@ -246,13 +246,16 @@ input[type="range"] {
 }
 input[type="range"]::-webkit-slider-runnable-track {
   height: 16px; border-radius: 8px;
-  background: linear-gradient(to right, var(--primary) 0 var(--fill, 50%), var(--secondary-container) var(--fill, 50%) 100%);
+  /* Lücke um den Griff (je 5 px) als echte Aussparung: zeigt immer den Hintergrund darunter, auch auf farbigen Flächen */
+  background: linear-gradient(to right,
+    var(--primary) 0 calc(var(--fill, 50%) - var(--fill-px, 0px) - 5px),
+    transparent calc(var(--fill, 50%) - var(--fill-px, 0px) - 5px) calc(var(--fill, 50%) - var(--fill-px, 0px) + 9px),
+    var(--secondary-container) calc(var(--fill, 50%) - var(--fill-px, 0px) + 9px) 100%);
 }
 input[type="range"]::-moz-range-track { height: 16px; border-radius: 8px; background: var(--secondary-container); }
 input[type="range"]::-moz-range-progress { height: 16px; border-radius: 8px; background: var(--primary); }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; width: 4px; height: 32px; border-radius: 2px; background: var(--primary); margin-top: -8px;
-  box-shadow: 0 0 0 6px var(--surface-container-high);
 }
 input[type="range"]::-moz-range-thumb { width: 4px; height: 32px; border: 0; border-radius: 2px; background: var(--primary); }
 
