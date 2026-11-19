@@ -184,12 +184,14 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        Widgets.appVisible = true
         if (::web.isInitialized) web.onResume()
     }
 
     override fun onPause() {
         if (::web.isInitialized) web.onPause()
         CookieManager.getInstance().flush()
+        Widgets.appVisible = false
         Widgets.refreshAll(this)
         super.onPause()
     }

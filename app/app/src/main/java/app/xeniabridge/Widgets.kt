@@ -44,7 +44,7 @@ object Widgets {
     const val EXTRA_DELTA = "delta"
 
     private const val QUIET_FAILS = 2
-    private val RETRY_MS = longArrayOf(60_000, 120_000, 300_000, 900_000)
+    private val RETRY_MS = longArrayOf(5_000, 10_000, 30_000, 60_000)
 
     /** Ein Widget-Typ: Klasse, Layout, Standardgröße (dp) für die erste Darstellung */
     private class Kind(val cls: Class<*>, val layout: Int, val w: Int, val h: Int)
@@ -130,29 +130,46 @@ object Widgets {
     }
 
     /**
-     * Nächste Aktualisierung planen: beim Bezug alle 5 s, beim Aufheizen alle 30 s, eingeschaltet jede Minute, sonst alle
-     * 5 min. Der Wecker weckt das Handy nicht (ELAPSED_REALTIME): bei ausgeschaltetem Bildschirm fällt nichts an, beim
-     * Einschalten wird die fällige Aktualisierung sofort nachgeholt.
+     * Nächste Aktualisierung planen, so live wie möglich: beim Bezug jede Sekunde, sonst alle 2 s (aus/Eco: 5 s).
+     * Nur bei eingeschaltetem Bildschirm und nicht, solange die App selbst offen ist (dann sind die Widgets nicht zu
+     * sehen; beim Verlassen der App geht es sofort weiter). Der Wecker weckt das Handy nicht (ELAPSED_REALTIME): bei
+     * ausgeschaltetem Bildschirm fällt nichts an, beim Einschalten wird sofort aktualisiert.
      */
     private fun scheduleFollowUp(context: Context, s: Api.State, fails: Int) {
         val delay = when {
             !s.online -> retryDelay(fails)
-            s.shot -> 5_000L
-            s.isOn && !s.heated -> 30_000L
-            s.isOn -> 60_000L
-            else -> 300_000L
+            s.shot -> 1_000L
+            s.isOn -> 2_000L
+            else -> 5_000L
         }
         schedule(context, delay)
     }
 
     private fun retryDelay(fails: Int): Long = RETRY_MS[(fails - 1).coerceIn(0, RETRY_MS.lastIndex)]
 
+    /** Die App ist im Vordergrund: Widgets ruhen lassen */
+    @Volatile var appVisible = false
+
     private fun schedule(context: Context, delay: Long) {
-        if (!hasWidgets(context)) return
+        if (appVisible || !hasWidgets(context)) return
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val i = Intent(context, PowerWidget::class.java).setAction(ACTION_UPDATE)
-        am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + delay, PendingIntent.getBroadcast(context, 99, i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+        val pi = PendingIntent.getBroadcast(context, 99, i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        // Bildschirm aus (CPU aber evtl. wach, z. B. Musik): nicht im Sekundentakt abfragen, nur einen späteren Termin
+        // vormerken, der beim Einschalten nachgeholt wird
+        if (context.getSystemService(android.os.PowerManager::class.java)?.isInteractive == false) {
+            am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 60_000L, pi)
+            return
+        }
+        val at = SystemClock.elapsedRealtime() + delay
+        // Exakt (USE_EXACT_ALARM / SCHEDULE_EXACT_ALARM), sonst bündelt Android die Wecker und verzögert sie um Minuten
+        val exact = android.os.Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
+        runCatching { if (exact) am.setExact(AlarmManager.ELAPSED_REALTIME, at, pi) else am.set(AlarmManager.ELAPSED_REALTIME, at, pi) }
+            .onFailure { am.set(AlarmManager.ELAPSED_REALTIME, at, pi) }
     }
+
+    /** Läuft gerade eine Aktualisierung? Dann keine zweite parallel (die laufende plant die nächste). */
+    private val updating = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /** Aktion aus einem Widget: ausführen, kurz warten, neu zeichnen. Läuft im goAsync-Kontext. */
     fun handleAction(receiver: AppWidgetProvider, context: Context, intent: Intent) {
@@ -163,7 +180,9 @@ object Widgets {
                 val prefs = Prefs(app)
                 when (intent.action) {
                     ACTION_REFRESH -> renderFresh(app)
-                    ACTION_UPDATE -> renderFresh(app, quiet = true)
+                    ACTION_UPDATE -> if (updating.compareAndSet(false, true)) {
+                        try { renderFresh(app, quiet = true) } finally { updating.set(false) }
+                    }
                     ACTION_NOSTEAM -> {
                         prefs.noSteamOn = !prefs.noSteamOn
                         renderFresh(app)
