@@ -92,9 +92,9 @@ P.toggleTile = 'M7 18q-2.5 0-4.25-1.75T1 12q0-2.5 1.75-4.25T7 6h10q2.5 0 4.25 1.
 P.coffeeLine = P.coffee; P.coffeeDrip = P.coffee; P.calendarBars = P.event; // Fallback ohne Xenia-Symbole
 P.group = P.thermo; P.boiler = P.thermo; P.pid = P.tune; P.shotlog = P.list;
 
-// Im Stil „Xenia“ die Icons der Original-Oberfläche, sonst Material-Icons
+// Symbole in beiden Designs gleich (ausgesuchte Kachel- und Leisten-Symbole); fehlt eines, das Material-Icon
 export function icon(name, cls = '') {
-  const x = document.documentElement.dataset.style === 'xenia' ? XENIA_ICONS[name] : null;
+  const x = XENIA_ICONS[name];
   if (x) {
     return h('svg', { class: `icon xi ${cls}`.trim(), viewBox: x.vb, 'aria-hidden': 'true' }, x.els.map(([tag, a]) => h(tag, a)));
   }

@@ -47,8 +47,10 @@ export function applyTheme(theme = localStorageGet('theme') || 'system') {
   const root = document.documentElement;
   if (theme === 'system') delete root.dataset.theme;
   else root.dataset.theme = theme;
-  root.dataset.style = 'xenia';
+  // Design: Xenia (wie die Web-Oberfläche der Maschine) oder Material (Material 3: Leiste mit Beschriftung, runde
+  // Formen, flache Anzeigen) – jeweils mit eigenen Farben
   const palette = uiPalette();
+  root.dataset.style = palette;
   if (palette === 'material') root.dataset.palette = 'material';
   else delete root.dataset.palette;
   // Anzeigen: Farbvorlage Xenia → Manometer, Material → flache Anzeigen. Hell oder dunkel merkt sich jede Vorlage

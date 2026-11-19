@@ -337,7 +337,7 @@ function themeCard() {
         localStorageGet(key) ? h('button', { class: 'btn text', onclick: () => { try { localStorage.removeItem(key); } catch { /* privat */ } applyTheme(); paint(); } }, 'Standard') : null);
     };
     box.replaceChildren(
-      h('div', { class: 'muted small' }, 'Farbvorlage (Layout, Schrift und Icons bleiben gleich)'),
+      h('div', { class: 'muted small' }, 'Design'),
       chips(style, [['material', 'Material'], ['xenia', 'Xenia']], (v) => localStorageSet('uiStyle', v)),
       h('div', { class: 'muted small', style: { 'margin-top': '12px' } }, 'Helligkeit'),
       chips(theme, [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], (v) => localStorageSet('theme', v)),
