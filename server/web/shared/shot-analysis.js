@@ -107,10 +107,25 @@ export function liveTimes(shot) {
   return { pre: false, preS, brewS: Math.max(0, t - preS) };
 }
 
+// Gewicht vor dem Tarieren verwerfen: Manche Waagen (Bookoo an der DBL) melden zu Beginn des Bezugs noch kurz den
+// alten Wert (z. B. 290 g), bevor sie auf 0 springen. Ab dem ersten Wert unter 1 g zählt die Kurve; davor 0.
+export function taredCurve(curve) {
+  const c = Array.isArray(curve) ? curve : [];
+  const i0 = c.findIndex((p) => Array.isArray(p) && p[2] != null && Number(p[2]) < 1);
+  if (i0 <= 0) return c;
+  return c.map((p, i) => (i < i0 && Array.isArray(p) && p[2] != null ? [p[0], p[1], 0, ...p.slice(3)] : p));
+}
+// Ausbeute aus der Kurve: höchstes Gewicht nach dem Tarieren (null ohne Gewichtswerte)
+export function curveYield(curve) {
+  const w = taredCurve(curve).filter((p) => Array.isArray(p) && p[2] != null).map((p) => Number(p[2])).filter(Number.isFinite);
+  const max = w.length ? Math.max(...w) : 0;
+  return max > 0 ? Math.round(max * 10) / 10 : null;
+}
+
 // Kennzahlen aus der Kurve und den Notizen
 export function shotMetrics(shot) {
-  const c = (shot?.curve || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
-  const yieldG = shot?.notes?.yieldG ?? shot?.weight ?? null;
+  const c = taredCurve(shot?.curve || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
+  const yieldG = shot?.notes?.yieldG ?? curveYield(c) ?? shot?.weight ?? null;
   const doseG = shot?.notes?.doseG ?? shot?.dose?.g ?? shot?.doseDefaultG ?? null;
   const ph = shotPhases(shot);
   const main = c.filter((p) => p[1] >= MAIN_BAR);

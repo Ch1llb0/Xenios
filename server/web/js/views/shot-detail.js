@@ -2,9 +2,9 @@
 // Kennzahlen, zugeordneter Mahlvorgang der Mühle, Bewertung mit Notizen und der Einstell-Assistent.
 // Dazu die Schnellbewertung direkt nach einem Bezug (Geschmack, Stärke, Mahlgrad → nächster Schritt).
 import { h, icon, fmt, fmtInt, snackbar, fullscreen, sheet, switchEl } from '../ui.js';
-import { api, hasGrinder } from '../api.js';
+import { api, hasGrinder, store } from '../api.js';
 import { shotChart } from '../gauge.js';
-import { targetCurve, shotMetrics, STRENGTH } from '../../shared/shot-analysis.js';
+import { targetCurve, shotMetrics, curveYield, STRENGTH } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
 import { TYPE_DE } from './grinder.js';
 import { navigate } from '../app.js';
@@ -149,7 +149,10 @@ function paint(root, d, close, onChange, page = false) {
     kpiBox.replaceChildren(...[
       k('Bezugszeit', m.timeS !== null ? fmt(m.timeS) : null, 's'), // ohne Vorbrühen, wie an der Xenia
       k('Ausbeute', m.yieldG !== null ? fmt(m.yieldG) : null, 'g'),
-      k(m.doseAssumed ? 'Dosis (Standard)' : 'Dosis', m.doseG !== null ? fmt(m.doseG) : null, 'g'),
+      m.doseG !== null ? k(m.doseAssumed ? 'Dosis (Standard)' : 'Dosis', fmt(m.doseG), 'g')
+        // Ohne Dosis kein Verhältnis: direkt zur Einstellung „Standard-Dosis“
+        : h('button', { class: 'kpi kpi-link', type: 'button', onclick: () => navigate(store.server?.mode === 'direct' ? '/einstellungen#aufzeichnung' : '/server#aufzeichnung') },
+          h('div', { class: 'k' }, 'Dosis'), h('div', { class: 'v' }, '–'), h('div', { class: 'muted small' }, 'Standard-Dosis festlegen')),
       k('Verhältnis', m.ratio !== null ? `1:${fmt(m.ratio)}` : null),
       k('Vorbrühen', m.preinfusionS !== null ? fmt(m.preinfusionS) : null, 's'),
       m.preinfusionS !== null ? k('Gesamt', m.totalS !== null ? fmt(m.totalS) : null, 's') : null,
@@ -181,7 +184,7 @@ function paint(root, d, close, onChange, page = false) {
   const strength = choice(STRENGTH, n.strength, (v) => { n.strength = v; });
   const bean = beanField(d.beans, n.bean || '');
   const grind = grindField(n.grind || '', d.lastGrind);
-  const yieldIn = h('input', { class: 'text', type: 'number', inputmode: 'decimal', step: 0.1, min: 1, max: 399, value: n.yieldG ?? '', placeholder: shot.weight ? `gemessen ${fmt(shot.weight)}` : 'Gramm' });
+  const yieldIn = h('input', { class: 'text', type: 'number', inputmode: 'decimal', step: 0.1, min: 1, max: 399, value: n.yieldG ?? '', placeholder: (curveYield(shot.curve) ?? shot.weight) ? `gemessen ${fmt(curveYield(shot.curve) ?? shot.weight)}` : 'Gramm' });
   const twoCups = shot.weight ? h('button', { type: 'button', class: 'btn tonal small-btn', title: 'Zwei Tassen, nur eine stand auf der Waage', onclick: () => { yieldIn.value = String(Math.round(shot.weight * 20) / 10); } }, '×2') : null;
   const doseIn = h('input', { class: 'text', type: 'number', inputmode: 'decimal', step: 0.1, min: 1, max: 39, value: n.doseG ?? '', placeholder: shot.dose?.g ? `Mühle ${fmt(shot.dose.g)}` : 'Gramm' });
   const text = h('textarea', { class: 'text', rows: 3, maxlength: 500, placeholder: 'Notiz (Bohne, Mahlgrad, Eindruck …)' }, n.text || '');

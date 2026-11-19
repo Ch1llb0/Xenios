@@ -2,7 +2,7 @@
 // Läuft im Server (Node) und in der Android-App im Direkt-Modus (Browser): Speicher, Logger und fetch werden übergeben.
 import { Emitter, MemoryStore } from './emitter.js';
 import { logger } from './log.js';
-import { dialIn, STRENGTH, shotPhases } from './shot-analysis.js';
+import { dialIn, STRENGTH, shotPhases, taredCurve, curveYield } from './shot-analysis.js';
 import { MACHINE_API, CLASSIC_SETTING_FIELDS, machineApiId, normalizeLive } from './machine-api.js';
 
 export { MACHINE_API, CLASSIC_SETTING_FIELDS, machineApiId } from './machine-api.js';
@@ -566,15 +566,16 @@ export class Machine extends Emitter {
   _finishShot(finalMs) {
     const s = this.state;
     const timeMs = Math.max(finalMs || 0, s.shot.timeMs || 0);
-    const curve = s.shot.curve;
+    // Gewicht vor dem Tarieren der Waage (alter Wert zu Beginn) verwerfen
+    const curve = taredCurve(s.shot.curve);
     const maxPressure = curve.reduce((m, p) => Math.max(m, p[1] || 0), 0);
     const shot = {
       id: shotId(),
       endedAt: new Date().toISOString(),
       startedAt: s.shot.startedAt,
       timeMs,
-      // Ausbeute: höchster Wert der Waage während des Bezugs – setzt sie am Ende schon zurück, bleibt er erhalten
-      weight: round(Math.max(s.scale.weight || 0, ...curve.map((p) => Number(p[2]) || 0)), 1) || null,
+      // Ausbeute: höchster Wert der Waage nach dem Tarieren – setzt sie am Ende schon zurück, bleibt er erhalten
+      weight: round(Math.max(s.scale.weight || 0, curveYield(curve) || 0), 1) || null,
       volumeMl: s.flow.ml || s.flow.volume || null,
       maxPressure: round(maxPressure, 1),
       groupTemp: s.temp.group,
@@ -724,6 +725,18 @@ export class Machine extends Emitter {
     const list = this.history.data.shots;
     if (!Array.isArray(list)) return;
     let removed = 0;
+    // Ältere Bezüge: Gewicht vor dem Tarieren der Waage steckte in Kurve und Ausbeute (z. B. 293 g statt 44 g)
+    let fixed = 0;
+    for (const shot of list) {
+      if (!Array.isArray(shot.curve) || !shot.curve.length) continue;
+      const tared = taredCurve(shot.curve);
+      if (tared === shot.curve) continue;
+      shot.curve = tared;
+      const y = curveYield(tared);
+      if (y) shot.weight = y;
+      fixed++;
+    }
+    if (fixed) this.history.save();
     for (let i = 0; i < list.length - 1; i++) {
       const dup = list[i];
       const live = list[i + 1];

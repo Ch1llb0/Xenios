@@ -187,6 +187,8 @@ export function createApp(cfg, hooks = {}) {
       group: m.temp?.group ?? null, groupSet: m.temp?.groupSet ?? null, steam: m.pressure?.steam ?? null,
       boiler: m.temp?.boiler ?? null, boilerSet: m.temp?.boilerSet ?? null, steamSet: m.pressure?.steamSet ?? null,
       shot: Boolean(m.shot?.running), at: Date.now(),
+      // Alte Xenia (DBL): Bluetooth-Waage verbunden
+      scaleConnected: Boolean(m.online && m.scaleLink?.connected),
       next: nextPlannedOn(),
       // Für die erweiterten Widgets (Instrumente, Bezüge, Pflege, Verlauf, laufender Bezug)
       ...widgetExtras({ m, shots: machine.listedShots().slice(0, 60), maintenance: machine.maintenance(), history: liveHistory }),

@@ -1125,3 +1125,7 @@ a.list-item { text-decoration: none; color: inherit; }
 
 /* Kurzzeitig ohne Übergänge (Farben für die Android-Widgets auslesen) */
 html.no-trans, html.no-trans * { transition: none !important; }
+
+/* Kennzahl als Verweis (z. B. „Standard-Dosis festlegen“) */
+.kpi.kpi-link { font: inherit; color: inherit; text-align: left; border: 0; cursor: pointer; width: 100%; }
+.kpi.kpi-link .small { color: var(--primary); margin-top: 2px; }

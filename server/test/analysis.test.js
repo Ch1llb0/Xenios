@@ -225,3 +225,16 @@ test('Bezugszeit ohne Vorbrühen, erster Tropfen, Standard-Dosis', () => {
   assert.deepEqual(liveTimes({ timeMs: 4000, curve: [[0, 2], [4, 2]] }), { pre: true, preS: 4, brewS: 0 });
   assert.deepEqual(liveTimes({ timeMs: 12000, curve: [[0, 2], [6, 9], [12, 9]] }), { pre: false, preS: 6, brewS: 6 });
 });
+
+test('Ausbeute: alter Waagenwert vor dem Tarieren zählt nicht (Bookoo an der DBL)', async () => {
+  const { taredCurve, curveYield, shotMetrics: sm } = await import('../web/shared/shot-analysis.js');
+  const curve = [[0, 0, 293.3], [0.3, 0, 290], [0.6, 0, 0], [10, 9, 0], [20, 9, 20], [30, 9, 44.2], [31, 0, 43.9]];
+  assert.equal(taredCurve(curve)[0][2], 0);
+  assert.equal(taredCurve(curve)[5][2], 44.2);
+  assert.equal(curveYield(curve), 44.2);
+  assert.equal(sm({ timeMs: 31000, weight: 293.3, curve }).yieldG, 44.2);
+  // Waage von Anfang an tariert: unverändert
+  const ok = [[0, 0, 0], [10, 9, 36]];
+  assert.equal(taredCurve(ok), ok);
+  assert.equal(curveYield([[0, 0, null]]), null);
+});

@@ -436,8 +436,13 @@ object Widgets {
             var x = b.left
             x += p.badge(if (s.tankOk) "Tank ok" else "Tank leer", x, b.centerY(), if (s.tankOk) p.withAlpha(p.t.success, 0.22f) else p.t.danger, if (s.tankOk) p.t.success else p.t.onDanger) + 4
             x += p.badge(if (s.steamOn) "Dampf an" else "Dampf aus", x, b.centerY(), p.t.primaryContainer, p.t.onPrimaryContainer) + 4
+            // Nur zeichnen, was noch ganz in die Zeile passt
+            fun fits(str: String) = x + p.measure(str, 10f, 1) + 12 <= b.right
+            // Alte Xenia (DBL): verbundene Bluetooth-Waage, wie in der Status-Kachel
+            if (d.raw?.optBoolean("scaleConnected") == true && fits("Waage verbunden"))
+                x += p.badge("Waage verbunden", x, b.centerY(), p.withAlpha(p.t.success, 0.22f), p.t.success) + 4
             val today = d.raw?.optJSONArray("days")?.let { a -> a.optJSONObject(a.length() - 1)?.optInt("count") }
-            if (today != null) p.badge("$today Bezüge heute", x, b.centerY(), p.t.primaryContainer, p.t.onPrimaryContainer)
+            if (today != null && fits("$today Bezüge heute")) p.badge("$today Bezüge heute", x, b.centerY(), p.t.primaryContainer, p.t.onPrimaryContainer)
         }
         drawSeg(p, r, s)
         drawToggles(p, r, s, d)

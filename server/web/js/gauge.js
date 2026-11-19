@@ -1,5 +1,6 @@
 // Analoges Rundinstrument (SVG) wie in der Xenia-App: Skala, rote Zone, Nadel, Wert in der Mitte.
 import { h, fmt } from './ui.js';
+import { taredCurve } from '../shared/shot-analysis.js';
 
 const START = 135;   // Winkel in Grad (SVG: 0° = rechts, im Uhrzeigersinn)
 const SWEEP = 270;
@@ -150,7 +151,8 @@ function clipPts(c, tMax) {
 // curve: [[t_s, druck_bar, gewicht_g, ml], …]; live: Endpunkt markieren und Zeitachse mitwachsen lassen.
 // Für die Analyse: compare = frühere Kurven (blass), reference = Referenz-Bezug, target = Soll-Druck [[t, bar] | null, …].
 export function shotChart(curve, { width = 320, height = 150, live = false, minSeconds = 30, compare = [], reference = null, target = null } = {}) {
-  const clean = (c) => (c || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
+  // Gewicht vor dem Tarieren der Waage (alter Wert zu Beginn) nicht zeichnen – es verzerrte die Gewichtsachse
+  const clean = (c) => taredCurve(c || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
   const pts = clean(curve);
   const others = [...compare.map(clean), clean(reference)].filter((c) => c.length > 1);
   const pad = { l: 26, r: 30, t: 18, b: 18 };
