@@ -216,11 +216,11 @@ async function openEditor(script, data, onSaved, host = fullscreen) {
             label: `${a.name}${a.unit ? ` (${a.unit})` : ''}`, min: a.min, max: a.max, step: a.step, value: st.args?.[ai] ?? a.min,
             digits: a.step < 1 ? 1 : 0, onInput: (v) => { st.args[ai] = v; summary.textContent = argSummary(def, st); },
           })));
-        const summary = h('span', { class: 'small' }, argSummary(def, st));
+        const summary = h('span', { class: 'sum' }, argSummary(def, st));
         return h('div', { class: 'step' },
           h('div', { class: 'step-head' },
             h('span', { class: 'n' }, String(i + 1)),
-            h('span', { class: 'name', onclick: () => { open ? expanded.delete(i) : expanded.add(i); paint(); } }, def.name, ' ', summary),
+            h('span', { class: 'name', onclick: () => { open ? expanded.delete(i) : expanded.add(i); paint(); } }, h('span', { class: 'title' }, def.name), def.args?.length ? summary : null),
             h('button', { class: 'icon-btn', 'aria-label': 'Nach oben', disabled: i === 0, onclick: () => move(i, -1) }, icon('up', 's18')),
             h('button', { class: 'icon-btn', 'aria-label': 'Nach unten', disabled: i === steps.length - 1, onclick: () => move(i, 1) }, icon('down', 's18')),
             def.args?.length ? h('button', { class: 'icon-btn', 'aria-label': 'Werte', onclick: () => { open ? expanded.delete(i) : expanded.add(i); paint(); } }, icon(open ? 'less' : 'more', 's20')) : null,
@@ -296,7 +296,8 @@ function defaultArg(a) {
 
 function argSummary(def, st) {
   if (!def.args?.length) return '';
-  return '· ' + def.args.map((a, i) => `${fmt(st.args?.[i], a.step < 1 ? 1 : 0)}${a.unit ? ' ' + a.unit : ''}`).join(' / ');
+  // eigene Zeile unter dem Namen; Zahl und Einheit bleiben zusammen (geschütztes Leerzeichen)
+  return def.args.map((a, i) => `${fmt(st.args?.[i], a.step < 1 ? 1 : 0)}${a.unit ? '\u00a0' + a.unit : ''}`).join(' · ');
 }
 
 // --- Druckprofil-Baukasten --------------------------------------------------------

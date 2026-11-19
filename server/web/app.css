@@ -303,7 +303,10 @@ input[type="range"]::-moz-range-thumb { width: 4px; height: 32px; border: 0; bor
 }
 .step-head { display: flex; align-items: center; gap: 4px; min-height: 44px; }
 .step-head .n { width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--on-primary-container); color: var(--primary-container); }
-.step-head .name { flex: 1; font-weight: 500; }
+.step-head .name { flex: 1; min-width: 0; font-weight: 500; margin-left: 6px; padding: 6px 0; cursor: pointer; }
+.step-head .name .title { display: block; }
+/* Werte des Schritts als eigene Zeile unter dem Namen (bricht nicht mitten im Wert um) */
+.step-head .name .sum { display: block; margin-top: 1px; font-size: 12px; font-weight: 400; opacity: .8; }
 .step-body { padding: 0 12px 8px 4px; }
 .step .icon-btn { color: var(--on-primary-container); width: 36px; height: 36px; }
 .ops { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
