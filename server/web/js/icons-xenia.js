@@ -41,3 +41,10 @@ XENIA_ICONS.coffeeDrip = { vb: '0 0 16 16', els: [
   ['path', { d: 'M3.5 9.5h7A2.5 2.5 0 0 1 8 12H6a2.5 2.5 0 0 1-2.5-2.5z' }],
   ['path', { d: 'M7 2c.6.95 1.05 1.55 1.05 2.15a1.05 1.05 0 0 1-2.1 0C5.95 3.55 6.4 2.95 7 2z' }],
 ] };
+
+// Mühle: das Material-Symbol (Behälter, Gehäuse mit Sichtfenster, Sockel) als schlanker Umriss im Strich der übrigen
+XENIA_ICONS.grinder = { vb: '0 0 16 16', els: [
+  ['path', { fill: 'none', stroke: 'currentColor', 'stroke-width': 1, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', d: 'M4.5 1.5h7l-1.25 3.75h-4.5z' }],
+  ['path', { fill: 'none', stroke: 'currentColor', 'stroke-width': 1, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', d: 'M5.75 6h4.5v6.25a1.25 1.25 0 0 1-1.25 1.25H7a1.25 1.25 0 0 1-1.25-1.25z' }],
+  ['path', { fill: 'none', stroke: 'currentColor', 'stroke-width': 1, 'stroke-linecap': 'round', d: 'M8 8.5v2.5M4 15h8' }],
+] };
