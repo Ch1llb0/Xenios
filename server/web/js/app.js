@@ -95,6 +95,7 @@ const WIDGET_COLORS = {
   primaryContainer: '--primary-container', onPrimaryContainer: '--on-primary-container', secondaryContainer: '--secondary-container',
   onSecondaryContainer: '--on-secondary-container', outline: '--outline', outlineVariant: '--outline-variant', highest: '--surface-container-highest',
   danger: '--danger', onDanger: '--on-danger', dangerContainer: '--danger-container', success: '--success', warning: '--warning',
+  active: '--active', onActive: '--on-active',
 };
 const GAUGE_COLORS = { face: '--gauge-face', ring: '--gauge-ring', tick: '--gauge-tick', needle: '--gauge-needle', text: '--gauge-text', ink: '--gauge-ink' };
 function hexOf(css) {

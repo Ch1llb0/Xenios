@@ -48,6 +48,9 @@ class WidgetTheme(
     val danger get() = col("danger", 0xFFC62828.toInt(), 0xFFEF5350.toInt())
     val onDanger get() = col("onDanger", 0xFFFFFFFF.toInt(), 0xFF2B0000.toInt())
     val success get() = col("success", 0xFF2E7D32.toInt(), 0xFF5FD07F.toInt())
+    // Aktiv-Farbe der Segment-Knöpfe (Ein/Eco/Aus), wie --active der Web-Kacheln (Xenia: orange); fehlt sie, Akzentfarbe
+    val active get() = c["active"] ?: primary
+    val onActive get() = c["onActive"] ?: onPrimary
     val warning get() = col("warning", 0xFFE65100.toInt(), 0xFFFFB74D.toInt())
     fun gauge(k: String, def: Int) = g[k] ?: def
 
@@ -210,8 +213,8 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
 
     /** Segment-Knopf (Ein/Eco/Aus) */
     fun segButton(r: RectF, iconRes: Int, label: String, active: Boolean, enabled: Boolean) {
-        if (active) roundRect(r, 10f, t.primary) else roundRect(r, 10f, Color.TRANSPARENT, t.outlineVariant)
-        val fg = when { active -> t.onPrimary; enabled -> t.onSurface; else -> withAlpha(t.onSurface, 0.38f) }
+        if (active) roundRect(r, 10f, t.active) else roundRect(r, 10f, Color.TRANSPARENT, t.outlineVariant)
+        val fg = when { active -> t.onActive; enabled -> t.onSurface; else -> withAlpha(t.onSurface, 0.38f) }
         val tw = measure(label, 12.5f, 1)
         val isz = 15f
         val total = isz + 4 + tw
