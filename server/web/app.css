@@ -38,7 +38,7 @@
   --radius-m: 12px;
   --radius-l: 16px;
   --radius-xl: 28px;
-  --nav-h: 80px;
+  --nav-h: 68px; /* Leiste unten: gleich in Material und Xenia */
   --ease-emph: cubic-bezier(.2, 0, 0, 1);
   --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
   --ease-out: cubic-bezier(.05, .7, .1, 1);
@@ -117,14 +117,14 @@ svg.icon.s20 { width: 20px; height: 20px; }
 .view { flex: 1; padding: 8px 16px calc(var(--nav-h) + 24px + var(--sab)); outline: none; }
 .navbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; justify-content: center;
-  background: var(--surface-container); padding: 12px 8px calc(12px + var(--sab));
+  background: var(--surface-container); padding: 8px 4px calc(8px + var(--sab));
 }
 .navbar-inner { display: flex; width: 100%; max-width: 560px; }
 .nav-item {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: none;
   color: var(--on-surface-variant); font-size: 12px; font-weight: 500; padding: 0;
 }
-.nav-item .pill { width: min(64px, calc(100% - 8px)); height: 32px; border-radius: 16px; display: grid; place-items: center; position: relative; overflow: hidden; isolation: isolate; }
+.nav-item .pill { width: min(56px, calc(100% - 6px)); height: 32px; border-radius: 16px; display: grid; place-items: center; position: relative; overflow: hidden; isolation: isolate; }
 .nav-item .pill::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--secondary-container); transform: scaleX(.3); opacity: 0; transition: transform .35s var(--ease-emph), opacity .2s; z-index: -1; }
 .nav-item[aria-current="page"] .pill::before { transform: scaleX(1); opacity: 1; }
 .nav-item .pill svg { transition: transform .35s var(--ease-spring); }
@@ -655,14 +655,18 @@ code.fp { font: 11px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywh
 /* Dashboard (nur Anzeige): 1 Spalte am Handy, 2 am Tablet hochkant, 3 quer */
 .app.wide { max-width: 1280px; }
 .nav-item { min-width: 0; white-space: nowrap; }
+/* Leiste unten (Material und Xenia gleich): alle Einträge (höchstens 8) passen ohne Wischen nebeneinander, jeder mit
+   Beschriftung. Lange Namen haben eine Kurzform (z. B. „Einstell.“), die nur bei Platzmangel erscheint. */
 .navbar-inner.many { max-width: 680px; }
-.nav-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.nav-item { flex: 1 1 0; }
+.nav-label { max-width: 100%; overflow: hidden; text-overflow: clip; line-height: 14px; }
+.nav-label .short { display: none; }
 .navbar-inner.many .nav-item { font-size: 11px; }
-/* Viele Einträge (Material): lange Beschriftungen wie „Einstellungen“ dürfen in den freien Rand der Nachbarn ragen,
-   statt abgeschnitten zu werden (die Nachbarn sind kurz genug, der letzte Eintrag hat den Innenabstand der Leiste) */
-.navbar-inner.many:not(.lots) .nav-label { max-width: none; overflow: visible; text-overflow: clip; }
-@media (max-width: 420px) { .navbar-inner.many .nav-item { font-size: 10px; letter-spacing: -.3px; } }
-@media (max-width: 380px) { .nav-item { font-size: 11px; letter-spacing: -.2px; } }
+.navbar-inner.lots .nav-item { font-size: 10.5px; letter-spacing: -.2px; }
+/* Kurzform: 8 Einträge unter 520 px, 6–7 Einträge unter 400 px */
+@media (max-width: 519px) { .navbar-inner.lots .nav-label .full { display: none; } .navbar-inner.lots .nav-label .short { display: inline; } }
+@media (max-width: 399px) { .navbar-inner.many .nav-label .full { display: none; } .navbar-inner.many .nav-label .short { display: inline; } }
+@media (max-width: 359px) { .navbar-inner.lots .nav-item { font-size: 9.5px; letter-spacing: -.3px; } }
 .dash { --cell: 180px; width: 100%; margin-left: auto; margin-right: auto; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: var(--cell); gap: 12px; align-items: stretch; grid-auto-flow: row dense; }
 /* Raster wie Android-Widgets: Breite in Spalten, Höhe in Zellen; alle Kacheln einer Zeile werden gleich hoch */
 .dash > .tile { background: var(--surface-container-high); border-radius: var(--radius-l); padding: 14px 16px 16px; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; }
@@ -888,7 +892,7 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
    Leisten #383c44 mit weißer, dünner Schrift, Überschriften der Leisten in Beigegrau #b9a397 */
 [data-style="xenia"] body, [data-style="xenia"] button, [data-style="xenia"] input, [data-style="xenia"] select, [data-style="xenia"] textarea { font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 [data-style="xenia"] .topbar-title { color: var(--chrome-title); font-weight: 300; letter-spacing: 1.25px; }
-[data-style="xenia"] .nav-item, [data-style="xenia"] .nav-item[aria-current="page"] { font-weight: 300; }
+/* Beschriftung der Leiste in beiden Designs gleich (500); die breite Xenia-Navigation links setzt ihre eigene */
 [data-style="xenia"] .card h2, [data-style="xenia"] .card h3, [data-style="xenia"] .section-title { font-weight: 400; color: var(--on-surface); }
 /* Kopfleiste über die ganze Breite */
 [data-style="xenia"] .topbar { background: var(--chrome); color: var(--on-chrome); box-shadow: 0 0 0 100vmax var(--chrome); clip-path: inset(0 -100vmax); }
@@ -914,9 +918,7 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
 [data-style="xenia"] .nav-item[aria-current="page"] .pill { color: var(--on-chrome); }
 [data-style="xenia"] .nav-item .pill::before { background: var(--chrome-active); border-radius: var(--radius-s); }
 /* Viele Tabs: Leiste waagerecht wischbar statt zu quetschen */
-.navbar-inner.lots { overflow-x: auto; scrollbar-width: none; justify-content: flex-start; max-width: 760px; }
-.navbar-inner.lots::-webkit-scrollbar { display: none; }
-.navbar-inner.lots .nav-item { flex: 1 0 64px; }
+
 /* Breite Bildschirme: Navigation links wie auf der Seite der Maschine */
 @media (min-width: 960px) {
   :root[data-style="xenia"] { --nav-h: 0px; }
@@ -977,13 +979,6 @@ svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height
 .dash > .tile > .tile-body > .chart-fit { flex: 1; min-height: 60px; position: relative; }
 .chart-fit > svg { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; }
 
-/* Kleine Bildschirme: Navigation unten nur mit Symbolen (Beschriftung als Tooltip/Screenreader-Name) */
-@media (max-width: 959px) {
-  [data-style="xenia"] .nav-label { display: none; }
-  [data-style="xenia"] .navbar { padding-top: 8px; padding-bottom: calc(8px + var(--sab)); }
-  :root[data-style="xenia"] { --nav-h: 56px; }
-  [data-style="xenia"] .navbar-inner.lots .nav-item { flex: 1 0 48px; }
-}
 
 /* Dashboard-Instrumente: füllen die Kachel, Größe und Anordnung (4 × 1 oder 2 × 2) setzt das Skript */
 .dash > .tile > .tile-body > .gauge-fit { flex: 1; min-height: 90px; position: relative; overflow: hidden; }

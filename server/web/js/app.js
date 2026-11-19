@@ -24,7 +24,7 @@ const ROUTES = [
   { path: '/timer', label: 'Timer', icon: 'event', view: timerView, title: 'Timer' },
   { path: '/muehle', label: 'Mühle', icon: 'grinder', view: grinderView, title: 'Mühle' },
   // Einstellungen: immer in der Leiste, lässt sich nicht ausblenden
-  { path: '/einstellungen', label: 'Einstellungen', icon: 'settings', view: settingsView, title: 'Einstellungen', fixed: true },
+  { path: '/einstellungen', label: 'Einstellungen', short: 'Einstell.', icon: 'settings', view: settingsView, title: 'Einstellungen', fixed: true },
   { path: '/einstellungen/maschine', label: 'Maschine', icon: 'settings', view: machineSettingsView, title: 'Maschinen-Einstellungen', nav: false, back: '/einstellungen' },
   { path: '/bezuege/bezug', label: 'Bezug', icon: 'coffeeLine', view: shotPageView, title: 'Bezug', nav: false, back: '/bezuege' },
   { path: '/skripte/neu', label: 'Skript erstellen', icon: 'add', view: scriptNewView, title: 'Skript erstellen', nav: false, back: '/skripte' },
@@ -225,9 +225,9 @@ function buildNav() {
   $('back-btn').replaceChildren(icon('left'));
   const routes = navRoutes();
   const cls = `navbar-inner${routes.length > 5 ? ' many' : ''}${routes.length > 7 ? ' lots' : ''}`;
-  // Auf kleinen Bildschirmen nur Symbole: Name als Tooltip und für Screenreader
+  // Beschriftung mit Kurzform für schmale Leisten (CSS wählt, siehe .nav-label); voller Name als Tooltip/Screenreader
   const make = (r) => h('button', { class: 'nav-item', dataset: { path: r.path }, title: r.label, 'aria-label': r.label, onclick: () => navigate(r.path) },
-    h('span', { class: 'pill' }, icon(r.icon)), h('span', { class: 'nav-label' }, r.label));
+    h('span', { class: 'pill' }, icon(r.icon)), h('span', { class: 'nav-label', 'aria-hidden': 'true' }, h('span', { class: 'full' }, r.label), h('span', { class: 'short' }, r.short || r.label)));
   const old = $('navbar').querySelector('.navbar-inner');
   if (!old || !old.isConnected || matchMedia('(prefers-reduced-motion: reduce)').matches) {
     $('navbar').replaceChildren(h('div', { class: cls }, routes.map(make)));
