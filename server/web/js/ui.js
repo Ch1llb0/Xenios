@@ -145,20 +145,35 @@ export function switchEl({ checked, disabled, onChange, label }) {
 }
 
 export function sliderRow({ label, min, max, step = 1, value, unit = '', digits = 1, onInput }) {
-  const out = h('span', { class: 'value' });
-  const input = h('input', { type: 'range', min, max, step, value });
+  // Wert antippen: genaue Eingabe per Tastatur in einem Dialog (zusätzlich zum Regler). Der eingegebene Wert gilt genau
+  // (auf die angezeigten Nachkommastellen), auch zwischen den Rasterschritten des Reglers.
+  const out = h('button', { type: 'button', class: 'value value-edit', title: 'Wert eingeben', 'aria-label': `${label}: Wert eingeben` });
+  const input = h('input', { type: 'range', min, max, step, value, 'aria-label': label });
+  let cur = Number(input.value);
   const paint = () => {
-    const pct = ((Number(input.value) - min) / (max - min)) * 100;
+    const pct = ((cur - min) / (max - min)) * 100;
     input.style.setProperty('--fill', `${pct}%`);
-    out.textContent = `${fmt(Number(input.value), digits)}${unit ? ' ' + unit : ''}`;
+    out.textContent = `${fmt(cur, digits)}${unit ? ' ' + unit : ''}`;
   };
   input.addEventListener('input', () => {
+    cur = Number(input.value);
     paint();
-    onInput?.(Number(input.value));
+    onInput?.(cur);
+  });
+  out.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const n = await promptNumber(label, { value: cur, min, max, step, unit, digits });
+    if (n === null) return;
+    if (!Number.isFinite(n)) { snackbar(`Erlaubt: ${fmt(min, digits)}–${fmt(max, digits)}${unit ? ' ' + unit : ''}`); return; }
+    const f = 10 ** digits;
+    cur = Math.min(max, Math.max(min, Math.round(n * f) / f));
+    input.value = String(cur);
+    paint();
+    onInput?.(cur);
   });
   paint();
   const row = h('div', { class: 'slider-row' }, h('span', { class: 'label' }, label), out, input);
-  row.setValue = (v) => { input.value = v; paint(); };
+  row.setValue = (v) => { input.value = v; cur = Number(v); paint(); };
   row.input = input;
   return row;
 }
@@ -231,14 +246,16 @@ export function dialog(title, content, actions = []) {
   });
 }
 
-export function promptNumber(title, { value, min, max, step = 0.1, unit = '' } = {}) {
-  const input = h('input', { class: 'text', type: 'number', inputmode: 'decimal', min, max, step, value: value ?? '' });
-  const p = dialog(title, h('label', { class: 'field' }, h('span', {}, `${fmt(min, 0)}–${fmt(max, 0)} ${unit}`), input), [
+export function promptNumber(title, { value, min, max, step = 0.1, unit = '', digits = 0 } = {}) {
+  // Textfeld mit Zifferntastatur: nimmt Komma und Punkt an (ein Zahlenfeld verwirft je nach Sprache das Komma)
+  const input = h('input', { class: 'text', type: 'text', inputmode: 'decimal', autocomplete: 'off', value: value == null ? '' : String(Math.round(value * 1000) / 1000).replace('.', ',') });
+  const p = dialog(title, h('label', { class: 'field' }, h('span', {}, `${fmt(min, digits)}–${fmt(max, digits)} ${unit}`), input), [
     { label: 'Abbrechen', value: null },
     { label: 'OK', value: 'ok', kind: 'filled' },
   ]).then((r) => {
     if (r !== 'ok') return null;
-    const n = Number(String(input.value).replace(',', '.'));
+    const raw = String(input.value).trim().replace(/\s/g, '').replace(',', '.');
+    const n = raw === '' ? NaN : Number(raw);
     return Number.isFinite(n) && n >= min && n <= max ? n : NaN;
   });
   setTimeout(() => { input.focus(); input.select(); }, 60);

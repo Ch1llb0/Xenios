@@ -236,6 +236,10 @@ select, select.text, option {
 .slider-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 6px 0; }
 .slider-row .label { font-size: 13px; color: var(--on-surface-variant); }
 .slider-row .value { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+/* Wert antippbar (Eingabe per Tastatur): dezent als Feld erkennbar */
+.slider-row .value-edit { font: inherit; font-weight: 600; color: var(--on-surface); background: var(--surface-container-highest); border: 0; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+.slider-row .value-edit:hover { background: color-mix(in srgb, var(--primary) 14%, var(--surface-container-highest)); }
+.slider-row .value-edit:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .slider-row input[type="range"] { grid-column: 1 / -1; }
 input[type="range"] {
   -webkit-appearance: none; appearance: none; width: 100%; height: 32px; background: transparent; margin: 0;
