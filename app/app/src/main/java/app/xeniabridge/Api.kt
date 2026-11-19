@@ -205,11 +205,12 @@ object Api {
     val SERVER_DOWN = setOf(502, 503, 504, 521, 522, 523, 530)
 
     /** Ein/Aus umschalten: Aus oder Eco → Ein, sonst → Aus. Gibt den gesendeten Modus zurück. */
-    fun toggle(context: Context): String {
+    /** noSteam: immer ohne Dampfkessel einschalten (Widget „Ein ohne Dampf/Aus“) */
+    fun toggle(context: Context, noSteam: Boolean = false): String {
         val s = state(context)
         if (!s.online) throw ApiException(502, "Maschine nicht erreichbar")
         if (s.shot) throw ApiException(409, "Bezug läuft – bitte an der Maschine stoppen")
-        val mode = if (s.isOn) "off" else "on"
+        val mode = if (s.isOn) "off" else if (noSteam) MODE_ON_NO_STEAM else "on"
         power(context, mode)
         return mode
     }

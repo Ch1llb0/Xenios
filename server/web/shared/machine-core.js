@@ -296,6 +296,8 @@ export class Machine extends Emitter {
       pressure: { pump: null, steam: null, steamSet: null, pumpSet: null },
       power: { group: null, boiler: null, pump: null },
       scale: { weight: null, rate: null },
+      // Bluetooth-Waage an der alten Xenia (DBL): verbunden? (BLE in /api/v2/machine); null = unbekannt
+      scaleLink: null,
       flow: { volume: null, rate: null, ml: null },
       shot: { running: false, timeMs: 0, startedAt: null, curve: [] },
       lastShot: null,
@@ -372,6 +374,7 @@ export class Machine extends Emitter {
       const d = await this.client.get(this.livePath);
       this._applyLive(normalizeLive(d));
       this._markOnline();
+      await this._readScaleLink(d);
     } catch (e) {
       // Ein einzelner Aussetzer (WLAN der Maschine, Zeitüberschreitung) ist noch nicht „offline“: gleich noch einmal
       // fragen. Sonst meldet z. B. ein Widget, das genau dann nachsieht, bis zum nächsten Update „Offline“.
@@ -631,6 +634,25 @@ export class Machine extends Emitter {
     this.emit('event', { topic, ...msg, at: new Date().toISOString() });
   }
 
+  // Alte Xenia: alle 10 s nachsehen, ob die Bluetooth-Waage verbunden ist. Ein Gewicht ungleich 0 zählt sofort.
+  async _readScaleLink(d) {
+    if (this.apiId !== 'classic') return;
+    const weighs = (num(d?.SCALE_WEIGHT) || 0) !== 0;
+    if (Date.now() >= (this._scaleLinkAt || 0)) {
+      this._scaleLinkAt = Date.now() + 10_000;
+      try {
+        const mm = await this.client.get('/api/v2/machine');
+        if (mm && 'BLE' in mm) this._ble = (num(mm.BLE) || 0) > 0;
+      } catch { /* optional */ }
+    }
+    if (this._ble === undefined && !weighs) return;
+    const connected = Boolean(this._ble) || weighs;
+    if (this.state.scaleLink?.connected !== connected) {
+      this.state.scaleLink = { connected };
+      this.emit('state');
+    }
+  }
+
   snapshot() {
     return { ...this.state, api: this.apiId, shot: { ...this.state.shot, curve: this.state.shot.curve.slice(-120) } };
   }
@@ -638,6 +660,9 @@ export class Machine extends Emitter {
   // Bezugs-Protokoll: bis zu 2000 Einträge, Druckkurven nur für die neuesten 100 (Speicherplatz)
   _log(shot) {
     const h = this.history.data;
+    // Ohne Mühle und eigene Angabe gilt die Standard-Dosis – auch für nachträglich (über den Zähler) erfasste Bezüge
+    const defDose = this.defaultDoseG;
+    if (defDose && shot.doseDefaultG == null && shot.dose?.g == null && shot.notes?.doseG == null) shot.doseDefaultG = defDose;
     h.shots.unshift(shot);
     h.shots = h.shots.slice(0, 2000);
     for (let i = 100; i < h.shots.length && h.shots[i].curve; i++) delete h.shots[i].curve;
@@ -821,6 +846,10 @@ export class Machine extends Emitter {
         const d = Number(defaultDoseG);
         if (!Number.isFinite(d) || d < 3 || d > 40) throw httpError(400, 'Standard-Dosis muss zwischen 3 und 40 g liegen');
         next.defaultDoseG = Math.round(d * 10) / 10;
+        // Bisherige Bezüge ganz ohne Dosis bekommen sie ebenfalls, damit auch dort das Verhältnis erscheint
+        for (const shot of this.history.data.shots || []) {
+          if (shot.doseDefaultG == null && shot.dose?.g == null && shot.notes?.doseG == null) shot.doseDefaultG = next.defaultDoseG;
+        }
       }
     }
     this.history.data.settings = next;

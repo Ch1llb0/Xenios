@@ -2,7 +2,7 @@
 // (Ein/Eco/Aus, Dampf, Skript stoppen) und „Sollwerte“. Am Handy (eine Spalte) sind die Kacheln so hoch wie ihr Inhalt. Auswahl, Reihenfolge, Breite und Höhe der Kacheln speichert jedes Gerät für sich (localStorage).
 // Raster wie bei Android-Widgets: Breite in Spalten (oder ganze Breite), Höhe in Zellen; Kacheln einer Zeile sind gleich hoch.
 import { h, icon, fmt, fmtInt, ago, sheet, switchEl, snackbar, promptNumber } from '../ui.js';
-import { api, store, subscribe, hasGrinder, machineOn, scriptActive } from '../api.js';
+import { api, store, subscribe, hasGrinder, machineOn, scriptActive, isClassic } from '../api.js';
 import { isHidden, noSteamOn, setNoSteamOn, powerOnBody, onPrefs } from '../prefs.js';
 import { createGauge, ring, shotChart, barChart, targetBar, liveChart } from '../gauge.js';
 import { navigate, setTopActions, localStorageGet, localStorageSet } from '../app.js';
@@ -451,7 +451,10 @@ function shotTile({ wide, h: rows }) {
         h('div', { class: 'dash-kpis' },
           kpi(running ? 'Druck' : 'Max. Druck', fmt(p), 'bar', 'pu'),
           kpi('Gewicht', w ? fmt(w) : running ? fmt(0) : '–', 'g', 'w'),
-          running ? kpi('Fluss', fmt(flow), 'g/s') : kpi('Menge', ls.volumeMl ? fmt(ls.volumeMl, 0) : '–', 'ml')));
+          running ? kpi('Fluss', fmt(flow), 'g/s')
+            // Ohne Durchflussmesser (alte Xenia) statt der Wassermenge das Verhältnis
+            : isClassic() ? kpi('Verhältnis', shotMetrics(ls).ratio ? `1:${fmt(shotMetrics(ls).ratio)}` : '–', '')
+            : kpi('Menge', ls.volumeMl ? fmt(ls.volumeMl, 0) : '–', 'ml')));
       return { extra: running ? h('span', { class: 'badge ok pulse' }, 'Bezug läuft') : h('span', { class: 'badge' }, 'Fertig') };
     },
   };
@@ -588,6 +591,8 @@ function statusTile() {
       chips.replaceChildren(
         m.tankOk === false ? h('span', { class: 'badge bad' }, 'Tank leer') : m.tankOk ? h('span', { class: 'badge ok' }, 'Tank ok') : null,
         h('span', { class: 'badge' }, m.steamOn ? (m.steamReady ? 'Dampf bereit' : 'Dampf heizt') : 'Dampf aus'),
+        // Alte Xenia (DBL): verbundene Bluetooth-Waage
+        m.online && m.scaleLink?.connected && !isHidden('scale') ? h('span', { class: 'badge ok' }, 'Waage verbunden') : null,
         h('span', { class: 'badge' }, `${fmtInt(n)} ${n === 1 ? 'Bezug' : 'Bezüge'} heute`));
       return {};
     },
@@ -863,7 +868,8 @@ function liveTile({ wide, h: rows, relayout }) {
           ...row('Heizleistung Gruppe / Kessel', `${fmt(m.power?.group, 0)} % / ${fmt(m.power?.boiler, 0)} %`),
           ...row('Pumpenleistung', `${fmt(m.power?.pump, 0)} %`),
           ...(isHidden('scale') ? [] : row('Waage', `${fmt(m.scale?.weight)} g · ${fmt(m.scale?.rate)} g/s`)),
-          ...row('Durchfluss', `${fmt(m.flow?.ml ?? m.flow?.volume, 0)} ml · ${fmt(m.flow?.rate)} ml/s`),
+          // Die alte Xenia (DBL) hat keinen Durchflussmesser (Felder stehen immer auf 0)
+          ...(isClassic() ? [] : row('Durchfluss', `${fmt(m.flow?.ml ?? m.flow?.volume, 0)} ml · ${fmt(m.flow?.rate)} ml/s`)),
           ...row('Wassertank', m.tankOk === false ? 'leer' : m.tankOk ? 'ok' : '–'));
       }
   }

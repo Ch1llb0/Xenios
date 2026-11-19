@@ -57,6 +57,7 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Xenia.Invisible" />
 
+        <!-- Reihenfolge wie in der Widget-Auswahl gewünscht: Ein/Aus, Ein ohne Dampf/Aus, Kaffeemaschine, Schalter, dann wie die Home-Kacheln -->
         <receiver
             android:name=".PowerWidget"
             android:exported="false"
@@ -68,13 +69,13 @@
         </receiver>
 
         <receiver
-            android:name=".SwitchWidget"
+            android:name=".PowerNoSteamWidget"
             android:exported="false"
-            android:label="@string/widget_switch">
+            android:label="@string/widget_powerns">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_switch_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_powerns_info" />
         </receiver>
 
         <receiver
@@ -88,6 +89,16 @@
         </receiver>
 
         <receiver
+            android:name=".SwitchWidget"
+            android:exported="false"
+            android:label="@string/widget_switch">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_switch_info" />
+        </receiver>
+
+        <receiver
             android:name=".GaugesWidget"
             android:exported="false"
             android:label="@string/widget_gauges">
@@ -95,26 +106,6 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_gauges_info" />
-        </receiver>
-
-        <receiver
-            android:name=".TargetsWidget"
-            android:exported="false"
-            android:label="@string/widget_targets">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_targets_info" />
-        </receiver>
-
-        <receiver
-            android:name=".CareWidget"
-            android:exported="false"
-            android:label="@string/widget_care">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_care_info" />
         </receiver>
 
         <receiver
@@ -155,6 +146,26 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_shotslarge_info" />
+        </receiver>
+
+        <receiver
+            android:name=".TargetsWidget"
+            android:exported="false"
+            android:label="@string/widget_targets">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_targets_info" />
+        </receiver>
+
+        <receiver
+            android:name=".CareWidget"
+            android:exported="false"
+            android:label="@string/widget_care">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_care_info" />
         </receiver>
 
         <!-- Nächsten Wecker an den Server melden (Wecker-Automatik) -->

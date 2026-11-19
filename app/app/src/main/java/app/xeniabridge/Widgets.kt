@@ -39,6 +39,8 @@ object Widgets {
     const val ACTION_REFRESH = "app.xeniabridge.widget.REFRESH"
     /** Automatisch (Android, Nachsehen beim Aufheizen, erneuter Versuch, App verlassen): kurze Aussetzer übergehen. */
     const val ACTION_UPDATE = "app.xeniabridge.widget.UPDATE"
+    /** Ein (immer ohne Dampfkessel) / Aus mit einem Tipp */
+    const val ACTION_TOGGLE_NOSTEAM = "app.xeniabridge.widget.TOGGLE_NOSTEAM"
     const val EXTRA_MODE = "mode"
     const val EXTRA_KEY = "key"
     const val EXTRA_DELTA = "delta"
@@ -51,6 +53,7 @@ object Widgets {
 
     private val KINDS = listOf(
         Kind(PowerWidget::class.java, R.layout.widget_power, 140, 90),
+        Kind(PowerNoSteamWidget::class.java, R.layout.widget_powerns, 140, 90),
         Kind(SwitchWidget::class.java, R.layout.widget_switch, 300, 150),
         Kind(LargeWidget::class.java, R.layout.widget_large, 300, 230),
         Kind(GaugesWidget::class.java, R.layout.widget_gauges, 300, 150),
@@ -130,19 +133,13 @@ object Widgets {
     }
 
     /**
-     * Nächste Aktualisierung planen, so live wie möglich: beim Bezug jede Sekunde, sonst alle 2 s (aus/Eco: 5 s).
-     * Nur bei eingeschaltetem Bildschirm und nicht, solange die App selbst offen ist (dann sind die Widgets nicht zu
-     * sehen; beim Verlassen der App geht es sofort weiter). Der Wecker weckt das Handy nicht (ELAPSED_REALTIME): bei
-     * ausgeschaltetem Bildschirm fällt nichts an, beim Einschalten wird sofort aktualisiert.
+     * Nächste Aktualisierung planen, so oft wie Android es erlaubt: Wecker liegen für Apps mindestens 5 s in der Zukunft
+     * (kürzere setzt Android auf 5 s). Nur bei eingeschaltetem Bildschirm und nicht, solange die App selbst offen ist
+     * (dann sind die Widgets nicht zu sehen; beim Verlassen der App geht es sofort weiter). Der Wecker weckt das Handy
+     * nicht (ELAPSED_REALTIME): bei ausgeschaltetem Bildschirm fällt nichts an, beim Einschalten wird sofort aktualisiert.
      */
     private fun scheduleFollowUp(context: Context, s: Api.State, fails: Int) {
-        val delay = when {
-            !s.online -> retryDelay(fails)
-            s.shot -> 1_000L
-            s.isOn -> 2_000L
-            else -> 5_000L
-        }
-        schedule(context, delay)
+        schedule(context, if (!s.online) retryDelay(fails) else 5_000L)
     }
 
     private fun retryDelay(fails: Int): Long = RETRY_MS[(fails - 1).coerceIn(0, RETRY_MS.lastIndex)]
@@ -195,6 +192,7 @@ object Widgets {
                         try {
                             when (intent.action) {
                                 ACTION_TOGGLE -> Api.toggle(app)
+                                ACTION_TOGGLE_NOSTEAM -> Api.toggle(app, noSteam = true)
                                 ACTION_POWER -> Api.power(app, intent.getStringExtra(EXTRA_MODE) ?: "on")
                                 ACTION_STEAM, ACTION_STOP, ACTION_TARGET -> {
                                     if (prefs.direct) throw Api.ApiException(0, "Im Direkt-Modus nur in der App")
@@ -310,22 +308,15 @@ object Widgets {
             return rv
         }
         when (k.cls) {
-            PowerWidget::class.java -> { drawPower(p, s); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE)) }
+            PowerWidget::class.java -> { drawPower(p, s, "Ein/Aus"); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE)) }
+            PowerNoSteamWidget::class.java -> { drawPower(p, s, "Ein ohne Dampf/Aus", noSteam = true); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE_NOSTEAM)) }
             SwitchWidget::class.java -> { drawSwitch(p, p.layout("switch"), s, d); bindSwitch(context, rv, s) }
             LargeWidget::class.java -> {
-                val live = d.raw?.optJSONObject("live")
-                if (live != null) {
-                    drawLive(p, p.layout("large_live"), live)
-                    rv.setViewVisibility(R.id.ov_large, View.GONE)
-                    rv.setViewVisibility(R.id.ov_large_live, View.VISIBLE)
-                    rv.setOnClickPendingIntent(R.id.live_stop, broadcast(context, ACTION_STOP))
-                    rv.setOnClickPendingIntent(R.id.live_head, openIntent(context, "/"))
-                } else {
-                    drawLarge(p, p.layout("large"), s, d)
-                    rv.setViewVisibility(R.id.ov_large, View.VISIBLE)
-                    rv.setViewVisibility(R.id.ov_large_live, View.GONE)
-                    bindSwitch(context, rv, s)
-                }
+                // Keine Live-Ansicht des Bezugs: Android aktualisiert Widgets höchstens alle paar Sekunden, zu träge dafür
+                drawLarge(p, p.layout("large"), s, d)
+                rv.setViewVisibility(R.id.ov_large, View.VISIBLE)
+                rv.setViewVisibility(R.id.ov_large_live, View.GONE)
+                bindSwitch(context, rv, s)
             }
             GaugesWidget::class.java -> { drawGauges(p, p.layout("gauges"), s, d); rv.setOnClickPendingIntent(R.id.root, openIntent(context, "/")) }
             TargetsWidget::class.java -> {
@@ -388,17 +379,18 @@ object Widgets {
         if (!d.login && p.hDp > 70) p.text("Antippen zum Neuladen", r.centerX(), r.bottom - 2, 10f, p.t.outline, 0, Paint.Align.CENTER)
     }
 
-    private fun drawPower(p: WidgetPainter, s: Api.State) {
+    private fun drawPower(p: WidgetPainter, s: Api.State, title: String, noSteam: Boolean = false) {
         val rows = p.layout("power")
         // Titel wie bei den anderen Widgets („Xenios – Ein/Aus“, bei wenig Platz nur „Ein/Aus“)
-        rows["head"]?.let { p.head(it, R.drawable.wi_power, "Ein/Aus") }
+        rows["head"]?.let { p.head(it, R.drawable.wi_power, title) }
         val r = rows["body"] ?: return
         val d = min(40f, r.height())
         val on = s.isOn || s.isEco
         p.roundRect(RectF(r.left, r.centerY() - d / 2, r.left + d, r.centerY() + d / 2), d / 2, if (on) p.t.primary else p.t.highest)
         p.icon(R.drawable.wi_power, r.left + d / 2 - 11, r.centerY() - 11, 22f, if (on) p.t.onPrimary else p.t.onSurface)
         val tx = RectF(r.left + d + 10, r.top, r.right, r.bottom)
-        val sub = if (s.online && !s.isOff && s.group != null) "${fmt(s.group)} °C" else null
+        val sub = if (s.online && !s.isOff && s.group != null) "${fmt(s.group)} °C${if (noSteam && !s.steamOn) " · ohne Dampf" else ""}"
+            else if (noSteam && s.online) "ohne Dampf" else null
         if (sub == null) p.textMid(stateLabel(s), tx, 14f, p.t.onSurface, 1)
         else {
             p.textMid(stateLabel(s), RectF(tx.left, tx.top, tx.right, tx.centerY() + 1), 14f, p.t.onSurface, 1)
@@ -465,32 +457,6 @@ object Widgets {
             out += DoubleArray(pt.length()) { k -> if (pt.isNull(k)) Double.NaN else pt.optDouble(k) }
         }
         return out
-    }
-
-    private fun drawLive(p: WidgetPainter, r: Map<String, RectF>, live: JSONObject) {
-        val title = live.optString("title").takeIf { it.isNotBlank() && it != "null" }
-        r["head"]?.let { p.head(it, R.drawable.wi_coffee_drip, "Bezug läuft", title, rightBadge = Pair(p.withAlpha(p.t.success, 0.22f), p.t.success)) }
-        r["info"]?.let { i ->
-            val rad = min(30f, i.height() / 2)
-            val t = live.optDouble("timeS", 0.0)
-            p.ring(i.left + rad, i.centerY(), rad, (t / 30).toFloat(), "${t.roundToInt()} s")
-            val kv = RectF(i.left + rad * 2 + 14, i.top, i.right, i.bottom)
-            val rows = listOf("Druck" to "${fmt(live.optDouble("pressure").takeIf { !it.isNaN() })} bar", "Gewicht" to "${fmt(live.optDouble("weight").takeIf { !it.isNaN() })} g", "Fluss" to "${fmt(live.optDouble("rate").takeIf { !it.isNaN() })} g/s")
-            val rh = kv.height() / rows.size
-            rows.forEachIndexed { k, (a, b) ->
-                val row = RectF(kv.left, kv.top + rh * k, kv.right, kv.top + rh * (k + 1))
-                p.textMid(a, row, 12f, p.t.onSurface)
-                p.textMid(b, row, 12f, p.t.onSurface, 1, Paint.Align.RIGHT)
-            }
-        }
-        r["chart"]?.let { p.shotChart(it, curveOf(live.optJSONArray("curve")), 30.0) }
-        r["stop"]?.let { st ->
-            p.roundRect(st, 10f, p.t.danger)
-            val tw = p.measure("Skript stoppen", 13f, 1)
-            val x0 = st.centerX() - (tw + 22) / 2
-            p.icon(R.drawable.wi_stop, x0, st.centerY() - 9, 18f, p.t.onDanger)
-            p.textMid("Skript stoppen", RectF(x0 + 22, st.top, st.right, st.bottom), 13f, p.t.onDanger, 1)
-        }
     }
 
     private fun drawGauges(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
@@ -649,7 +615,7 @@ abstract class XeniaWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Widgets.ACTION_TOGGLE, Widgets.ACTION_POWER, Widgets.ACTION_STEAM, Widgets.ACTION_NOSTEAM, Widgets.ACTION_TARGET,
+            Widgets.ACTION_TOGGLE, Widgets.ACTION_TOGGLE_NOSTEAM, Widgets.ACTION_POWER, Widgets.ACTION_STEAM, Widgets.ACTION_NOSTEAM, Widgets.ACTION_TARGET,
             Widgets.ACTION_STOP, Widgets.ACTION_REFRESH, Widgets.ACTION_UPDATE -> Widgets.handleAction(this, context, intent)
             else -> super.onReceive(context, intent)
         }
@@ -658,9 +624,11 @@ abstract class XeniaWidget : AppWidgetProvider() {
 
 /** 2×1: Ein/Aus mit einem Tipp */
 class PowerWidget : XeniaWidget()
+/** 2×1: Ein ohne Dampfkessel / Aus mit einem Tipp */
+class PowerNoSteamWidget : XeniaWidget()
 /** 4×2: Ein/Eco/Aus, Dampfkessel, Ohne Dampf einschalten */
 class SwitchWidget : XeniaWidget()
-/** 4×3: Status und Schalter; während eines Bezugs Live-Ansicht mit Stopp */
+/** 4×3: Status und Schalter */
 class LargeWidget : XeniaWidget()
 /** 4×2: Instrumente */
 class GaugesWidget : XeniaWidget()
