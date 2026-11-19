@@ -31,7 +31,13 @@ class WidgetTheme(
     val mano: Boolean,
     val gaugeWhite: Boolean,
     val dark: Boolean,
+    /** Design der App: Xenia (fast eckig, Open Sans, Schalter mit Rand in der Akzentfarbe) oder Material (rund) */
+    val xenia: Boolean = false,
 ) {
+    /** Eckenradien je Design (dp): Karte, Schalter/Knöpfe, Plaketten */
+    val cardR get() = if (xenia) 6f else 22f
+    val btnR: (Float) -> Float get() = { h -> if (xenia) 2f else h / 2 }
+    val badgeR get() = if (xenia) 2f else 9f
     private fun col(k: String, light: Int, darkC: Int) = c[k] ?: if (dark) darkC else light
     val bg get() = col("bg", 0xFFFFFFFF.toInt(), 0xFF1F1F25.toInt())
     val onSurface get() = col("onSurface", 0xFF1B1B21.toInt(), 0xFFE4E1E9.toInt())
@@ -75,6 +81,7 @@ class WidgetTheme(
                 json?.optBoolean("mano", false) ?: false,
                 (part?.optString("gauge") ?: if (dark) "black" else "white") == "white",
                 dark,
+                json?.optString("palette") == "xenia",
             )
         }
     }
@@ -84,9 +91,11 @@ class WidgetTheme(
 class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float, val hDp: Float, val s: Float) {
     val bitmap: Bitmap = Bitmap.createBitmap(max(1, (wDp * s).roundToInt()), max(1, (hDp * s).roundToInt()), Bitmap.Config.ARGB_8888)
     val c = Canvas(bitmap)
-    private val regular: Typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-    private val medium: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-    private val bold: Typeface = Typeface.create("sans-serif", Typeface.BOLD)
+    // Schrift je Design: Xenia „Open Sans“ wie die Web-Oberfläche der Maschine, Material die Systemschrift
+    private fun font(id: Int, fallback: Typeface): Typeface = runCatching { ctx.resources.getFont(id) }.getOrDefault(fallback)
+    private val regular: Typeface = if (t.xenia) font(R.font.open_sans_regular, Typeface.SANS_SERIF) else Typeface.create("sans-serif", Typeface.NORMAL)
+    private val medium: Typeface = if (t.xenia) font(R.font.open_sans_semibold, Typeface.SANS_SERIF) else Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    private val bold: Typeface = if (t.xenia) font(R.font.open_sans_semibold, Typeface.DEFAULT_BOLD) else Typeface.create("sans-serif", Typeface.BOLD)
 
     fun px(dp: Float) = dp * s
     // Hinweis: bei Farbverläufen (shader) muss die Farbe deckend sein – Android übernimmt ihre Deckkraft für den Verlauf
@@ -121,7 +130,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
     }
 
     fun card() {
-        c.drawRoundRect(RectF(0f, 0f, px(wDp), px(hDp)), px(22f), px(22f), fill(t.bg))
+        c.drawRoundRect(RectF(0f, 0f, px(wDp), px(hDp)), px(t.cardR), px(t.cardR), fill(t.bg))
     }
 
     private fun rpx(r: RectF) = RectF(px(r.left), px(r.top), px(r.right), px(r.bottom))
@@ -198,7 +207,7 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
     fun badgeRight(str: String, right: Float, cy: Float, bg: Int, fg: Int): Float {
         val w = measure(str, 10f, 1) + 12
         val r = RectF(right - w, cy - 9, right, cy + 9)
-        roundRect(r, 6f, bg)
+        roundRect(r, t.badgeR, bg)
         textMid(str, r, 10f, fg, 1, Paint.Align.CENTER)
         return w
     }
@@ -206,14 +215,16 @@ class WidgetPainter(private val ctx: Context, val t: WidgetTheme, val wDp: Float
     fun badge(str: String, x: Float, cy: Float, bg: Int, fg: Int): Float {
         val w = measure(str, 10f, 1) + 12
         val r = RectF(x, cy - 9, x + w, cy + 9)
-        roundRect(r, 6f, bg)
+        roundRect(r, t.badgeR, bg)
         textMid(str, r, 10f, fg, 1, Paint.Align.CENTER)
         return w
     }
 
     /** Segment-Knopf (Ein/Eco/Aus) */
     fun segButton(r: RectF, iconRes: Int, label: String, active: Boolean, enabled: Boolean) {
-        if (active) roundRect(r, 10f, t.active) else roundRect(r, 10f, Color.TRANSPARENT, t.outlineVariant)
+        // wie die Kachel „Schalter“: Material pillenförmig mit dezentem Rand, Xenia fast eckig mit Rand in der Akzentfarbe
+        val rad = t.btnR(r.height())
+        if (active) roundRect(r, rad, t.active) else roundRect(r, rad, Color.TRANSPARENT, if (t.xenia) t.primary else t.outlineVariant)
         val fg = when { active -> t.onActive; enabled -> t.onSurface; else -> withAlpha(t.onSurface, 0.38f) }
         val tw = measure(label, 12.5f, 1)
         val isz = 15f
