@@ -2,6 +2,7 @@ package app.xeniabridge
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
@@ -28,7 +29,7 @@ import javax.net.ssl.X509TrustManager
 object DirectHttp {
     private const val MAX_BODY = 20 * 1024 * 1024
 
-    private fun sha256Hex(bytes: ByteArray): String =
+    fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     /** pin = null: jedes Zertifikat (erster Kontakt); sonst nur genau dieses. */
@@ -48,7 +49,7 @@ object DirectHttp {
     private var pinned: Pair<String, SSLContext>? = null
 
     @Synchronized
-    private fun contextFor(pin: String?): SSLContext {
+    fun contextFor(pin: String?): SSLContext {
         if (pin.isNullOrEmpty()) return trustFirst
         pinned?.let { if (it.first == pin) return it.second }
         return tlsContext(pin).also { pinned = pin to it }
@@ -105,6 +106,22 @@ object DirectHttp {
                 .put("headers", outHeaders)
                 .put("body", Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP))
                 .put("fingerprint", fingerprint ?: JSONObject.NULL)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Zertifikat einer https-Adresse im Heimnetz lesen (erster Kontakt, noch ohne Pin). */
+    fun fingerprint(base: String): String? {
+        val conn = URL(base.trimEnd('/') + "/healthz").openConnection() as? HttpsURLConnection ?: return null
+        try {
+            conn.sslSocketFactory = contextFor(null).socketFactory
+            conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+            conn.connectTimeout = 4000
+            conn.readTimeout = 4000
+            conn.connect()
+            val cert = conn.serverCertificates.firstOrNull() ?: return null
+            return sha256Hex(cert.encoded)
         } finally {
             conn.disconnect()
         }
@@ -180,7 +197,9 @@ object DirectMachine {
         val group = temp(d.num("BG_SENS_TEMP_A"), bgOff)
         val groupSet = single.num("BG_SET_TEMP") ?: general?.num("BG_SET_TEMP")
         val on = status == 1 || status == 3 || status == 4 || status == 5
-        val steamOn = d.num("SB_STATUS")?.toInt() == 2
+        // Neue Firmware: 2 = Dampfkessel an. Alte Firmware wie deren Original-Oberfläche: alles außer 1 (aus) ist an
+        val sb = d.num("SB_STATUS")?.toInt()
+        val steamOn = if (classic) sb != null && sb != 1 else sb == 2
         val steam = d.num("SB_SENS_PRESS")
         val steamSet = single.num("SB_SET_PRESS") ?: general?.num("SB_SET_PRESS")
         return Api.State(
@@ -203,9 +222,17 @@ object DirectMachine {
 
     /** Wie die Original-Oberfläche: Maschine schalten und den Dampfkessel passend mitschalten. */
     fun power(context: Context, mode: String) {
-        val action = when (mode) { "off" -> "0"; "on" -> "1"; "eco" -> "2"; else -> throw Api.ApiException(400, "Ungültiger Modus") }
+        val classic = Prefs(context).machineApi == "classic"
+        val action = when (mode) {
+            "off" -> "0"
+            "on" -> "1"
+            "eco" -> "2"
+            // Alte Xenia: eigene Aktion „an ohne Dampfkessel“; neue: einschalten und Dampfkessel aus
+            Api.MODE_ON_NO_STEAM -> if (classic) "5" else "1"
+            else -> throw Api.ApiException(400, "Ungültiger Modus")
+        }
         post(context, "/api/v2/machine/control", JSONObject().put("action", action))
-        if (Prefs(context).machineApi == "classic") return
+        if (classic) return
         val steam = when (mode) {
             "on" -> if (get(context, "/api/v2/general").num("MA_BOILER_START_MODE")?.toInt() == 2) 0 else 1
             else -> 0
@@ -215,31 +242,77 @@ object DirectMachine {
 }
 
 /** Sucht Maschine und Mühle im WLAN des Handys (nur das eigene /24-Netz). */
+/** Eigenes Zertifikat des Servers im Heimnetz (https://<IP>:8443): nur genau das gemerkte wird akzeptiert. */
+object LocalTls {
+    @Volatile var pin: String? = null
+
+    /** Nur private IPv4-Adressen, nie Cloudflare oder andere Namen. */
+    fun applies(host: String?): Boolean {
+        val n = host?.split('.')?.mapNotNull { it.toIntOrNull() } ?: return false
+        if (n.size != 4) return false
+        return n[0] == 10 || (n[0] == 192 && n[1] == 168) || (n[0] == 172 && n[1] in 16..31)
+    }
+
+    /** Für HttpURLConnection: bei https auf eine private IP mit gemerktem Zertifikat dieses akzeptieren. */
+    fun prepare(conn: HttpURLConnection) {
+        val p = pin
+        if (conn is HttpsURLConnection && !p.isNullOrEmpty() && applies(conn.url.host)) {
+            conn.sslSocketFactory = DirectHttp.contextFor(p).socketFactory
+            conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+        }
+    }
+}
+
 object NetworkScan {
     data class Found(val ip: String, val kind: String, val name: String)
 
     fun ownSubnet(context: Context): String? {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return null
-        val lp = cm.getLinkProperties(cm.activeNetwork) ?: return null
-        val addr = lp.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address && !it.isLoopbackAddress } ?: return null
-        val parts = addr.hostAddress?.split('.') ?: return null
-        if (parts.size != 4) return null
-        return parts.take(3).joinToString(".")
+        // WLAN bevorzugen (bei aktivem VPN ist das aktive Netz sonst das VPN), dann jedes Netz mit privater IPv4-Adresse
+        val nets = (listOfNotNull(cm.activeNetwork) + cm.allNetworks).distinct()
+        val wifiFirst = nets.sortedByDescending { cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true }
+        for (n in wifiFirst) {
+            val lp = runCatching { cm.getLinkProperties(n) }.getOrNull() ?: continue
+            val addr = lp.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address && it.isSiteLocalAddress } ?: continue
+            val parts = addr.hostAddress?.split('.') ?: continue
+            if (parts.size == 4) return parts.take(3).joinToString(".")
+        }
+        return null
     }
 
-    fun scan(context: Context): List<Found> {
+    /** Fortschritt der Suche: abgefragte Adressen (von 254) und bisherige Treffer */
+    fun interface Progress { fun update(done: Int, total: Int, found: Int) }
+
+    fun scan(context: Context, progress: Progress? = null): List<Found> {
         val subnet = ownSubnet(context) ?: return emptyList()
-        val pool = Executors.newFixedThreadPool(32)
+        val pool = Executors.newFixedThreadPool(64)
         val found = java.util.Collections.synchronizedList(mutableListOf<Found>())
+        val done = java.util.concurrent.atomic.AtomicInteger()
         for (i in 1..254) {
             val ip = "$subnet.$i"
             pool.execute {
+                try { probeDevice(ip, found) } finally { progress?.update(done.incrementAndGet(), 254, found.size) }
+            }
+        }
+        pool.shutdown()
+        pool.awaitTermination(90, TimeUnit.SECONDS)
+        return found.sortedBy { it.ip.substringAfterLast('.').toInt() }
+    }
+
+    private fun probeDevice(ip: String, found: MutableList<Found>) {
                 try {
-                    val (code, text) = DirectHttp.text("http://$ip/api/v2/machine", timeoutMs = 900)
+                    // der ESP32 der Xenia antwortet im Stromsparmodus mitunter erst nach über einer Sekunde
+                    val (code, text) = DirectHttp.text("http://$ip/api/v2/machine", timeoutMs = 2500)
                     if (code == 200 && text.contains("MA_TYPE")) {
-                        val type = JSONObject(text).optInt("MA_TYPE")
-                        found += Found(ip, "machine", when (type) { 1 -> "Xenia 2K"; 2 -> "Xenia Dual Boiler"; 3 -> "Xenia Brew-by-Sync"; 4 -> "Xenia 303"; 5 -> "Xenia 2K + L"; else -> "Xenia" })
-                        return@execute
+                        val j = JSONObject(text)
+                        val type = j.optInt("MA_TYPE")
+                        // alte Firmware (4.x, z. B. DBL): eigene Modellnummern
+                        val classic = j.optInt("FW_VERSION_MAJOR", 5) in 1..4
+                        found += Found(ip, "machine", when (type) {
+                            1 -> "Xenia 2K"; 2 -> "Xenia Dual Boiler"; 3 -> if (classic) "Xenia Dual Boiler + L" else "Xenia Brew-by-Sync"
+                            4 -> "Xenia 303"; 5 -> "Xenia 2K + L"; else -> "Xenia"
+                        })
+                        return
                     }
                 } catch (_: Exception) { }
                 try {
@@ -248,10 +321,42 @@ object NetworkScan {
                         found += Found(ip, "grinder", JSONObject(text).optString("grinderTypeName", "Mühle").ifBlank { "Mühle" })
                     }
                 } catch (_: Exception) { }
+    }
+
+    /** Sucht Xenios-Server im eigenen /24-Netz: /healthz antwortet mit dem Kopf X-Xenios-Instance (HTTPS 8443, HTTP 80/8080). */
+    fun scanServers(context: Context, progress: Progress? = null): List<String> {
+        val subnet = ownSubnet(context) ?: return emptyList()
+        val pool = Executors.newFixedThreadPool(64)
+        val found = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val done = java.util.concurrent.atomic.AtomicInteger() // je Adresse drei Abfragen (8443, 80, 8080)
+        for (i in 1..254) {
+            for (base in listOf("https://$subnet.$i:8443", "http://$subnet.$i", "http://$subnet.$i:8080")) {
+                pool.execute {
+                  try {
+                    try {
+                        val conn = URL("$base/healthz").openConnection() as HttpURLConnection
+                        if (conn is HttpsURLConnection) {
+                            conn.sslSocketFactory = DirectHttp.contextFor(null).socketFactory // nur Erkennung; gemerkt wird beim Verbinden
+                            conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+                        }
+                        try {
+                            conn.connectTimeout = 1500
+                            conn.readTimeout = 2000
+                            if (conn.responseCode == 200 && conn.getHeaderField("X-Xenios-Instance") != null) found += base
+                        } finally { conn.disconnect() }
+                    } catch (_: Exception) { }
+                  } finally {
+                    val n = done.incrementAndGet()
+                    if (n % 3 == 0) progress?.update(n / 3, 254, found.map { it.substringAfter("://").substringBefore(':') }.distinct().size)
+                  }
+                }
             }
         }
         pool.shutdown()
         pool.awaitTermination(60, TimeUnit.SECONDS)
-        return found.sortedBy { it.ip.substringAfterLast('.').toInt() }
+        // je Server eine Adresse, HTTPS bevorzugt
+        return found.groupBy { it.substringAfter("://").substringBefore(':') }
+            .map { (_, list) -> list.firstOrNull { it.startsWith("https") } ?: list.first() }
+            .sortedBy { it.substringAfter("://").substringBefore(':').substringAfterLast('.').toInt() }
     }
 }
