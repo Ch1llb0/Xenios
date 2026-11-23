@@ -31,8 +31,8 @@ export const DEFAULTS = {
     url: 'http://192.168.178.55',
     api: 'bbs',               // 'bbs' = neue Xenia (Brew-by-Sync), 'classic' = alte Xenia (DBL-API)
     timeoutMs: 6000,
-    pollActiveMs: 1000,       // App offen und Maschine an / Bezug läuft
-    pollIdleMs: 4000,         // App offen, Maschine aus
+    pollActiveMs: 300,        // App offen und Maschine an / Bezug läuft (Pause nach jeder Antwort; die Xenia braucht selbst 75–400 ms)
+    pollIdleMs: 2000,         // App offen, Maschine aus
     pollBackgroundMs: 10000,  // Keine App offen (nur für Push-Benachrichtigungen)
     slowPollMs: 60000,        // Einstellungen, Zähler, Tank
   },

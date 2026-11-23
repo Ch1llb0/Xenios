@@ -109,3 +109,64 @@ test('Alte zu kurze Einträge ohne Notizen werden aufgeräumt', () => {
   ]);
   assert.deepEqual(m.history.data.shots.map((s) => s.id), ['b', 'c']);
 });
+
+test('Mindestdauer einstellbar: kürzere Bezüge werden weder protokolliert noch gelistet', () => {
+  const m = machine([
+    { id: 'kurz', endedAt: '2026-11-01T08:00:00.000Z', timeMs: 16000 },
+    { id: 'lang', endedAt: '2026-11-01T07:00:00.000Z', timeMs: 28000 },
+    { id: 'notiert', endedAt: '2026-11-01T06:00:00.000Z', timeMs: 17000, notes: { rating: 4 } },
+  ]);
+  assert.equal(m.shotSettings().minShotS, 15);
+  assert.equal(m.shots(10).length, 3);
+  m.setShotSettings({ minShotS: 20 });
+  assert.deepEqual(m.shots(10).map((s) => s.id), ['lang', 'notiert'], 'zu kurz ausgeblendet, bewertete bleiben');
+  assert.equal(m.history.data.shots.length, 3, 'nichts gelöscht');
+  assert.equal(m.state.lastShot.id, 'lang');
+  // Neuer Bezug mit 18 s: unter 20 s → nicht protokolliert
+  m._checkCounter(1);
+  m.state.counters = { extractions: 1 };
+  m._applyLive(diag(1));
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 18000));
+  assert.equal(m.history.data.shots.length, 3);
+  // Mindestdauer 10 s: ein 12-s-Bezug kommt ins Protokoll
+  m.setShotSettings({ minShotS: 10 });
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 12000));
+  assert.equal(m.history.data.shots.length, 4);
+  assert.throws(() => m.setShotSettings({ minShotS: 99 }), /zwischen/);
+  // Standard-Dosis: wird neuen Bezügen mitgegeben, Mindestdauer bleibt
+  assert.ok(m.history.data.shots.every((x) => x.doseDefaultG == null));
+  m.setShotSettings({ defaultDoseG: 18 });
+  assert.equal(m.shotSettings().defaultDoseG, 18);
+  assert.ok(m.history.data.shots.every((x) => x.doseDefaultG === 18), 'bisherige Bezüge ohne Dosis bekommen die Standard-Dosis');
+  assert.equal(m.shotSettings().minShotS, 10);
+  m._applyLive(diag(3, 1000));
+  m._applyLive(diag(1, 15000));
+  const last = m.history.data.shots[0];
+  assert.equal(last.doseDefaultG, 18);
+  assert.equal(last.brewMs, 15000, 'ohne Vorbrühen: Bezugszeit = Gesamtzeit');
+  // Nachträglich über den Zähler erfasster Bezug bekommt sie ebenfalls
+  m._checkCounter(9);
+  assert.equal(m.history.data.shots[0].estimated, true);
+  assert.equal(m.history.data.shots[0].doseDefaultG, 18);
+  assert.throws(() => m.setShotSettings({ defaultDoseG: 99 }), /Standard-Dosis/);
+  m.setShotSettings({ defaultDoseG: null });
+  assert.equal(m.shotSettings().defaultDoseG, null);
+});
+
+test('Ausbeute: Bluetooth-Waage der DBL (SCALE_WEIGHT) und Waage, die am Ende schon zurücksetzt', async () => {
+  const { normalizeLive } = await import('../web/shared/machine-api.js');
+  // interne Waage fehlt (0), die Bluetooth-Waage misst
+  assert.equal(normalizeLive({ PU_SENS_SCALE_VOLUME: 0, SCALE_WEIGHT: 36.4 }).PU_LOADCELL_VOLUME, 36.4);
+  assert.equal(normalizeLive({ PU_SENS_SCALE_VOLUME: 0, SCALE_WEIGHT: 0 }).PU_LOADCELL_VOLUME, 0);
+  assert.equal(normalizeLive({ PU_LOADCELL_VOLUME: 20, SCALE_WEIGHT: 0 }).PU_LOADCELL_VOLUME, 20);
+  // Waage steht nach dem Bezug schon wieder auf 0: der höchste Wert während des Bezugs zählt
+  const m = machine();
+  m._applyLive(diag(1));
+  m._applyLive(diag(3, 1000, { PU_LOADCELL_VOLUME: 0 }));
+  m._applyLive(diag(3, 12000, { PU_LOADCELL_VOLUME: 18 }));
+  m._applyLive(diag(3, 26000, { PU_LOADCELL_VOLUME: 37.2 }));
+  m._applyLive(diag(1, 26000, { PU_LOADCELL_VOLUME: 0 }));
+  assert.equal(m.history.data.shots[0].weight, 37.2);
+});

@@ -4,7 +4,7 @@ import net from 'node:net';
 import crypto from 'node:crypto';
 import { hashPassword, verifyPassword, passwordProblem, sessionCookie } from './auth.js';
 import { updateConfigFile, setPath, getPath, applyTimezone, isTimezone } from './config.js';
-import { XeniaClient, MA_TYPE, machineApiId, httpError } from './machine.js';
+import { XeniaClient, MA_TYPE, CLASSIC_TYPE, machineApiId, httpError } from './machine.js';
 import { GrinderHttp } from './grinder.js';
 import { ensureCert, certInfo } from './tls.js';
 import { setLogLevel, logger } from './log.js';
@@ -55,7 +55,7 @@ export function publicUrl(v) {
   try {
     u = new URL(String(v ?? '').trim());
   } catch {
-    throw bad('Öffentliche Adresse: z. B. https://xenios.deine-domain.de');
+    throw bad('Öffentliche Adresse: z. B. https://xenios.example.de');
   }
   if (u.protocol !== 'https:' || u.port || u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '')) {
     throw bad('Öffentliche Adresse: nur https://name.domain, ohne Port und Pfad');
@@ -172,7 +172,7 @@ export async function probeDevice({ kind, url, password }, { pinned = null, inst
     try { await client.get('/api/v2/general'); apiHint = 'bbs'; } catch { /* alte API hat /general nicht */ }
     return {
       ok: true,
-      name: MA_TYPE[m.MA_TYPE] || `Xenia (Typ ${m.MA_TYPE})`,
+      name: (apiHint === 'classic' ? CLASSIC_TYPE : MA_TYPE)[m.MA_TYPE] || `Xenia (Typ ${m.MA_TYPE})`,
       detail: `Firmware ${m.FW_VERSION_MAJOR}.${m.FW_VERSION_MINOR}`,
       apiHint,
     };
@@ -422,7 +422,15 @@ export function authRoutes(route, app) {
   // --- Server-Einstellungen ---
   route('GET', '/api/admin/config', async (ctx) => view(ctx));
   route('PUT', '/api/admin/config', async (ctx) => {
-    const applied = applyChanges(validate(ctx.body.changes));
+    const clean = validate(ctx.body.changes);
+    // Nicht den Zugang abschalten, über den diese Anfrage gerade kommt (sonst sperrt man sich aus)
+    const sock = ctx.req?.socket;
+    const kind = sock?.encrypted ? 'https' : ctx.req?.lanPort ? 'lan' : 'http';
+    const label = { https: 'HTTPS', lan: 'Heimnetz-HTTP', http: 'den Zugang über den Tunnel-Port' }[kind];
+    if (ctx.req && clean[`${kind}.enabled`] === false) {
+      throw bad(`Diese Sitzung nutzt gerade ${label}. Zum Abschalten erst über einen anderen Zugang öffnen, sonst ist Xenios von hier nicht mehr erreichbar.`);
+    }
+    const applied = applyChanges(clean);
     return { ...view(ctx), applied };
   });
   route('POST', '/api/admin/password', async (ctx) => {

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Machine, buildScript, parseScript } from '../web/shared/machine-core.js';
 import { MemoryStore } from '../web/shared/emitter.js';
-import { targetCurve, shotMetrics, grindAdvice, profileSteps, dialIn } from '../web/shared/shot-analysis.js';
+import { targetCurve, shotMetrics, grindAdvice, profileSteps, dialIn, shotPhases, liveTimes, brewSeconds } from '../web/shared/shot-analysis.js';
 import { DEFAULTS } from '../src/config.js';
 import { setLogLevel } from '../src/log.js';
 
@@ -33,6 +33,8 @@ test('Kennzahlen und Mahlgrad-Tipp', () => {
   const shot = { timeMs: 30000, weight: 34.5, maxPressure: 9, curve, dose: { g: 18 } };
   const m = shotMetrics(shot);
   assert.equal(m.preinfusionS, 6);
+  assert.equal(m.timeS, 24, 'Bezugszeit ohne Vorbrühen');
+  assert.equal(m.totalS, 30);
   assert.equal(m.firstDropS, 8);
   assert.equal(m.ratio, 1.9);
   assert.equal(m.avgFlow, 1.6);
@@ -199,4 +201,40 @@ test('Bohnen anlegen, umbenennen, löschen; Bewertung legt an', () => {
   assert.deepEqual(m.listBeans().map((b) => b.name), ['Kenia Nyeri']);
   assert.throws(() => m.saveBean({ name: '' }), /Name fehlt/);
   assert.throws(() => m.deleteBean('gibt-es-nicht'), /nicht gefunden/);
+});
+
+test('Bezugszeit ohne Vorbrühen, erster Tropfen, Standard-Dosis', () => {
+  // kurzer Druckaufbau (< 3 s) ist kein Vorbrühen
+  const e61 = [[0, 0, 0], [1, 3, 0], [2, 8, 0], [6, 9, 1.2], [25, 9, 36]];
+  assert.deepEqual(shotPhases({ timeMs: 25000, curve: e61 }), { totalMs: 25000, preMs: 0, brewMs: 25000, firstDropMs: 6000 });
+  // Waage nicht tariert (Tasse steht mit 210 g drauf): erster Tropfen = 1 g über dem Tiefstwert
+  const cup = [[0, 2, 210.2], [5, 2, 210.1], [8, 9, 210.4], [10, 9, 211.3], [30, 9, 246]];
+  const ph = shotPhases({ timeMs: 30000, curve: cup });
+  assert.equal(ph.preMs, 8000);
+  assert.equal(ph.brewMs, 22000);
+  assert.equal(ph.firstDropMs, 10000);
+  // gespeicherte Werte gehen vor, ohne Kurve gilt die Gesamtzeit
+  assert.equal(brewSeconds({ timeMs: 30000, brewMs: 23000 }), 23);
+  assert.equal(brewSeconds({ timeMs: 28000 }), 28);
+  // Standard-Dosis, wenn weder Mühle noch Eintrag
+  const m = shotMetrics({ timeMs: 30000, weight: 36, doseDefaultG: 18 });
+  assert.equal(m.ratio, 2);
+  assert.equal(m.doseAssumed, true);
+  assert.equal(shotMetrics({ timeMs: 30000, weight: 36, doseDefaultG: 18, notes: { doseG: 20 } }).ratio, 1.8);
+  // live: im Vorbrühen dessen Dauer, danach Bezugszeit ab Ende des Vorbrühens
+  assert.deepEqual(liveTimes({ timeMs: 4000, curve: [[0, 2], [4, 2]] }), { pre: true, preS: 4, brewS: 0 });
+  assert.deepEqual(liveTimes({ timeMs: 12000, curve: [[0, 2], [6, 9], [12, 9]] }), { pre: false, preS: 6, brewS: 6 });
+});
+
+test('Ausbeute: alter Waagenwert vor dem Tarieren zählt nicht (Bookoo an der DBL)', async () => {
+  const { taredCurve, curveYield, shotMetrics: sm } = await import('../web/shared/shot-analysis.js');
+  const curve = [[0, 0, 293.3], [0.3, 0, 290], [0.6, 0, 0], [10, 9, 0], [20, 9, 20], [30, 9, 44.2], [31, 0, 43.9]];
+  assert.equal(taredCurve(curve)[0][2], 0);
+  assert.equal(taredCurve(curve)[5][2], 44.2);
+  assert.equal(curveYield(curve), 44.2);
+  assert.equal(sm({ timeMs: 31000, weight: 293.3, curve }).yieldG, 44.2);
+  // Waage von Anfang an tariert: unverändert
+  const ok = [[0, 0, 0], [10, 9, 36]];
+  assert.equal(taredCurve(ok), ok);
+  assert.equal(curveYield([[0, 0, null]]), null);
 });

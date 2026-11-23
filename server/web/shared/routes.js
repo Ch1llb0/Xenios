@@ -1,6 +1,6 @@
 // API-Routen für Maschine und Mühle – gemeinsam für den Server und den Direkt-Modus der Android-App.
 // Downloads geben { download: { data, filename, type } } zurück; Server bzw. App liefern die Datei aus.
-import { SCRIPT_OPS, BUILTIN_SCRIPTS, httpError } from './machine-core.js';
+import { SCRIPT_OPS, httpError } from './machine-core.js';
 
 // Nur lesende Original-Endpunkte (für Diagnose). Gefährliche GETs sind hier bewusst nicht enthalten.
 export const RAW_READ = ['status', 'overview', 'overview_single', 'diagram/get', 'diagram_get', 'general', 'machine', 'info', 'switches', 'scriptslist', 'scripts/list', 'timer2', 'network', 'mako', 'language', 'brewgroup/pid', 'brewboiler/pid', 'pump/pid', 'steamboiler/pid', 'mahlkonig/get', 'upload/status'];
@@ -14,7 +14,9 @@ export function intParam(v) {
 const enc = (s) => new TextEncoder().encode(s);
 
 export function deviceRoutes(route, { machine, grinder, cfg }) {
-  route('GET', '/api/shots', async () => ({ shots: machine.shots(500, { curves: 20 }), total: machine.history.data.shots.length, beans: machine.listBeans() }));
+  route('GET', '/api/shots', async () => ({ shots: machine.shots(500, { curves: 20 }), total: machine.listedShots().length, minShotS: machine.minShotMs / 1000, beans: machine.listBeans() }));
+  route('GET', '/api/shots/settings', async () => machine.shotSettings());
+  route('PUT', '/api/shots/settings', async ({ body }) => machine.setShotSettings({ minShotS: body.minShotS, defaultDoseG: body.defaultDoseG }));
   route('GET', '/api/shots/:id', async ({ params }) => machine.shotDetail(params.id));
   route('PUT', '/api/shots/:id/notes', async ({ params, body }) => machine.annotateShot(params.id, body));
   route('GET', '/api/beans', async () => ({ beans: machine.listBeans() }));
@@ -34,7 +36,7 @@ export function deviceRoutes(route, { machine, grinder, cfg }) {
   route('POST', '/api/machine/temperature', async ({ body }) => machine.setTemperature(body.group, body.boiler));
   route('GET', '/api/machine/settings', async () => ({ settings: await machine.readSettings() }));
   route('POST', '/api/machine/settings', async ({ body }) => machine.updateSettings(body.changes || {}));
-  route('GET', '/api/machine/scripts', async () => ({ scripts: await machine.scripts(), ops: SCRIPT_OPS, builtin: BUILTIN_SCRIPTS }));
+  route('GET', '/api/machine/scripts', async () => ({ scripts: await machine.scripts(), ops: SCRIPT_OPS, builtin: machine.builtinScripts() }));
   route('GET', '/api/machine/scripts/:id', async ({ params }) => machine.readScript(intParam(params.id)));
   route('GET', '/api/machine/scripts/:id/export', async ({ params }) => {
     const { title, file } = await machine.exportScript(intParam(params.id));
