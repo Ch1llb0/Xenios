@@ -1,5 +1,6 @@
 // Analoges Rundinstrument (SVG) wie in der Xenia-App: Skala, rote Zone, Nadel, Wert in der Mitte.
 import { h, fmt } from './ui.js';
+import { taredCurve } from '../shared/shot-analysis.js';
 
 const START = 135;   // Winkel in Grad (SVG: 0° = rechts, im Uhrzeigersinn)
 const SWEEP = 270;
@@ -9,41 +10,90 @@ function polar(r, deg) {
   return [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
 }
 
-export function createGauge({ title, min, max, majorStep, minorStep, redFrom = null, digits = 1, labelEvery = majorStep }) {
+let gaugeNo = 0;
+// Zifferblatt der Manometer (Einstellungen → Darstellung): „black“ oder „white“ wie an der Maschine
+export const gaugeStyle = () => (document.documentElement.dataset.gauge === 'white' ? 'white' : 'black');
+
+const num = (v) => String(Math.round(v * 10) / 10); // Skalenzahlen wie auf dem Manometer: 0.5, 1, 1.5 …
+
+// mano: abweichende Skala für den Manometer-Stil (z. B. Pumpe 0–16 bar wie an der Maschine) und Aufschrift
+export function createGauge({ title, min, max, majorStep, minorStep, redFrom = null, digits = 1, labelEvery = majorStep, unit = '', mano: manoOpts = {} }) {
+  const mano = document.documentElement.dataset.palette !== 'material'; // Material: flache Anzeigen
+  if (mano) ({ min = min, max = max, majorStep = majorStep, minorStep = minorStep, labelEvery = labelEvery } = { ...manoOpts });
+  const gid = `gb${++gaugeNo}`;
+  const near = (x) => Math.abs(x - Math.round(x)) < 1e-6;
   const ticks = [];
-  for (let v = min; v <= max + 1e-9; v += minorStep) {
-    const major = Math.abs((v - min) / majorStep - Math.round((v - min) / majorStep)) < 1e-6;
+  for (let i = 0; min + i * minorStep <= max + 1e-9; i++) {
+    const v = min + i * minorStep;
+    const major = near((v - min) / majorStep);
     const deg = START + ((v - min) / (max - min)) * SWEEP;
-    const [x1, y1] = polar(major ? 70 : 74, deg);
-    const [x2, y2] = polar(82, deg);
-    const red = redFrom !== null && v >= redFrom - 1e-9;
+    const [x1, y1] = polar(mano ? (major ? 70 : 74) : (major ? 70 : 74), deg);
+    const [x2, y2] = polar(mano ? 80 : 82, deg);
+    const red = !mano && redFrom !== null && v >= redFrom - 1e-9;
     ticks.push(h('line', { x1, y1, x2, y2, class: `g-tick${major ? ' major' : ''}${red ? ' g-zone' : ''}` }));
     const atEnd = Math.abs(v - min) < 1e-9 || Math.abs(v - max) < 1e-9;
-    if (major && !atEnd && Math.abs((v - min) / labelEvery - Math.round((v - min) / labelEvery)) < 1e-6) {
-      const [lx, ly] = polar(58, deg);
-      ticks.push(h('text', { x: lx, y: ly + 3, class: 'g-label' }, String(Math.round(v))));
+    if (major && (mano || !atEnd) && near((v - min) / labelEvery)) {
+      const [lx, ly] = polar(mano ? 57 : 58, deg);
+      ticks.push(h('text', { x: lx, y: ly + (mano ? 4 : 3), class: 'g-label' }, mano ? num(v) : String(Math.round(v))));
     }
   }
-  const needle = h('polygon', { class: 'g-needle', points: '100,96 100,104 168,100' });
   const value = h('text', { x: 100, y: 156, class: 'g-value' }, '–');
   const sub = h('text', { x: 100, y: 174, class: 'g-sub' }, '');
-  const svg = h('svg', { viewBox: '0 0 200 200', role: 'img', 'aria-label': title },
-    h('circle', { cx: 100, cy: 100, r: 92, class: 'g-face' }),
-    ...ticks,
-    needle,
-    h('circle', { cx: 100, cy: 100, r: 7, class: 'g-hub' }),
-    value,
-    sub,
-  );
-  const el = h('div', { class: 'gauge' }, h('div', { class: 'gauge-title' }, title), svg);
+  let needle;
+  let svg;
+  if (mano) {
+    // Manometer der Xenia: Chromring, Zifferblatt, „bar“ oben, Aufschrift unten, Messingnabe und zwei Messingschrauben
+    needle = h('polygon', { class: 'g-needle', points: '82,99.2 100,98.3 172,100 100,101.7 82,100.8' });
+    svg = h('svg', { viewBox: '0 0 200 200', role: 'img', 'aria-label': title },
+      h('defs', {},
+        h('linearGradient', { id: gid, x1: 0, y1: 0, x2: 1, y2: 1 },
+          h('stop', { offset: '0', 'stop-color': '#ffffff' }), h('stop', { offset: '.22', 'stop-color': '#b9bcc0' }),
+          h('stop', { offset: '.45', 'stop-color': '#f4f5f6' }), h('stop', { offset: '.7', 'stop-color': '#8d9196' }),
+          h('stop', { offset: '1', 'stop-color': '#e9ebed' })),
+        h('radialGradient', { id: `${gid}b`, cx: '.4', cy: '.35', r: '.7' },
+          h('stop', { offset: '0', 'stop-color': '#f3d98a' }), h('stop', { offset: '.6', 'stop-color': '#c9a13b' }), h('stop', { offset: '1', 'stop-color': '#8a6a1c' }))),
+      h('circle', { cx: 100, cy: 100, r: 98, class: 'g-bezel', fill: `url(#${gid})` }),
+      h('circle', { cx: 100, cy: 100, r: 87, class: 'g-lip' }),
+      h('circle', { cx: 100, cy: 100, r: 85, class: 'g-face' }),
+      ...ticks,
+      h('text', { x: 100, y: 74, class: 'g-unit' }, unit || ''),
+      manoOpts.label ? h('text', { x: 100, y: 128, class: 'g-brand' }, manoOpts.label) : null,
+      h('circle', { cx: 89, cy: 141, r: 3.6, class: 'g-screw', fill: `url(#${gid}b)` }),
+      h('circle', { cx: 111, cy: 141, r: 3.6, class: 'g-screw', fill: `url(#${gid}b)` }),
+      needle,
+      h('circle', { cx: 100, cy: 100, r: 7.5, class: 'g-hub', style: { fill: `url(#${gid}b)` } }),
+      h('circle', { cx: 100, cy: 100, r: 2.2, class: 'g-hub-dot' }));
+  } else {
+    needle = h('polygon', { class: 'g-needle', points: '100,96 100,104 168,100' });
+    svg = h('svg', { viewBox: '0 0 200 200', role: 'img', 'aria-label': title },
+      h('circle', { cx: 100, cy: 100, r: 92, class: 'g-face' }),
+      ...ticks,
+      needle,
+      h('circle', { cx: 100, cy: 100, r: 7, class: 'g-hub' }),
+      value,
+      sub);
+  }
+  // Unter dem Instrument: Manometer zeigen Messwert und Ziel (echte Manometer haben keine Ziffern), flache Anzeigen
+  // das Ziel – in beiden Designs immer lesbar groß statt winzig im Zifferblatt
+  const foot = mano ? h('div', { class: 'gauge-foot' }, h('span', { class: 'gv' }, '–'), h('span', { class: 'gs' }, ''))
+    : h('div', { class: 'gauge-foot flat' }, h('span', { class: 'gs' }, ''));
+  const el = h('div', { class: `gauge${mano ? ' mano' : ''}` }, h('div', { class: 'gauge-title' }, title), svg, foot);
   el.update = (v, subText) => {
     const n = Number(v);
     const clamped = Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : min;
     const deg = START + ((clamped - min) / (max - min)) * SWEEP;
     needle.style.setProperty('transform', `rotate(${deg}deg)`);
-    value.textContent = Number.isFinite(n) ? fmt(n, digits) : '–';
-    sub.textContent = subText || '';
-    svg.setAttribute('aria-label', `${title}: ${value.textContent} ${subText || ''}`);
+    const txt = Number.isFinite(n) ? fmt(n, digits) : '–';
+    const st = mano && unit && subText === unit ? '' : (subText || '');
+    if (mano) {
+      foot.firstChild.textContent = Number.isFinite(n) && unit ? `${txt} ${unit}` : txt;
+      foot.lastChild.textContent = st;
+    } else {
+      value.textContent = txt;
+      sub.textContent = unit; // im Zifferblatt nur die Einheit, das Ziel steht darunter
+      foot.lastChild.textContent = subText === unit ? '' : (subText || '');
+    }
+    svg.setAttribute('aria-label', `${title}: ${txt} ${unit} ${subText || ''}`);
   };
   return el;
 }
@@ -66,10 +116,12 @@ export function sparkline(curve, { height = 64 } = {}) {
   );
 }
 
-export function ring(progress, label) {
+export function ring(progress, label, sub = null) {
   const c = 2 * Math.PI * 40;
   const fg = h('circle', { cx: 48, cy: 48, r: 40, class: 'fg', 'stroke-dasharray': c.toFixed(1), 'stroke-dashoffset': (c * (1 - Math.min(1, progress))).toFixed(1) });
-  return h('svg', { class: 'ring', viewBox: '0 0 96 96' }, h('circle', { cx: 48, cy: 48, r: 40, class: 'bg' }), fg, h('text', { x: 48, y: 48 }, label));
+  // optional kleine zweite Zeile (z. B. „Vorbrühen“)
+  return h('svg', { class: 'ring', viewBox: '0 0 96 96' }, h('circle', { cx: 48, cy: 48, r: 40, class: 'bg' }), fg,
+    h('text', { x: 48, y: sub ? 43 : 48 }, label), sub ? h('text', { x: 48, y: 63, class: 'sub' }, sub) : null);
 }
 
 // Bezugskurve mit Achsen: Druck (bar, links) und Gewicht (g, rechts) über die Bezugszeit.
@@ -99,7 +151,8 @@ function clipPts(c, tMax) {
 // curve: [[t_s, druck_bar, gewicht_g, ml], …]; live: Endpunkt markieren und Zeitachse mitwachsen lassen.
 // Für die Analyse: compare = frühere Kurven (blass), reference = Referenz-Bezug, target = Soll-Druck [[t, bar] | null, …].
 export function shotChart(curve, { width = 320, height = 150, live = false, minSeconds = 30, compare = [], reference = null, target = null } = {}) {
-  const clean = (c) => (c || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
+  // Gewicht vor dem Tarieren der Waage (alter Wert zu Beginn) nicht zeichnen – es verzerrte die Gewichtsachse
+  const clean = (c) => taredCurve(c || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]));
   const pts = clean(curve);
   const others = [...compare.map(clean), clean(reference)].filter((c) => c.length > 1);
   const pad = { l: 26, r: 30, t: 18, b: 18 };
@@ -204,13 +257,17 @@ export function liveChart(samples, series, { width = 320, height = 150, spanMs =
     return pad.t + ih - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * ih;
   };
   const grid = [];
-  for (let i = 0; i <= 4; i++) {
-    const gy = pad.t + (ih * i) / 4;
+  // Weniger Rasterlinien bzw. Beschriftungen, wenn das Diagramm flach oder schmal ist (sonst überlappen sie)
+  const rowsY = ih >= 60 ? 4 : 2;
+  for (let i = 0; i <= rowsY; i++) {
+    const gy = pad.t + (ih * i) / rowsY;
     grid.push(h('line', { x1: pad.l, y1: gy, x2: width - pad.r, y2: gy, class: 'grid' }));
-    grid.push(h('text', { x: pad.l - 4, y: gy + 3, class: 'lbl', 'text-anchor': 'end' }, String(Math.round(110 - (90 * i) / 4))));
-    grid.push(h('text', { x: width - pad.r + 4, y: gy + 3, class: 'lbl' }, String(12 - 3 * i)));
+    grid.push(h('text', { x: pad.l - 4, y: gy + 3, class: 'lbl', 'text-anchor': 'end' }, String(Math.round(110 - (90 * i) / rowsY))));
+    grid.push(h('text', { x: width - pad.r + 4, y: gy + 3, class: 'lbl' }, String(Math.round((12 - (12 * i) / rowsY) * 10) / 10)));
   }
-  for (let m = 1; m < spanMs / 60e3; m++) {
+  const perMin = iw / (spanMs / 60e3);
+  const stepMin = [1, 2, 5, 10].find((st) => perMin * st >= 34) ?? 10; // „-10 min“ braucht etwa 30 Einheiten
+  for (let m = stepMin; m < spanMs / 60e3; m += stepMin) {
     const gx = x(now - m * 60e3);
     grid.push(h('text', { x: gx, y: height - 3, class: 'lbl', 'text-anchor': 'middle' }, `-${m} min`));
   }

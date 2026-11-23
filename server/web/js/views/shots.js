@@ -1,15 +1,18 @@
 // Bezugs-Protokoll: alle Bezüge dauerhaft (Server-Datei bzw. App-Speicher), Statistik, Filter, Pflege, CSV-Export.
 // Ein Bezug öffnet die Analyse (Kurve mit Vergleich, Kennzahlen, Bewertung).
 import { h, icon, fmt, fmtInt, snackbar, sheet, confirmDialog } from '../ui.js';
-import { api, subscribe } from '../api.js';
-import { setTopActions } from '../app.js';
-import { shotMetrics, dialIn } from '../../shared/shot-analysis.js';
+import { api, store, subscribe, hasPaddle } from '../api.js';
+import { navigate } from '../app.js';
+import { isHidden } from '../prefs.js';
+import { shotMetrics, dialIn, brewSeconds } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
-import { openShot, quickRate, adviceNote } from './shot-detail.js';
+import { quickRate, adviceNote } from './shot-detail.js';
 
 // Backflush starten (direkte Pumpensteuerung, auch aus dem Skripte-Tab): erst nachfragen, dann mit Stopp in der Meldung.
 // Er trägt sich nach dem Lauf selbst als erledigt ein.
 export async function startBackflush() {
+  // Ohne direkte Pumpensteuerung (ältere Firmware der alten Xenia) gar nicht erst nachfragen
+  if (!hasPaddle()) return snackbar('Backflush braucht die direkte Pumpensteuerung, diese Xenia hat sie nicht');
   const content = h('div', {}, h('p', { class: 'muted' }, 'Blindträger installiert?'), h('p', { class: 'muted' }, 'Driptray ausgeleert?'));
   if (!(await confirmDialog('Backflush starten?', content, 'Starten'))) return;
   try {
@@ -30,9 +33,12 @@ export function shotsView(root) {
   const box = h('div', {}, h('div', { class: 'empty' }, 'Lade Bezüge …'));
   const beansBox = h('div', {});
   root.append(dial, care, beansBox, box);
-  setTopActions(
-    h('button', { class: 'icon-btn', 'aria-label': 'Bohne anlegen', title: 'Bohne anlegen', onclick: () => editBean() }, icon('add')),
-    h('a', { class: 'icon-btn', href: '/api/shots.csv', download: '', 'aria-label': 'Als CSV exportieren', title: 'Als CSV exportieren' }, icon('download')));
+  // Anlegen steht unter „Bohnen“, der Export als eigene Option darunter – keine unbeschrifteten Knöpfe in der Kopfzeile
+  const csvTile = () => h('div', { class: 'list', style: { 'margin-top': '12px', 'margin-bottom': '12px' } }, // gleicher Abstand oben (Bohnen) und unten (Statistik)
+    h('a', { class: 'list-item clickable as-button', href: '/api/shots.csv', download: '' },
+      h('span', { class: 'lead' }, icon('download')),
+      h('div', { class: 'grow' }, h('div', { class: 'title' }, 'Als CSV exportieren'), h('div', { class: 'sub' }, 'Alle Bezüge als Tabelle, z. B. für Excel oder Numbers')),
+      icon('right', 's20 muted')));
   let data = { shots: [], total: 0, beans: [] };
   let filter = 'all';
   let bean = '';
@@ -40,7 +46,7 @@ export function shotsView(root) {
   async function load() {
     try {
       const r = await api('/api/shots');
-      data = { shots: r.shots, total: r.total ?? r.shots.length, beans: r.beans || [] };
+      data = { shots: r.shots, total: r.total ?? r.shots.length, beans: r.beans || [], minShotS: r.minShotS ?? null };
       paint();
       paintDial();
     } catch (e) {
@@ -51,6 +57,7 @@ export function shotsView(root) {
 
   // Pflege: Backflush-Erinnerung
   async function loadCare() {
+    if (isHidden('care')) return care.replaceChildren();
     let m;
     try { m = (await api('/api/maintenance')).backflush; } catch { return care.replaceChildren(); }
     const intervalSel = h('select', { class: 'text small-select', 'aria-label': 'Erinnerung alle' },
@@ -107,7 +114,7 @@ export function shotsView(root) {
       const v = recent.map(f).filter((x) => Number.isFinite(x) && x > 0);
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
     };
-    const avgTime = avg((s) => s.timeMs);
+    const avgTime = avg((s) => (brewSeconds(s) || 0) * 1000); // Bezugszeit ohne Vorbrühen
     const avgRatio = avg((s) => shotMetrics(s).ratio);
 
     const beans = data.beans?.length ? data.beans : [...new Set(shots.map((s) => s.notes?.bean).filter(Boolean))].map((n) => ({ name: n }));
@@ -129,7 +136,8 @@ export function shotsView(root) {
         h('div', { class: 'kpis' },
           kpi('Heute', fmtInt(today)), kpi('7 Tage', fmtInt(week)), kpi('Gesamt', fmtInt(total)),
           kpi('Ø Zeit', avgTime ? `${fmt(avgTime / 1000)} s` : '–'), kpi('Ø Verhältnis', avgRatio ? `1:${fmt(avgRatio)}` : '–')),
-        h('p', { class: 'muted small' }, 'Einen Bezug antippen für Kurve, Vergleich, Kennzahlen und Bewertung. Die Dosis kommt automatisch von der Mühle, wenn kurz vorher gemahlen wurde.')),
+        h('p', { class: 'muted small' }, 'Einen Bezug antippen für Kurve, Vergleich, Kennzahlen und Bewertung. Die Dosis kommt automatisch von der Mühle, wenn kurz vorher gemahlen wurde.'),
+        data.minShotS ? h('button', { class: 'btn text', onclick: () => navigate(store.server?.mode === 'direct' ? '/einstellungen#aufzeichnung' : '/server#aufzeichnung') }, icon('tune', 's18'), `Bezüge unter ${fmtInt(data.minShotS)} s ausgeblendet`) : null),
       h('div', { class: 'row filter-row' }, h('div', { class: 'chips grow' }, chip('all', 'Alle'), chip('rated', 'Bewertet'), chip('ref', 'Referenzen')), beanSel),
       visible.length ? null : h('div', { class: 'empty' }, 'Keine Bezüge für diesen Filter.'),
       ...groups.flatMap((g) => [
@@ -142,18 +150,18 @@ export function shotsView(root) {
   function paintBeans(beans) {
     if (!beans.length) {
       beansBox.replaceChildren(h('section', { class: 'card' },
-        h('div', { class: 'row' }, icon('coffee', 's20'),
+        h('div', { class: 'row' }, icon('coffeeLine', 's20'),
           h('div', { class: 'grow' }, h('div', {}, 'Bohnen'), h('div', { class: 'small muted' }, 'Anlegen, dann in der Bewertung auswählen.')),
-          h('button', { class: 'btn tonal', onclick: () => editBean() }, icon('add', 's18'), 'Anlegen'))));
+          h('button', { class: 'btn tonal', onclick: () => editBean() }, icon('add', 's18'), 'Anlegen'))), csvTile());
       return;
     }
     beansBox.replaceChildren(h('section', { class: 'card' },
-      h('div', { class: 'row' }, icon('coffee', 's20'), h('div', { class: 'grow' }, h('strong', {}, 'Bohnen')),
+      h('div', { class: 'row' }, icon('coffeeLine', 's20'), h('div', { class: 'grow' }, h('strong', {}, 'Bohnen')),
         h('button', { class: 'btn text', onclick: () => editBean() }, icon('add', 's18'), 'Neu')),
       h('div', { class: 'list', style: { 'margin-top': '8px' } }, beans.map((b) => h('div', { class: 'list-item' },
         h('div', { class: 'grow' }, h('div', { class: 'title' }, b.name), b.roaster ? h('div', { class: 'sub' }, b.roaster) : null),
         h('button', { class: 'icon-btn', 'aria-label': `${b.name} umbenennen`, title: 'Umbenennen', onclick: () => editBean(b) }, icon('edit', 's20')),
-        h('button', { class: 'icon-btn', 'aria-label': `${b.name} entfernen`, title: 'Aus der Liste nehmen', onclick: () => removeBean(b) }, icon('del', 's20')))))));
+        h('button', { class: 'icon-btn', 'aria-label': `${b.name} entfernen`, title: 'Aus der Liste nehmen', onclick: () => removeBean(b) }, icon('del', 's20')))))), csvTile());
   }
 
   function editBean(existing = null) {
@@ -201,10 +209,10 @@ export function shotsView(root) {
     const m = shotMetrics(s);
     const amount = m.yieldG ? `${fmt(m.yieldG)} g` : s.volumeMl ? `${fmt(s.volumeMl, 0)} ml` : '–';
     const n = s.notes || {};
-    return h('button', { class: 'list-item clickable as-button shot-item', type: 'button', onclick: () => openShot(s.id, { onChange: load }) },
-      h('span', { class: 'lead' }, icon(n.reference ? 'check' : 'coffee')),
+    return h('button', { class: 'list-item clickable as-button shot-item', type: 'button', onclick: () => navigate(`/bezuege/bezug?id=${encodeURIComponent(s.id)}`) },
+      h('span', { class: 'lead' }, icon(n.reference ? 'check' : 'coffeeLine')),
       h('div', { class: 'grow' },
-        h('div', { class: 'title' }, `${time} · ${s.timeMs ? `${fmt(s.timeMs / 1000)} s` : '–'} · ${amount}${m.ratio ? ` · 1:${fmt(m.ratio)}` : ''}`),
+        h('div', { class: 'title' }, `${time} · ${m.timeS ? `${fmt(m.timeS)} s` : '–'} · ${amount}${m.ratio ? ` · 1:${fmt(m.ratio)}` : ''}`),
         h('div', { class: 'sub' },
           [s.maxPressure ? `max. ${fmt(s.maxPressure)} bar` : null, m.doseG ? `${fmt(m.doseG)} g Dosis` : null, s.script?.title || null, n.bean || null, s.no ? `Nr. ${fmtInt(s.no)}` : null].filter(Boolean).join(' · '),
           n.rating ? h('span', { class: 'mini-stars', 'aria-label': `${n.rating} Sterne` }, ` ${'★'.repeat(n.rating)}`) : null,

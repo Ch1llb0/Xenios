@@ -1,3 +1,10 @@
+:root { --sat: 0px; --sab: 0px; }
+/* Ränder für Status- und Navigationsleiste nur als installierte Web-App (dort zeichnet die Seite bis an den Rand).
+   Im Browser hält der Browser den Platz frei, in der Android-App die App selbst – sonst entstünde doppelter Rand. */
+@media (display-mode: standalone), (display-mode: fullscreen) { :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); } }
+@font-face { font-family: 'Open Sans'; font-style: normal; font-weight: 300; font-display: swap; src: url(/fonts/open-sans-latin-300-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Open Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/open-sans-latin-400-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Open Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url(/fonts/open-sans-latin-600-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
 /* Xenia – Material 3 Design (an die Xenia-App angelehnt: Lavendel-Flächen, Indigo-Akzent, Rot für Stopp) */
 :root {
   --primary: #4a5891;
@@ -31,7 +38,7 @@
   --radius-m: 12px;
   --radius-l: 16px;
   --radius-xl: 28px;
-  --nav-h: 80px;
+  --nav-h: 68px; /* Leiste unten: gleich in Material und Xenia */
   --ease-emph: cubic-bezier(.2, 0, 0, 1);
   --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
   --ease-out: cubic-bezier(.05, .7, .1, 1);
@@ -86,7 +93,7 @@ svg.icon.s20 { width: 20px; height: 20px; }
 .app { min-height: 100%; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; }
 .topbar {
   position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 4px;
-  padding: calc(env(safe-area-inset-top) + 8px) 16px 8px; min-height: 64px; background: var(--surface);
+  padding: calc(var(--sat) + 8px) 16px 8px; min-height: 64px; background: var(--surface);
 }
 .topbar-title { font-size: 18px; font-weight: 600; margin: 0; flex: 1; letter-spacing: .1px; }
 .topbar-actions { display: flex; gap: 4px; }
@@ -107,17 +114,17 @@ svg.icon.s20 { width: 20px; height: 20px; }
   content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
   width: 64px; height: 3px; border-radius: 3px 3px 0 0; background: var(--primary);
 }
-.view { flex: 1; padding: 8px 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom)); outline: none; }
+.view { flex: 1; padding: 8px 16px calc(var(--nav-h) + 24px + var(--sab)); outline: none; }
 .navbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; justify-content: center;
-  background: var(--surface-container); padding: 12px 8px calc(12px + env(safe-area-inset-bottom));
+  background: var(--surface-container); padding: 8px 4px calc(8px + var(--sab));
 }
 .navbar-inner { display: flex; width: 100%; max-width: 560px; }
 .nav-item {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: none;
   color: var(--on-surface-variant); font-size: 12px; font-weight: 500; padding: 0;
 }
-.nav-item .pill { width: min(64px, calc(100% - 8px)); height: 32px; border-radius: 16px; display: grid; place-items: center; position: relative; overflow: hidden; isolation: isolate; }
+.nav-item .pill { width: min(56px, calc(100% - 6px)); height: 32px; border-radius: 16px; display: grid; place-items: center; position: relative; overflow: hidden; isolation: isolate; }
 .nav-item .pill::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--secondary-container); transform: scaleX(.3); opacity: 0; transition: transform .35s var(--ease-emph), opacity .2s; z-index: -1; }
 .nav-item[aria-current="page"] .pill::before { transform: scaleX(1); opacity: 1; }
 .nav-item .pill svg { transition: transform .35s var(--ease-spring); }
@@ -226,22 +233,29 @@ select, select.text, option {
 .error { color: var(--danger); min-height: 1.2em; margin: 4px 0; }
 
 /* Schieberegler */
-.slider-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 6px 0; }
+.slider-row { display: grid; grid-template-columns: 1fr auto; gap: 10px 12px; align-items: center; padding: 6px 0; }
 .slider-row .label { font-size: 13px; color: var(--on-surface-variant); }
 .slider-row .value { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+/* Wert antippbar (Eingabe per Tastatur): dezent als Feld erkennbar */
+.slider-row .value-edit { font: inherit; font-weight: 600; color: var(--on-surface); background: var(--surface-container-highest); border: 0; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+.slider-row .value-edit:hover { background: color-mix(in srgb, var(--primary) 14%, var(--surface-container-highest)); }
+.slider-row .value-edit:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .slider-row input[type="range"] { grid-column: 1 / -1; }
 input[type="range"] {
   -webkit-appearance: none; appearance: none; width: 100%; height: 32px; background: transparent; margin: 0;
 }
 input[type="range"]::-webkit-slider-runnable-track {
   height: 16px; border-radius: 8px;
-  background: linear-gradient(to right, var(--primary) 0 var(--fill, 50%), var(--secondary-container) var(--fill, 50%) 100%);
+  /* Lücke um den Griff (je 5 px) als echte Aussparung: zeigt immer den Hintergrund darunter, auch auf farbigen Flächen */
+  background: linear-gradient(to right,
+    var(--primary) 0 calc(var(--fill, 50%) - var(--fill-px, 0px) - 5px),
+    transparent calc(var(--fill, 50%) - var(--fill-px, 0px) - 5px) calc(var(--fill, 50%) - var(--fill-px, 0px) + 9px),
+    var(--secondary-container) calc(var(--fill, 50%) - var(--fill-px, 0px) + 9px) 100%);
 }
 input[type="range"]::-moz-range-track { height: 16px; border-radius: 8px; background: var(--secondary-container); }
 input[type="range"]::-moz-range-progress { height: 16px; border-radius: 8px; background: var(--primary); }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; width: 4px; height: 32px; border-radius: 2px; background: var(--primary); margin-top: -8px;
-  box-shadow: 0 0 0 6px var(--surface-container-high);
 }
 input[type="range"]::-moz-range-thumb { width: 4px; height: 32px; border: 0; border-radius: 2px; background: var(--primary); }
 
@@ -255,7 +269,7 @@ input[type="range"]::-moz-range-thumb { width: 4px; height: 32px; border: 0; bor
 .gauge .g-tick.major { stroke-width: 2.4; }
 .gauge .g-zone { stroke: var(--danger); stroke-width: 2.4; }
 .gauge .g-label { fill: var(--on-surface-variant); font-size: 9px; text-anchor: middle; }
-.gauge .g-needle { fill: var(--gauge-needle); transition: transform .6s cubic-bezier(.3,1.3,.5,1); transform-origin: 100px 100px; }
+.gauge .g-needle { fill: var(--gauge-needle); transition: transform .35s cubic-bezier(.3,1.2,.5,1); transform-origin: 100px 100px; }
 .gauge .g-hub { fill: var(--gauge-needle); }
 .gauge .g-value { fill: var(--on-surface); font-size: 26px; font-weight: 700; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .gauge .g-sub { fill: var(--on-surface-variant); font-size: 10px; text-anchor: middle; }
@@ -270,6 +284,7 @@ input[type="range"]::-moz-range-thumb { width: 4px; height: 32px; border: 0; bor
 .ring .bg { stroke: var(--secondary-container); }
 .ring .fg { stroke: var(--primary); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .9s linear; }
 .ring text { fill: var(--on-surface); font-size: 20px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.ring text.sub { fill: var(--on-surface-variant); font-size: 11px; font-weight: 500; }
 .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .kpi { background: var(--surface-container-low); border-radius: var(--radius-m); padding: 8px 10px; }
 .kpi .k { font-size: 11px; color: var(--on-surface-variant); }
@@ -291,7 +306,10 @@ input[type="range"]::-moz-range-thumb { width: 4px; height: 32px; border: 0; bor
 }
 .step-head { display: flex; align-items: center; gap: 4px; min-height: 44px; }
 .step-head .n { width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--on-primary-container); color: var(--primary-container); }
-.step-head .name { flex: 1; font-weight: 500; }
+.step-head .name { flex: 1; min-width: 0; font-weight: 500; margin-left: 6px; padding: 6px 0; cursor: pointer; }
+.step-head .name .title { display: block; }
+/* Werte des Schritts als eigene Zeile unter dem Namen (bricht nicht mitten im Wert um) */
+.step-head .name .sum { display: block; margin-top: 1px; font-size: 12px; font-weight: 400; opacity: .8; }
 .step-body { padding: 0 12px 8px 4px; }
 .step .icon-btn { color: var(--on-primary-container); width: 36px; height: 36px; }
 .ops { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -341,7 +359,7 @@ input.time-input { height: 44px; font-size: 20px; padding: 0 10px; border-radius
 
 /* --- Snackbar, Sheets, Dialoge -------------------------------------------- */
 .snackbar {
-  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px);
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 16px + var(--sab)); transform: translate(-50%, 20px);
   min-width: 280px; max-width: calc(100% - 32px); background: #313036; color: #f4eff4; border-radius: 4px;
   padding: 12px 16px; display: flex; align-items: center; gap: 12px; opacity: 0; pointer-events: none;
   transition: opacity .2s, transform .2s; z-index: 60; box-shadow: var(--shadow);
@@ -353,7 +371,7 @@ input.time-input { height: 44px; font-size: 20px; padding: 0 10px; border-radius
 .scrim.show { opacity: 1; }
 .sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 71; max-width: 560px; margin: 0 auto; max-height: 92vh; overflow: auto;
-  background: var(--surface-container-low); border-radius: 28px 28px 0 0; padding: 8px 16px calc(24px + env(safe-area-inset-bottom));
+  background: var(--surface-container-low); border-radius: 28px 28px 0 0; padding: 8px 16px calc(24px + var(--sab));
   transform: translateY(100%); transition: transform .25s cubic-bezier(.2,.8,.2,1);
 }
 .sheet.show { transform: translateY(0); }
@@ -371,7 +389,7 @@ input.time-input { height: 44px; font-size: 20px; padding: 0 10px; border-radius
   transform: translateY(16px); opacity: 0; transition: all .2s;
 }
 .fullscreen.show { transform: none; opacity: 1; }
-.fullscreen .inner { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 8px) 16px 40px; }
+.fullscreen .inner { max-width: 560px; margin: 0 auto; padding: calc(var(--sat) + 8px) 16px 40px; }
 
 /* --- Login / Splash -------------------------------------------------------- */
 .login { min-height: 100%; display: grid; place-items: center; padding: 24px; }
@@ -388,7 +406,7 @@ input.time-input { height: 44px; font-size: 20px; padding: 0 10px; border-radius
 .kv dt { color: var(--on-surface-variant); }
 .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .savebar {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 20px + env(safe-area-inset-bottom)); z-index: 40;
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + 20px + var(--sab)); z-index: 40;
   display: flex; gap: 8px; background: var(--surface-container-highest); border-radius: 28px; padding: 6px; box-shadow: var(--shadow);
 }
 .offline-banner { background: var(--danger-container); color: var(--danger); border-radius: var(--radius-m); padding: 10px 14px; margin: 4px 0 12px; display: flex; gap: 10px; align-items: center; font-size: 13px; }
@@ -423,6 +441,30 @@ details.adv > summary::-webkit-details-marker { display: none; }
 .machine-svg .mbtn .glyph path { fill: none; stroke: #33363b; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
 .machine-svg .mbtn:hover .halo, .machine-svg .mbtn:focus-visible .halo { opacity: .35; }
 .machine-svg .mbtn.sel .halo { opacity: .75; }
+/* Xenia DBL nach Foto: weiße Front, kleine Kippschalter von vorn, Holzknöpfe */
+.machine-svg.dbl { max-width: 380px; }
+.machine-svg .front { fill: url(#mFront); stroke: #c9c9c6; }
+.machine-svg .front-edge { stroke: #d4d4d1; stroke-width: 1; }
+.machine-svg .sym { fill: none; stroke: #b0413e; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.machine-svg .grp-shade { fill: #9fa3a8; opacity: .35; }
+.machine-svg .kn-neck { fill: url(#mChrome); stroke: #8a8e93; stroke-width: .6; }
+.machine-svg .kn-wood { fill: url(#mWood); }
+.machine-svg .kn-grain { fill: none; stroke: #5b3a1f; stroke-width: 1; opacity: .35; }
+.machine-svg .tg-nut { fill: url(#mChrome); stroke: #6d7176; stroke-width: .8; }
+.machine-svg .tg-ring { fill: #d8dbde; stroke: #7d8186; stroke-width: .8; }
+.machine-svg .tg-hole { fill: #3a3c40; }
+.machine-svg .tg-stem { stroke: #c9ccd1; stroke-width: 4; stroke-linecap: round; }
+.machine-svg .tg-head { fill: url(#mChrome); stroke: #5a5d62; stroke-width: .8; transition: cx .25s cubic-bezier(.3,1.4,.5,1); }
+.machine-svg .tg-stem { transition: x2 .25s cubic-bezier(.3,1.4,.5,1); }
+.machine-svg .lever-side .hit { fill: transparent; }
+.machine-svg .lever-side.sel .halo { opacity: .28; }
+.machine-svg .lever-side .pos-ring { fill: #fff; stroke: #d9534f; stroke-width: 1.4; }
+.machine-svg .lever-side .pos-no { fill: #d9534f; font-size: 10px; font-weight: 700; }
+.machine-svg .lever-side.sel .pos-ring { fill: var(--primary); stroke: var(--primary); }
+.machine-svg .lever-side.sel .pos-no { fill: var(--on-primary); }
+.machine-svg .lever-side.fixed { cursor: default; }
+.machine-svg .lever-side.fixed .pos-ring { stroke-dasharray: 2 2; }
+@media (prefers-reduced-motion: reduce) { .machine-svg .tg-head, .machine-svg .tg-stem { transition: none; } }
 .btn-assign { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .assign-card { box-sizing: border-box; cursor: pointer; padding: 10px 12px; border-radius: var(--radius-m); background: var(--surface-container-high); border: 2px solid transparent; display: grid; gap: 6px; min-width: 0; }
 .assign-card.sel { border-color: var(--primary); }
@@ -471,7 +513,12 @@ details.adv > summary::-webkit-details-marker { display: none; }
 @keyframes leave { to { opacity: 0; transform: translateX(24px); height: 0; padding-top: 0; padding-bottom: 0; margin: 0; } }
 
 /* Seitenwechsel: Inhalte steigen gestaffelt auf */
-.view.enter > *, .stagger > * { animation: rise .42s var(--ease-out) both; }
+.view.enter > *, .stagger > * { animation: enter .42s var(--ease-out) backwards; } /* backwards: danach gelten wieder die eigenen Werte (z. B. Deckkraft gesperrter Knöpfe) */
+/* Ziel ohne Deckkraft: endet bei der eigenen (gesperrte Knöpfe bleiben durchgehend ausgegraut) */
+@keyframes enter { from { opacity: 0; transform: translateY(var(--enter-dy, 24px)); } to { transform: none; } }
+/* Seiten der unteren Leiste: Inhalt kommt von oben; Unterseiten (mit Zurück) von unten wie das Anpassen-Menü */
+.view.from-above { --enter-dy: -18px; }
+.view.enter > .stagger { animation: none; } /* nur die Kacheln selbst blenden ein, nicht zusätzlich ihr Raster */
 .view.enter > :nth-child(2), .stagger > :nth-child(2) { animation-delay: 30ms; }
 .view.enter > :nth-child(3), .stagger > :nth-child(3) { animation-delay: 60ms; }
 .view.enter > :nth-child(4), .stagger > :nth-child(4) { animation-delay: 90ms; }
@@ -605,7 +652,6 @@ code.fp { font: 11px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywh
 .sessions { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .session { display: flex; align-items: center; gap: 12px; padding: 8px 4px 8px 10px; border-radius: 12px; background: var(--surface-container-low); overflow: hidden; }
 .session.current { box-shadow: inset 0 0 0 1px var(--primary-container); }
-.session.leaving { animation: leave .28s var(--ease-emph) forwards; }
 .list-item.as-button { border: 0; width: 100%; text-align: left; color: inherit; font: inherit; }
 .savebar, .view.enter > .savebar { animation: savebar-in .38s var(--ease-spring) both; animation-delay: 0s; }
 .savebar { align-items: center; padding: 6px 6px 6px 18px; }
@@ -615,10 +661,42 @@ code.fp { font: 11px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywh
 /* Dashboard (nur Anzeige): 1 Spalte am Handy, 2 am Tablet hochkant, 3 quer */
 .app.wide { max-width: 1280px; }
 .nav-item { min-width: 0; white-space: nowrap; }
-@media (max-width: 380px) { .nav-item { font-size: 11px; letter-spacing: -.2px; } }
-.dash { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); grid-auto-rows: 8px; column-gap: 12px; align-items: start; grid-auto-flow: dense; }
-.dash > .tile { margin-bottom: 12px; }   /* Zeilenabstand: die Kacheln spannen per Skript über passend viele 8-px-Zeilen */
-.dash > .tile { background: var(--surface-container-high); border-radius: var(--radius-l); padding: 14px 16px 16px; min-width: 0; }
+/* Leiste unten (Material und Xenia gleich): alle Einträge (höchstens 8) passen ohne Wischen nebeneinander, jeder mit
+   Beschriftung. Lange Namen haben eine Kurzform (z. B. „Einstell.“), die nur bei Platzmangel erscheint. */
+.navbar-inner.many { max-width: 680px; }
+.nav-item { flex: 1 1 0; }
+.nav-label { max-width: 100%; overflow: hidden; text-overflow: clip; line-height: 14px; }
+.nav-label .short { display: none; }
+.navbar-inner.many .nav-item { font-size: 11px; }
+.navbar-inner.lots .nav-item { font-size: 10.5px; letter-spacing: -.2px; }
+/* Kurzform ab 6 Einträgen unter 520 px; zusätzlich schaltet das Skript um, wenn ein voller Name nicht passt (.use-short) */
+@media (max-width: 519px) { .navbar-inner.many .nav-label .full { display: none; } .navbar-inner.many .nav-label .short { display: inline; } }
+.navbar-inner.use-short .nav-label .full { display: none; } .navbar-inner.use-short .nav-label .short { display: inline; }
+@media (max-width: 359px) { .navbar-inner.lots .nav-item { font-size: 9.5px; letter-spacing: -.3px; } }
+.dash { --cell: 180px; width: 100%; margin-left: auto; margin-right: auto; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: var(--cell); gap: 12px; align-items: stretch; grid-auto-flow: row dense; }
+/* Raster wie Android-Widgets: Breite in Spalten, Höhe in Zellen; alle Kacheln einer Zeile werden gleich hoch */
+.dash > .tile { background: var(--surface-container-high); border-radius: var(--radius-l); padding: 14px 16px 16px; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; }
+.dash > .tile[hidden] { display: none; }
+.dash > .tile > .tile-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.dash > .tile > .tile-body > .chart-box, .dash > .tile > .tile-body > div:only-child { flex: 1; }
+.dash > .empty { grid-column: 1 / -1; }
+.dash-cfg-ctl { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.dash-cfg-ctl .small-select { padding: 4px 6px; font-size: 12px; max-width: 112px; }
+.dash-control { display: grid; gap: 6px; align-content: start; }
+.dash-control .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 22px; border: 1px solid var(--outline-variant, rgba(127,127,127,.4)); background: transparent; color: var(--on-surface); font: inherit; font-weight: 600; cursor: pointer; position: relative; overflow: hidden; }
+.seg-btn[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.seg-btn:disabled:not([aria-pressed="true"]) { opacity: .45; cursor: default; }
+.seg-btn:disabled[aria-pressed="true"] { cursor: default; }
+.dash-control .ctl-row { display: flex; align-items: center; gap: 10px; }
+.dash-control .ctl-row > svg { color: var(--on-surface-variant); flex: none; }
+.dash > .tile > .tile-body { container-type: inline-size; }
+.gauges.four { grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0; }
+.gauges.four .gauge-title { font-size: 12px; }
+@container (max-width: 300px) { .gauges.four { grid-template-columns: repeat(2, 1fr); } }
+/* Startseite: vier Anzeigen nebeneinander, am schmalen Handy 2 × 2 */
+.view > .gauges.four { gap: 8px; margin: 4px 0 8px; }
+@media (max-width: 420px) { .view > .gauges.four { grid-template-columns: repeat(2, 1fr); } }
 .tile.wide { grid-column: 1 / -1; }
 .tile.clickable { cursor: pointer; }
 .tile.t-shot { order: -1; background: var(--primary-container); color: var(--on-primary-container); }
@@ -774,3 +852,262 @@ select.small-select { height: 36px; width: auto; padding: 0 10px; font-size: 13p
 .quick-rate .note.advice { margin-top: 4px; }
 .quick-actions { margin-top: 12px; }
 .card.rate-card .big-chips { margin-top: 10px; }
+.dash-cfg-row { flex-wrap: wrap; }
+
+/* --- Stil „Xenia“ (Standard): angelehnt an die eingebaute Web-Oberfläche der Maschine ------------------
+   dunkelgraue Kopf- und Navigationsleiste, weiße Karten mit dünnem Rahmen, grüne Akzente, Orange für „aktiv“.
+   Akzent- und Aktiv-Farbe lassen sich in den Einstellungen ändern (setzt --primary bzw. --active inline). */
+:root { --active: var(--primary); --on-active: var(--on-primary); --chrome: var(--surface); --on-chrome: var(--on-surface); --chrome-active: var(--secondary-container); }
+:root[data-style="xenia"] {
+  --primary: #4f9a1c; --on-primary: #ffffff; --primary-container: #e3f1d5; --on-primary-container: #2c5c0b;
+  --secondary-container: #ececec; --on-secondary-container: #2b2b2b;
+  --surface: #ffffff; --surface-dim: #e9e9e9; --surface-container-lowest: #ffffff; --surface-container-low: #fafafa;
+  --surface-container: #f3f3f3; --surface-container-high: #ffffff; --surface-container-highest: #e6e6e6;
+  --on-surface: #212529; --on-surface-variant: #666666; --outline: #9a9da3; --outline-variant: #dcdde0;
+  --danger: #d0312d; --danger-container: #fbe3e2; --warning: #e07a1f; --success: #4f9a1c;
+  --gauge-face: #ffffff; --gauge-ring: #dcdde0; --gauge-tick: #55585e; --gauge-needle: #d0312d;
+  --active: #f5862f; --on-active: #ffffff;
+  --chrome: #383c44; --on-chrome: #ffffff; --chrome-active: #666666; --chrome-title: #b9a397;
+  --radius-s: 2px; --radius-m: 3px; --radius-l: 4px; --radius-xl: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style="xenia"]:not([data-theme="light"]) {
+    --primary: #7cc242; --on-primary: #10200a; --primary-container: #2b4419; --on-primary-container: #cfeab6;
+    --secondary-container: #33363d; --on-secondary-container: #e6e6e6;
+    --surface: #1d1f24; --surface-dim: #1d1f24; --surface-container-lowest: #24262c; --surface-container-low: #212329;
+    --surface-container: #2a2c33; --surface-container-high: #24262c; --surface-container-highest: #34363e;
+    --on-surface: #e6e7ea; --on-surface-variant: #a9acb3; --outline: #7d8088; --outline-variant: #3a3d45;
+    --danger: #ef5350; --danger-container: #5c1a17; --warning: #ffa04d; --success: #7cc242;
+    --gauge-face: #24262c; --gauge-ring: #3a3d45; --gauge-tick: #b9bcc4; --gauge-needle: #ef5350;
+    --chrome: #2b2d34; --on-chrome: #ffffff; --chrome-active: #555a63; --chrome-title: #b9a397;
+  }
+}
+:root[data-style="xenia"][data-theme="dark"] {
+  --primary: #7cc242; --on-primary: #10200a; --primary-container: #2b4419; --on-primary-container: #cfeab6;
+  --secondary-container: #33363d; --on-secondary-container: #e6e6e6;
+  --surface: #1d1f24; --surface-dim: #1d1f24; --surface-container-lowest: #24262c; --surface-container-low: #212329;
+  --surface-container: #2a2c33; --surface-container-high: #24262c; --surface-container-highest: #34363e;
+  --on-surface: #e6e7ea; --on-surface-variant: #a9acb3; --outline: #7d8088; --outline-variant: #3a3d45;
+  --danger: #ef5350; --danger-container: #5c1a17; --warning: #ffa04d; --success: #7cc242;
+  --gauge-face: #24262c; --gauge-ring: #3a3d45; --gauge-tick: #b9bcc4; --gauge-needle: #ef5350;
+  --chrome: #2b2d34; --on-chrome: #ffffff; --chrome-active: #555a63; --chrome-title: #b9a397;
+  color-scheme: dark;
+}
+/* Schrift und Textfarben wie die Original-Seite: Open Sans, Text #212529, Nebentext #666,
+   Leisten #383c44 mit weißer, dünner Schrift, Überschriften der Leisten in Beigegrau #b9a397 */
+[data-style="xenia"] body, [data-style="xenia"] button, [data-style="xenia"] input, [data-style="xenia"] select, [data-style="xenia"] textarea { font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+[data-style="xenia"] .topbar-title { color: var(--chrome-title); font-weight: 300; letter-spacing: 1.25px; }
+/* Beschriftung der Leiste in beiden Designs gleich (500); die breite Xenia-Navigation links setzt ihre eigene */
+[data-style="xenia"] .card h2, [data-style="xenia"] .card h3, [data-style="xenia"] .section-title { font-weight: 400; color: var(--on-surface); }
+/* Kopfleiste über die ganze Breite */
+[data-style="xenia"] .topbar { background: var(--chrome); color: var(--on-chrome); box-shadow: 0 0 0 100vmax var(--chrome); clip-path: inset(0 -100vmax); }
+[data-style="xenia"] .topbar-title { font-size: 20px; }
+[data-style="xenia"] .topbar .icon-btn { color: var(--on-chrome); }
+[data-style="xenia"] .tabs { background: var(--surface); }
+/* Karten: weiß mit dünnem Rahmen, kaum gerundet */
+[data-style="xenia"] .card, [data-style="xenia"] .list-item, [data-style="xenia"] .dash > .tile { background: var(--surface-container-lowest); border: 1px solid var(--outline-variant); box-shadow: none; }
+[data-style="xenia"] .card.low { background: var(--surface-container-low); }
+[data-style="xenia"] .dash > .tile.t-shot { background: var(--primary-container); }
+[data-style="xenia"] .btn, [data-style="xenia"] .btn.big, [data-style="xenia"] .chip, [data-style="xenia"] .seg-btn, [data-style="xenia"] .icon-btn.filled, [data-style="xenia"] .icon-btn.tonal { border-radius: var(--radius-s); }
+[data-style="xenia"] .btn.outlined, [data-style="xenia"] .seg-btn { border: 1px solid var(--primary); color: var(--on-surface); }
+[data-style="xenia"] .btn.tonal { background: transparent; border: 1px solid var(--primary); color: var(--on-surface); }
+.seg-btn[aria-pressed="true"] { background: var(--active); border-color: var(--active); color: var(--on-active); }
+[data-style="xenia"] .seg-btn[aria-pressed="true"] { color: var(--on-active); }
+[data-style="xenia"] .chip[aria-pressed="true"], [data-style="xenia"] .chip.on { background: var(--active); color: var(--on-active); }
+[data-style="xenia"] .section-title { font-size: 18px; font-weight: 400; margin-top: 24px; }
+[data-style="xenia"] .badge { border-radius: var(--radius-s); }
+/* Untere Leiste dunkel wie die Navigation der Maschine */
+[data-style="xenia"] .navbar { background: var(--chrome); }
+[data-style="xenia"] .nav-item { color: var(--on-chrome); opacity: .78; }
+[data-style="xenia"] .nav-item[aria-current="page"] { color: var(--on-chrome); opacity: 1; }
+[data-style="xenia"] .nav-item[aria-current="page"] .pill { color: var(--on-chrome); }
+[data-style="xenia"] .nav-item .pill::before { background: var(--chrome-active); border-radius: var(--radius-s); }
+/* Viele Tabs: Leiste waagerecht wischbar statt zu quetschen */
+
+/* Breite Bildschirme: Navigation links wie auf der Seite der Maschine */
+@media (min-width: 960px) {
+  :root[data-style="xenia"] { --nav-h: 0px; }
+  [data-style="xenia"] body { padding-left: 230px; }
+  [data-style="xenia"] .navbar { top: 0; right: auto; width: 230px; flex-direction: column; justify-content: flex-start; padding: 0 0 16px; overflow-y: auto; }
+  [data-style="xenia"] .navbar::before { content: "Navigation"; display: block; height: 64px; line-height: 64px; padding: 0 14px; font-size: 22px; font-weight: 300; letter-spacing: 1.25px; color: var(--chrome-title); flex: none; }
+  [data-style="xenia"] .navbar-inner, [data-style="xenia"] .navbar-inner.lots { flex-direction: column; max-width: none; overflow: visible; }
+  [data-style="xenia"] .nav-item, [data-style="xenia"] .navbar-inner.many .nav-item, [data-style="xenia"] .navbar-inner.lots .nav-item { flex: none; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 9px 12px; font-size: 15px; font-weight: 400; letter-spacing: 0; }
+  [data-style="xenia"] .nav-item .pill { width: 22px; height: 22px; overflow: visible; }
+  [data-style="xenia"] .nav-item .pill svg { width: 18px; height: 18px; }
+  /* Linke Liste: die ganze Zeile ist markiert – das Symbol wächst dort nicht (das Federn wirkte wie ein Zucken) */
+  [data-style="xenia"] .nav-item .pill svg, [data-style="xenia"] .nav-item[aria-current="page"] .pill svg { transform: none; transition: none; }
+  [data-style="xenia"] .nav-item .pill::before { display: none; }
+  [data-style="xenia"] .nav-item[aria-current="page"] { background: var(--chrome-active); }
+  [data-style="xenia"] .nav-item:hover { opacity: 1; }
+  [data-style="xenia"] .view { padding-bottom: 32px; }
+  [data-style="xenia"] .savebar { bottom: 24px; }
+}
+/* Darstellung in den Einstellungen */
+.color-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+.color-row input[type="color"] { width: 44px; height: 32px; padding: 0; border: 1px solid var(--outline-variant); border-radius: var(--radius-s); background: none; cursor: pointer; }
+/* Einstellungen: eine Liste von oben nach unten, gegliedert wie die Seite der Maschine */
+.set-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.set-nav .chip { height: 28px; padding: 0 10px; font-size: 12px; }
+.set-section { scroll-margin-top: 72px; }
+.set-section > .section-title { display: flex; align-items: center; gap: 8px; }
+.set-section > .section-title svg { width: 20px; height: 20px; color: var(--primary); }
+.set-section .sub-title { font-size: 13px; font-weight: 600; color: var(--on-surface-variant); margin: 14px 4px 6px; text-transform: none; }
+svg.icon.xi { width: 20px; height: 20px; } svg.icon.xi.s18 { width: 16px; height: 16px; } svg.icon.xi.s20 { width: 18px; height: 18px; }
+
+/* Anzeigen wie die Manometer der Xenia (nach Fotos): Chromring, Zifferblatt cremeweiß oder schiefergrau,
+   dünner schwarzer bzw. weißer Zeiger, Messingnabe und -schrauben, keine rote Zone */
+:root[data-gauge="white"] { --gauge-face: #f3f1ea; --gauge-ink: #1c1c1c; --gauge-needle: #151515; }
+:root[data-gauge="black"] { --gauge-face: #2b2e33; --gauge-ink: #ecebe6; --gauge-needle: #f4f4f2; }
+/* direkt am Manometer, damit die Farben des dunklen Themes (spezifischere :root-Regeln) sie nicht überschreiben */
+[data-gauge="white"] .gauge.mano { --gauge-face: #f3f1ea; --gauge-ink: #1c1c1c; --gauge-needle: #151515; }
+[data-gauge="black"] .gauge.mano { --gauge-face: #2b2e33; --gauge-ink: #ecebe6; --gauge-needle: #f4f4f2; }
+.gauge.mano .g-bezel { stroke: rgba(0,0,0,.3); stroke-width: .8; }
+.gauge.mano .g-lip { fill: none; stroke: rgba(0,0,0,.45); stroke-width: 2.5; }
+.gauge.mano .g-face { fill: var(--gauge-face); stroke: none; }
+.gauge.mano .g-tick { stroke: var(--gauge-ink); stroke-width: 1; }
+.gauge.mano .g-tick.major { stroke-width: 2.4; }
+.gauge.mano .g-label { fill: var(--gauge-ink); font-size: 12px; font-weight: 400; text-anchor: middle; font-family: "Open Sans", Arial, sans-serif; }
+.gauge.mano .g-unit { fill: var(--gauge-ink); font-size: 11px; text-anchor: middle; font-family: "Open Sans", Arial, sans-serif; }
+.gauge.mano .g-brand { fill: var(--gauge-ink); font-size: 8.5px; font-weight: 600; letter-spacing: .4px; text-anchor: middle; font-family: "Open Sans", Arial, sans-serif; }
+.gauge.mano .g-screw { stroke: rgba(0,0,0,.35); stroke-width: .6; }
+.gauge.mano .g-needle { fill: var(--gauge-needle); filter: drop-shadow(0 1.2px 1px rgba(0,0,0,.45)); }
+.gauge.mano .g-hub { stroke: rgba(0,0,0,.35); stroke-width: .8; }
+.gauge.mano .g-hub-dot { fill: #6b5214; }
+.gauge-foot { display: flex; flex-direction: column; align-items: center; line-height: 1.25; margin-top: 4px; }
+.gauge-foot .gv { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--on-surface); }
+.gauge-foot .gs { font-size: 11px; color: var(--on-surface-variant); min-height: 1.25em; }
+.dbl-start + .dbl-start { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline-variant); }
+.dbl-start .time { font-size: 30px; } .timer-card.off .dbl-start .time { font-size: 22px; }
+.timer-card > .day { font-size: 14px; font-weight: 600; color: var(--on-surface); margin-bottom: 2px; }
+
+/* Dashboard: Diagramm füllt die verfügbare Höhe der Kachel (statt aus der Breite zu wachsen), mindestens 60 px */
+.dash > .tile > .tile-body > .chart-fit { flex: 1; min-height: 60px; position: relative; }
+.chart-fit > svg { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; }
+
+
+/* Dashboard-Instrumente: füllen die Kachel, Größe und Anordnung (4 × 1 oder 2 × 2) setzt das Skript */
+.dash > .tile > .tile-body > .gauge-fit { flex: 1; min-height: 90px; position: relative; overflow: hidden; }
+.gauge-fit > .dash-gauges { position: absolute; inset: 0; display: grid; gap: 8px 6px; margin: 0; align-content: center; justify-items: center; }
+.dash-gauges .gauge svg { width: var(--gsize, 120px); height: var(--gsize, 120px); max-width: none; }
+.dash-gauges .gauge-title { font-size: 12px; margin-bottom: 2px; white-space: nowrap; }
+.dash-gauges.tiny .gauge-foot .gs { font-size: 9px; } /* Ziel bleibt immer sichtbar */
+.dash-gauges.tiny .gauge-foot .gv { font-size: 13px; }
+
+/* Dashboard: laufendes Skript bzw. letzte Störung in „Status“ */
+.dash-running { margin: 8px 0 2px; padding: 8px 10px; border-radius: var(--radius-m); background: var(--primary-container); color: var(--on-primary-container); }
+.dash-running .run-title { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.dash-running.fault { background: var(--danger-container); color: var(--danger); }
+.dash-control > .btn.danger { height: 40px; }
+
+.machine-svg.mk { max-width: 380px; }
+/* Einklappbare Kategorien (Maschinen-Einstellungen, Server & App) */
+.folds { display: flex; flex-direction: column; gap: 8px; }
+details.fold { padding: 0; margin: 0; }
+details.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 14px 16px; font-size: 16px; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary > svg:first-child { color: var(--primary); }
+details.fold > summary .chev { color: var(--on-surface-variant); transition: transform .2s; }
+details.fold[open] > summary .chev { transform: rotate(180deg); }
+details.fold[open] > summary { border-bottom: 1px solid var(--outline-variant); }
+.fold-body { padding: 14px 16px 16px; }
+.fold-body > .card { border: 0; padding: 0; margin: 0; background: none; }
+.fold-body > .list:first-child, .fold-body > :first-child { margin-top: 0; }
+/* Abstände: Text nach Schaltflächen und Zeilen mit Schaltfläche rechts */
+.card .row + p, .card .btn + p, .card .row + .muted, .card p + p { margin-top: 10px; }
+.card p.muted.small { line-height: 1.5; }
+.card h3 + .row, .card h4 + .row { margin-top: 4px; }
+
+/* Home am Handy (eine Spalte): Kacheln so hoch wie ihr Inhalt */
+.dash.single { grid-auto-rows: auto; }
+.dash.single > .tile { overflow: visible; }
+.dash.single > .tile > .tile-body > .gauge-fit { position: static; min-height: 0; overflow: visible; }
+.dash.single .gauge-fit > .dash-gauges { position: static; }
+.dash.single > .tile > .tile-body > .chart-fit { flex: none; height: 200px; }
+/* Verlauf: Reiter „Alle Werte“ unter dem Diagramm */
+.live-foot { display: flex; align-items: center; gap: 8px; }
+.live-foot .legend { flex: 1; margin-top: 4px; }
+.tab-mini { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--outline-variant); background: none; color: var(--on-surface-variant); border-radius: var(--radius-s); padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+.tab-mini[aria-expanded="true"] svg { transform: rotate(180deg); }
+.live-values { margin-top: 8px; }
+/* Sollwerte */
+.tgt-list { display: grid; gap: 2px; }
+.tgt-row { display: flex; align-items: center; gap: 4px; }
+.tgt-row .icon-btn { width: 34px; height: 34px; }
+.tgt-val { min-width: 76px; text-align: center; border: 0; background: none; font-size: 16px; font-weight: 600; color: var(--on-surface); padding: 4px; border-radius: var(--radius-s); }
+
+/* Schalter-Ansichten (neue Xenia und DBL) rein schematisch: nur Linien in Textfarben, Form der Schalter bleibt */
+.machine-svg .front, .machine-svg .body { fill: none; stroke: var(--outline); stroke-width: 1.2; }
+.machine-svg .sym { stroke: var(--on-surface-variant); }
+.machine-svg .mbtn .cap { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1; }
+.machine-svg .mbtn .cap-in { fill: none; stroke: var(--outline-variant); }
+.machine-svg .mbtn .glyph path { stroke: var(--on-surface); }
+.machine-svg .tg-nut { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1; }
+.machine-svg .tg-ring { fill: none; stroke: var(--outline); }
+.machine-svg .tg-hole { fill: var(--on-surface-variant); }
+.machine-svg .tg-stem { stroke: var(--on-surface-variant); }
+.machine-svg .tg-head { fill: var(--surface-container-lowest); stroke: var(--on-surface); stroke-width: 1; }
+.machine-svg .pos-ring { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); }
+.machine-svg .pos-no { fill: var(--on-surface); }
+.machine-svg .mbtn .halo { fill: var(--on-surface); }
+.machine-svg .mbtn.sel .halo { opacity: .14; }
+.machine-svg .mbtn:hover .halo, .machine-svg .mbtn:focus-visible .halo { opacity: .08; }
+.machine-svg .lever-side.sel .pos-ring { stroke: var(--on-surface); stroke-width: 1.6; }
+.machine-svg .lever-side .pos-ring { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1.2; }
+.machine-svg .lever-side .pos-no { fill: var(--on-surface); }
+.machine-svg .lever-side.sel .pos-ring { fill: var(--on-surface); stroke: var(--on-surface); }
+.machine-svg .lever-side.sel .pos-no { fill: var(--surface-container-lowest); }
+.machine-svg .lever-side.sel .halo { opacity: .12; }
+
+/* Fenster (Sheet) mit fester Kopfzeile und Schließen-Knopf */
+.sheet { padding-top: 0; }
+.sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; margin: 0 -16px 8px; padding: 12px 8px 8px 20px; background: var(--surface-container-low); border-bottom: 1px solid var(--outline-variant); }
+.sheet-head h2 { margin: 0; font-size: 20px; }
+
+/* Farbvorlage Material: flache Anzeigen (frühere Optik), hell oder dunkel */
+:root[data-palette="material"][data-gauge="white"] { --gauge-face: #ffffff; --gauge-ring: #d9d8e0; --gauge-tick: #5d5e6b; --gauge-needle: #4a5891; --gauge-text: #1b1b21; --gauge-text2: #46464f; }
+:root[data-palette="material"][data-gauge="black"] { --gauge-face: #1f1f25; --gauge-ring: #3a3a42; --gauge-tick: #b9b8c4; --gauge-needle: #b8c4ff; --gauge-text: #e4e1e9; --gauge-text2: #c6c5d0; }
+:root[data-palette="material"] .gauge:not(.mano) .g-label { fill: var(--gauge-text2); }
+:root[data-palette="material"] .gauge:not(.mano) .g-value { fill: var(--gauge-text); }
+:root[data-palette="material"] .gauge:not(.mano) .g-sub { fill: var(--gauge-text2); }
+
+/* Android-App: kein Doppeltipp-Zoom */
+html.in-app, html.in-app body { touch-action: pan-x pan-y; }
+
+/* Zurück-Pfeil: klappt in der Breite ein und aus, der Titel gleitet mit */
+#back-btn { transition: width .26s cubic-bezier(.2, 0, 0, 1), margin .26s cubic-bezier(.2, 0, 0, 1), opacity .2s, transform .26s cubic-bezier(.2, 0, 0, 1); overflow: hidden; flex: none; }
+#back-btn.gone { width: 0; min-width: 0; padding: 0; margin: 0; opacity: 0; transform: translateX(-8px); pointer-events: none; }
+/* Fenster (Anpassen, Bohne, Dialoge) mittig im Inhaltsbereich, also rechts der linken Navigationsleiste */
+@media (min-width: 960px) {
+  [data-style="xenia"] .sheet { left: 230px; }
+  [data-style="xenia"] .dialog { left: calc(50% + 115px); }
+  [data-style="xenia"] .fullscreen { padding-left: 230px; }
+}
+
+/* Auswahl-Fenster der App (statt System-Dialog für <select>) */
+.pick-list { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px; }
+.pick-opt { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; border: 0; background: none; color: var(--on-surface);
+  font: 400 15px/1.35 'Open Sans', system-ui, sans-serif; text-align: left; border-radius: 14px; hyphens: auto; -webkit-hyphens: auto; overflow-wrap: break-word; }
+.pick-opt .ck { width: 22px; flex: none; color: var(--primary); display: grid; place-items: center; }
+.pick-opt.sel { background: var(--secondary-container); color: var(--on-secondary-container); font-weight: 600; }
+.pick-opt.sel .ck { color: inherit; }
+.pick-opt:disabled { opacity: .45; }
+
+/* Links als Listeneintrag (z. B. CSV-Export) wie Knöpfe darstellen */
+a.list-item { text-decoration: none; color: inherit; }
+
+/* Titel-Überblendung: alter und neuer Titel in derselben Rasterzelle übereinander */
+.topbar-title { display: grid; min-width: 0; }
+.topbar-title > .tt { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Kurzzeitig ohne Übergänge (Farben für die Android-Widgets auslesen) */
+html.no-trans, html.no-trans * { transition: none !important; }
+
+/* Kennzahl als Verweis (z. B. „Standard-Dosis festlegen“) */
+.kpi.kpi-link { font: inherit; color: inherit; text-align: left; border: 0; cursor: pointer; width: 100%; }
+.kpi.kpi-link .small { color: var(--primary); margin-top: 2px; }
+
+/* Schaltbefehl läuft: Zielknopf ist schon hervorgehoben und pulsiert dezent, bis die Maschine den Zustand meldet */
+.seg-btn.pending { animation: seg-pending 1.1s ease-in-out infinite; }
+@keyframes seg-pending { 50% { opacity: .62; } }
+@media (prefers-reduced-motion: reduce) { .seg-btn.pending { animation: none; opacity: .75; } }

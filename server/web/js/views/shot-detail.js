@@ -2,11 +2,12 @@
 // Kennzahlen, zugeordneter Mahlvorgang der Mühle, Bewertung mit Notizen und der Einstell-Assistent.
 // Dazu die Schnellbewertung direkt nach einem Bezug (Geschmack, Stärke, Mahlgrad → nächster Schritt).
 import { h, icon, fmt, fmtInt, snackbar, fullscreen, sheet, switchEl } from '../ui.js';
-import { api, hasGrinder } from '../api.js';
+import { api, hasGrinder, store } from '../api.js';
 import { shotChart } from '../gauge.js';
-import { targetCurve, shotMetrics, STRENGTH } from '../../shared/shot-analysis.js';
+import { targetCurve, shotMetrics, curveYield, STRENGTH } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
 import { TYPE_DE } from './grinder.js';
+import { navigate } from '../app.js';
 
 const ADVICE_ICON = { finer: 'tune', coarser: 'tune', keep: 'check', longer: 'scale', shorter: 'scale', puck: 'warn' };
 const TASTE_SHORT = { sour: 'sauer', balanced: 'ausgewogen', bitter: 'bitter' };
@@ -73,25 +74,35 @@ function choice(options, value, onPick, cls = '') {
   return box;
 }
 
-export function openShot(id, { onChange } = {}) {
-  return fullscreen(async (root, close) => {
-    root.replaceChildren(head(close, 'Bezug'), h('div', { class: 'empty' }, h('span', { class: 'spinner' }), ' Lade …'));
+export function openShot(id, { onChange, host = fullscreen } = {}) {
+  const page = Boolean(host.page);
+  return host(async (root, close) => {
+    root.replaceChildren(head(close, 'Bezug', null, page), h('div', { class: 'empty' }, h('span', { class: 'spinner' }), ' Lade …'));
     try {
       const d = await api(`/api/shots/${encodeURIComponent(id)}`);
-      paint(root, d, close, onChange);
+      paint(root, d, close, onChange, page);
     } catch (e) {
-      root.replaceChildren(head(close, 'Bezug'), h('div', { class: 'empty' }, e.message));
+      root.replaceChildren(head(close, 'Bezug', null, page), h('div', { class: 'empty' }, e.message));
     }
   });
 }
 
-function head(close, title, sub = null) {
+// Als Unterseite steht der Zurück-Pfeil schon in der Kopfzeile: dann nur Datum und Kurzinfo
+function head(close, title, sub = null, page = false) {
   return h('div', { class: 'row detail-head' },
-    h('button', { class: 'icon-btn', 'aria-label': 'Zurück', onclick: close }, icon('left')),
+    page ? null : h('button', { class: 'icon-btn', 'aria-label': 'Zurück', onclick: close }, icon('left')),
     h('div', { class: 'grow' }, h('div', { class: 'title' }, title), sub ? h('div', { class: 'small muted' }, sub) : null));
 }
 
-function paint(root, d, close, onChange) {
+// Unterseite „Bezug“ (/bezuege/bezug?id=…): Zurück-Pfeil, Zurück-Taste, Animation und Scrollposition wie überall
+export function shotPageView(root) {
+  const id = new URLSearchParams(location.search).get('id');
+  const host = (build) => build(root, () => navigate('/bezuege', { replace: true }));
+  host.page = true;
+  openShot(id, { host });
+}
+
+function paint(root, d, close, onChange, page = false) {
   let shot = d.shot;
   let advice = d.advice;
   const show = { compare: true, reference: true, target: true };
@@ -135,16 +146,20 @@ function paint(root, d, close, onChange) {
   function paintFacts() {
     const m = shotMetrics(shot);
     const k = (label, v, unit = '') => h('div', { class: 'kpi' }, h('div', { class: 'k' }, label), h('div', { class: 'v' }, v ?? '–', v !== null && v !== undefined && unit ? h('span', { class: 'muted small' }, ` ${unit}`) : null));
-    kpiBox.replaceChildren(
-      k('Zeit', m.timeS !== null ? fmt(m.timeS) : null, 's'),
+    kpiBox.replaceChildren(...[
+      k('Bezugszeit', m.timeS !== null ? fmt(m.timeS) : null, 's'), // ohne Vorbrühen, wie an der Xenia
       k('Ausbeute', m.yieldG !== null ? fmt(m.yieldG) : null, 'g'),
-      k('Dosis', m.doseG !== null ? fmt(m.doseG) : null, 'g'),
+      m.doseG !== null ? k(m.doseAssumed ? 'Dosis (Standard)' : 'Dosis', fmt(m.doseG), 'g')
+        // Ohne Dosis kein Verhältnis: direkt zur Einstellung „Standard-Dosis“
+        : h('button', { class: 'kpi kpi-link', type: 'button', onclick: () => navigate(store.server?.mode === 'direct' ? '/einstellungen#aufzeichnung' : '/server#aufzeichnung') },
+          h('div', { class: 'k' }, 'Dosis'), h('div', { class: 'v' }, '–'), h('div', { class: 'muted small' }, 'Standard-Dosis festlegen')),
       k('Verhältnis', m.ratio !== null ? `1:${fmt(m.ratio)}` : null),
       k('Vorbrühen', m.preinfusionS !== null ? fmt(m.preinfusionS) : null, 's'),
+      m.preinfusionS !== null ? k('Gesamt', m.totalS !== null ? fmt(m.totalS) : null, 's') : null,
       k('Erster Tropfen', m.firstDropS !== null ? fmt(m.firstDropS) : null, 's'),
       k('Ø Druck', m.avgPressure !== null ? fmt(m.avgPressure) : null, 'bar'),
       k('Max. Druck', m.maxPressure !== null ? fmt(m.maxPressure) : null, 'bar'),
-      k('Ø Fluss', m.avgFlow !== null ? fmt(m.avgFlow) : null, 'g/s'));
+      k('Ø Fluss', m.avgFlow !== null ? fmt(m.avgFlow) : null, 'g/s')].filter(Boolean));
     const g = shot.dose;
     grindBox.replaceChildren(g
       ? h('div', { class: 'row' }, icon('grinder', 's20'),
@@ -169,7 +184,7 @@ function paint(root, d, close, onChange) {
   const strength = choice(STRENGTH, n.strength, (v) => { n.strength = v; });
   const bean = beanField(d.beans, n.bean || '');
   const grind = grindField(n.grind || '', d.lastGrind);
-  const yieldIn = h('input', { class: 'text', type: 'number', inputmode: 'decimal', step: 0.1, min: 1, max: 399, value: n.yieldG ?? '', placeholder: shot.weight ? `gemessen ${fmt(shot.weight)}` : 'Gramm' });
+  const yieldIn = h('input', { class: 'text', type: 'number', inputmode: 'decimal', step: 0.1, min: 1, max: 399, value: n.yieldG ?? '', placeholder: (curveYield(shot.curve) ?? shot.weight) ? `gemessen ${fmt(curveYield(shot.curve) ?? shot.weight)}` : 'Gramm' });
   const twoCups = shot.weight ? h('button', { type: 'button', class: 'btn tonal small-btn', title: 'Zwei Tassen, nur eine stand auf der Waage', onclick: () => { yieldIn.value = String(Math.round(shot.weight * 20) / 10); } }, '×2') : null;
   const doseIn = h('input', { class: 'text', type: 'number', inputmode: 'decimal', step: 0.1, min: 1, max: 39, value: n.doseG ?? '', placeholder: shot.dose?.g ? `Mühle ${fmt(shot.dose.g)}` : 'Gramm' });
   const text = h('textarea', { class: 'text', rows: 3, maxlength: 500, placeholder: 'Notiz (Bohne, Mahlgrad, Eindruck …)' }, n.text || '');
@@ -195,7 +210,7 @@ function paint(root, d, close, onChange) {
   } }, icon('check', 's18'), 'Speichern');
 
   root.replaceChildren(
-    head(close, title, sub),
+    head(close, title, sub, page),
     h('div', { class: 'stagger detail' },
       h('section', { class: 'card' }, chartBox, legend),
       kpiBox,
@@ -264,7 +279,7 @@ export async function quickRate(id, { taste = null, onChange } = {}) {
       body.replaceChildren(
         adviceNote(r.advice, shot.dose?.recipe) || h('p', { class: 'muted' }, 'Gespeichert.'),
         h('div', { class: 'row quick-actions' },
-          h('button', { class: 'btn text', onclick: () => { close(); openShot(shot.id, { onChange }); } }, 'Details'),
+          h('button', { class: 'btn text', onclick: () => { close(); navigate(`/bezuege/bezug?id=${encodeURIComponent(shot.id)}`); } }, 'Details'),
           h('span', { class: 'grow' }),
           h('button', { class: 'btn filled', onclick: close }, 'Fertig')));
     } catch (e) {
