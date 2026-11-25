@@ -640,6 +640,10 @@ button.time-field { height: 48px; padding: 0 14px; border-radius: 8px; border: 1
 .setting-card { padding: 16px 16px 14px; }
 .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .card-head h3 { margin: 0; }
+/* Sprung zu einer Karte (z. B. „Ansicht ändern“): unter der Kopfleiste stehen lassen und kurz hervorheben */
+.setting-card[data-anchor] { scroll-margin-top: 72px; }
+.setting-card.flash { animation: card-flash 1.8s var(--ease-emph) .35s; }
+@keyframes card-flash { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 25%, 60% { box-shadow: 0 0 0 2px var(--primary); } }
 .card-head svg { color: var(--primary); }
 .setting-card h4 { margin: 12px 0 4px; font-size: 12px; font-weight: 600; color: var(--on-surface-variant); text-transform: uppercase; letter-spacing: .6px; }
 .toggle-row { padding: 8px 0; }

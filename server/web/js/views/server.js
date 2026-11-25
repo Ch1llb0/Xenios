@@ -105,10 +105,22 @@ export const serverPage = (part) => (root) => {
     savebar.hidden = Object.keys(dirty).length === 0;
   }
 
+  // Sprung von außen (z. B. „Ansicht ändern“ unter Schalter, …#aussehen): Karte nach dem ersten Zeichnen in den Blick
+  // holen und kurz hervorheben, danach die Marke aus der Adresse nehmen
+  let anchor = location.hash.slice(1);
+  function reveal() {
+    if (!anchor) return;
+    const el = body.querySelector(`[data-anchor="${anchor}"]`);
+    anchor = '';
+    history.replaceState(history.state, '', location.pathname);
+    if (el) setTimeout(() => { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); el.classList.add('flash'); }, 350);
+  }
+
   async function load() {
     try {
       data = await api('/api/admin/config');
       paint();
+      reveal();
     } catch (e) {
       body.replaceChildren(h('div', { class: 'empty' }, e.message));
     }
@@ -160,8 +172,8 @@ export const serverPage = (part) => (root) => {
   }
   // Karte mit Kopfzeile; jede Unterseite hat nur wenige, deshalb offen statt eingeklappt
   const card = (head, ic, ...kids) => {
-    const { title, badge } = typeof head === 'string' ? { title: head } : head;
-    return h('section', { class: 'card setting-card' },
+    const { title, badge, anchor: id } = typeof head === 'string' ? { title: head } : head;
+    return h('section', { class: 'card setting-card', 'data-anchor': id },
       h('div', { class: 'card-head' }, icon(ic, 's20'), h('h3', { class: 'grow' }, title), badge || null),
       ...kids.filter(Boolean));
   };
@@ -229,7 +241,7 @@ export const serverPage = (part) => (root) => {
     colorInput.addEventListener('change', () => { change('machine.look.color', colorInput.value); paint(); });
     const own = !LOOK_COLORS.some(([c]) => c === lookColor);
     const simple = value('machine.look.style') === 'simple';
-    const look = card('Aussehen', 'palette',
+    const look = card({ title: 'Aussehen', anchor: 'aussehen' }, 'palette',
       h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine (Farbe des Gehäuses und Seite der Dampflanze einstellbar) oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
       h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Ansicht' },
         [['render', 'Render'], ['simple', 'Vereinfacht']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String((simple ? 'simple' : 'render') === v), onclick: () => { change('machine.look.style', v); paint(); } }, label))),

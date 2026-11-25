@@ -333,7 +333,7 @@ function switchesTab(root) {
             ? 'Alte Xenia (DBL): Eine Position ①–④ antippen und auswählen, was kurzes bzw. langes Drücken startet. ② (linker Schalter nach rechts, am Ein/Aus-Symbol) ist fest Ein/Aus und lässt sich nicht ändern.'
             : 'Einen Taster antippen und auswählen, was kurzes bzw. langes Drücken startet. Eigene Abläufe entstehen unter „Skripte“.'),
           h('div', { class: 'machine-wrap' }, svg,
-            directMode || !look.editButton ? null : h('button', { class: 'btn text', type: 'button', onclick: () => navigate('/einstellungen/modell') }, icon('settings', 's18'), 'Ansicht ändern')),
+            directMode || !look.editButton ? null : h('button', { class: 'btn text', type: 'button', onclick: () => navigate('/einstellungen/modell#aussehen') }, icon('settings', 's18'), 'Ansicht ändern')),
           grid,
           editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')));
     } catch (e) {
