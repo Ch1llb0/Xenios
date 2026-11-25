@@ -13,6 +13,8 @@ TGT = lambda n: [(None, 40), (f't{n}_minus', 22), (None, 34), (f't{n}_plus', 22)
 # Zeile: (Name, Gewicht, Spalten oder None, Spaltenabstand dp)
 SPECS = {
   'power':      [('head', 18, None, 0), (None, 4, None, 0), ('body', 40, None, 0)],
+  # 4×1 wie das frühere Widget: Status links, Ein/Eco/Aus rechts
+  'mode':       [('row', 1, [('head', 1.6), ('btn_on', 1), ('btn_eco', 1), ('btn_off', 1)], 6)],
   'switch':     [('head', 18, None, 0), (None, 6, None, 0), ('seg', 36, SEG, 6), (None, 8, None, 0), ('tg_steam', 26, None, 0), ('tg_nosteam', 26, None, 0)],
   'large':      [('head', 18, None, 0), (None, 4, None, 0), ('status', 46, None, 0), (None, 4, None, 0), ('badges', 18, None, 0), (None, 8, None, 0),
                  ('seg', 36, SEG, 6), (None, 8, None, 0), ('tg_steam', 26, None, 0), ('tg_nosteam', 26, None, 0)],
@@ -29,7 +31,7 @@ SPECS = {
 CLICK = {'btn_on', 'btn_eco', 'btn_off', 'tg_steam', 'tg_nosteam', 'stop', 'head',
          't1_minus', 't1_plus', 't2_minus', 't2_plus', 't3_minus', 't3_plus'}
 LAYOUTS = {  # Layout-Datei → Overlays (Spezifikationen)
-  'widget_power': [], 'widget_powerns': [], 'widget_switch': ['switch'], 'widget_large': ['large', 'large_live'], 'widget_gauges': [],
+  'widget_power': [], 'widget_powerns': [], 'widget_mode': ['mode'], 'widget_switch': ['switch'], 'widget_large': ['large', 'large_live'], 'widget_gauges': [],
   'widget_targets': ['targets'], 'widget_care': [], 'widget_history': [], 'widget_lastshot': [], 'widget_shots': [], 'widget_shotslarge': [],
 }
 
@@ -57,7 +59,7 @@ for lay, overs in LAYOUTS.items():
     for i, o in enumerate(overs):
         parts.append(overlay(o, f'ov_{o}', i == 0, 'live_' if o == 'large_live' else ''))
     xml = '<?xml version="1.0" encoding="utf-8"?>\n<!-- Erzeugt (widgets_gen): Bild des Widgets und deckungsgleiche Klickflächen -->\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"\n    android:id="@+id/root"\n    android:layout_width="match_parent"\n    android:layout_height="match_parent">\n' + '\n'.join(parts) + '\n</FrameLayout>\n'
-    open(os.path.join(RES, f'{lay}.xml'), 'w').write(xml)
+    open(os.path.join(RES, f'{lay}.xml'), 'w', encoding='utf-8').write(xml)
 
 # Kotlin: dieselben Maße für den Renderer
 kt = ['package app.xeniabridge', '', '// Erzeugt (widgets_gen) – gleiche Zeilen/Spalten wie die Klickflächen in den Widget-Layouts', 'object WidgetSpecs {', f'    const val PAD = {PAD}f', '    class Row(val name: String?, val weight: Float, val cols: List<Pair<String?, Float>>?, val gap: Float)', '    val ROWS: Map<String, List<Row>> = mapOf(']
@@ -68,5 +70,5 @@ for spec, rows in SPECS.items():
         rr.append(f'Row({chr(34) + name + chr(34) if name else "null"}, {w}f, {cs}, {gap}f)')
     kt.append(f'        "{spec}" to listOf(' + ', '.join(rr) + '),')
 kt += ['    )', '}', '']
-open(KT, 'w').write('\n'.join(kt))
+open(KT, 'w', encoding='utf-8').write('\n'.join(kt))
 print('ok', len(LAYOUTS), 'Layouts')

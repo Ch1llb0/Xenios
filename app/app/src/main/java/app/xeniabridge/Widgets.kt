@@ -54,6 +54,7 @@ object Widgets {
     private val KINDS = listOf(
         Kind(PowerWidget::class.java, R.layout.widget_power, 140, 90),
         Kind(PowerNoSteamWidget::class.java, R.layout.widget_powerns, 140, 90),
+        Kind(ModeWidget::class.java, R.layout.widget_mode, 300, 70),
         Kind(SwitchWidget::class.java, R.layout.widget_switch, 300, 150),
         Kind(LargeWidget::class.java, R.layout.widget_large, 300, 230),
         Kind(GaugesWidget::class.java, R.layout.widget_gauges, 300, 150),
@@ -390,6 +391,7 @@ object Widgets {
         when (k.cls) {
             PowerWidget::class.java -> { drawPower(p, s, "Ein/Aus", note = d.note, dim = d.dim); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE)) }
             PowerNoSteamWidget::class.java -> { drawPower(p, s, "Ein ohne Dampf/Aus", noSteam = true, note = d.note, dim = d.dim); rv.setOnClickPendingIntent(R.id.root, broadcast(context, ACTION_TOGGLE_NOSTEAM)) }
+            ModeWidget::class.java -> { drawMode(p, p.layout("mode"), s, d); bindSeg(context, rv, s) }
             SwitchWidget::class.java -> { drawSwitch(p, p.layout("switch"), s, d); bindSwitch(context, rv, s) }
             LargeWidget::class.java -> {
                 // Keine Live-Ansicht des Bezugs: Android aktualisiert Widgets höchstens alle paar Sekunden, zu träge dafür
@@ -419,12 +421,18 @@ object Widgets {
         return rv
     }
 
-    private fun bindSwitch(context: Context, rv: RemoteViews, s: Api.State) {
+    /** Kopf (öffnet die App) und Ein/Eco/Aus; jedes Layout mit diesen Flächen */
+    private fun bindSeg(context: Context, rv: RemoteViews, s: Api.State) {
         rv.setOnClickPendingIntent(R.id.head, openIntent(context, "/"))
         val reachable = s.online
         rv.setOnClickPendingIntent(R.id.btn_on, if (reachable) broadcast(context, ACTION_POWER, mode = "on") else null)
         rv.setOnClickPendingIntent(R.id.btn_eco, if (reachable && !s.isOff) broadcast(context, ACTION_POWER, mode = "eco") else null)
         rv.setOnClickPendingIntent(R.id.btn_off, if (reachable && !s.isOff) broadcast(context, ACTION_POWER, mode = "off") else null)
+    }
+
+    private fun bindSwitch(context: Context, rv: RemoteViews, s: Api.State) {
+        bindSeg(context, rv, s)
+        val reachable = s.online
         rv.setOnClickPendingIntent(R.id.tg_steam, if (reachable && s.isOn) broadcast(context, ACTION_STEAM, mode = if (s.steamOn) "off" else "on") else null)
         rv.setOnClickPendingIntent(R.id.tg_nosteam, broadcast(context, ACTION_NOSTEAM))
     }
@@ -490,6 +498,27 @@ object Widgets {
     private fun drawToggles(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
         r["tg_steam"]?.let { p.toggleRow(it, R.drawable.wi_cloud, "Dampfkessel", if (s.steamOn && s.steam != null) "an · ${fmt(s.steam, 2)} bar" else if (s.steamOn) "an" else "aus", s.steamOn, s.online && s.isOn && !d.direct) }
         r["tg_nosteam"]?.let { p.toggleRow(it, R.drawable.wi_power, "Ohne Dampf einschalten", null, d.noSteam) }
+    }
+
+    /** 4×1 wie das frühere Widget: Status und Brühgruppe links, Ein/Eco/Aus rechts */
+    private fun drawMode(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
+        r["head"]?.let { h ->
+            val dot = 8f
+            p.roundRect(RectF(h.left, h.centerY() - dot / 2, h.left + dot, h.centerY() + dot / 2), dot / 2, stateDot(p, s))
+            val tx = RectF(h.left + dot + 8, h.top, h.right - 4, h.bottom)
+            val label = d.note ?: stateLabel(s)
+            val sub = if (s.online && !s.isOff && s.group != null) "${fmt(s.group)} °C" else null
+            if (sub == null || d.note != null || tx.height() < 30) p.textMid(label, tx, 14f, p.t.onSurface, 1)
+            else {
+                p.textMid(label, RectF(tx.left, tx.top, tx.right, tx.centerY() + 1), 14f, p.t.onSurface, 1)
+                p.textMid(sub, RectF(tx.left, tx.centerY() + 1, tx.right, tx.bottom), 11.5f, p.t.muted)
+            }
+        }
+        // Knöpfe höchstens 40 dp hoch (bei größerem Widget mittig), die Klickflächen bleiben so groß wie die Zeile
+        val seg = r.mapValues { (k, v) ->
+            if (k.startsWith("btn_") && v.height() > 40f) RectF(v.left, v.centerY() - 20f, v.right, v.centerY() + 20f) else v
+        }
+        drawSeg(p, seg, s, d.dim)
     }
 
     private fun drawSwitch(p: WidgetPainter, r: Map<String, RectF>, s: Api.State, d: Data) {
@@ -713,6 +742,8 @@ abstract class XeniaWidget : AppWidgetProvider() {
 class PowerWidget : XeniaWidget()
 /** 2×1: Ein ohne Dampfkessel / Aus mit einem Tipp */
 class PowerNoSteamWidget : XeniaWidget()
+/** 4×1: Status, Ein/Eco/Aus (wie das frühere Widget) */
+class ModeWidget : XeniaWidget()
 /** 4×2: Ein/Eco/Aus, Dampfkessel, Ohne Dampf einschalten */
 class SwitchWidget : XeniaWidget()
 /** 4×3: Status und Schalter */
