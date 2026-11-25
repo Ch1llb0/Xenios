@@ -72,6 +72,7 @@ jobs:
           cat > notes.md <<EOF
           ## Android-App
           \`Xenios-*.apk\` unten herunterladen und auf dem Handy installieren (ab Android 11).
+          Ist Xenios schon installiert: in der App *Einstellungen → App-Update* (ab der ersten Version mit App-Update).
 
           ## Server (Docker)
           \`\`\`

@@ -97,4 +97,23 @@ class Prefs(context: Context) {
     var widgetCache: String?
         get() = p.getString("widgetCache", null)
         set(v) = p.edit().putString("widgetCache", v).apply()
+
+    /** App-Update: neuestes Release mit APK (JSON, siehe AppUpdate) und Zeitpunkt der letzten erfolgreichen Prüfung */
+    var updateRelease: String?
+        get() = p.getString("updateRelease", null)
+        set(v) = p.edit().putString("updateRelease", v).apply()
+
+    var updateCheckedAt: Long
+        get() = p.getLong("updateCheckedAt", 0L)
+        set(v) = p.edit().putLong("updateCheckedAt", v).apply()
+
+    /** Wann für ein Update zu „Unbekannte Apps installieren“ geführt wurde (0 = nicht) */
+    var updateInstallAsked: Long
+        get() = p.getLong("updateInstallAsked", 0L)
+        set(v) = p.edit().putLong("updateInstallAsked", v).apply()
+
+    /** Build, auf das die Web-App schon einmal hingewiesen hat (Hinweis nur einmal je neuer Version) */
+    var updateAnnounced: Long
+        get() = p.getLong("updateAnnounced", 0L)
+        set(v) = p.edit().putLong("updateAnnounced", v).apply()
 }

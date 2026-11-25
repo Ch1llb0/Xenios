@@ -52,6 +52,10 @@ class MainActivity : Activity() {
     /** Notbetrieb: Server nicht erreichbar, Web-App aus der APK spricht die Maschine direkt an (Modus bleibt „Server“). */
     @Volatile private var fallback = false
     private val direct: Boolean get() = prefs.direct || fallback
+    /** App-Update meldet Fortschritt und Ergebnis: Einstellungen neu zeichnen */
+    private val updateListener: () -> Unit = {
+        runOnUiThread { if (::web.isInitialized && !isDestroyed) web.evaluateJavascript("window.dispatchEvent(new Event('xenios-app-update'))", null) }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,6 +101,8 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 33) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { handleBack() }
         }
+
+        AppUpdate.onChange = updateListener
 
         setCookies()
         load(intent, fresh = true)
@@ -189,6 +195,8 @@ class MainActivity : Activity() {
         ExactAlarms.askOnce(this)
         // nach der Rückkehr aus den Android-Einstellungen den Stand der Erlaubnis an die Web-Oberfläche melden
         if (::web.isInitialized) web.evaluateJavascript("window.dispatchEvent(new Event('xenios-exact-alarms'))", null)
+        // App-Update: nach erteilter Erlaubnis weiter, höchstens einmal am Tag von selbst prüfen
+        if (::web.isInitialized) AppUpdate.resume(this)
     }
 
     override fun onPause() {
@@ -200,6 +208,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (AppUpdate.onChange === updateListener) AppUpdate.onChange = null
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }
@@ -488,6 +497,26 @@ class MainActivity : Activity() {
                     Toast.makeText(this@MainActivity, "Keine Uhr-App gefunden", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+
+        /** App-Update: installierte und neueste Version, laufender Vorgang, Erlaubnis (JSON, siehe AppUpdate.state). */
+        @JavascriptInterface
+        fun appUpdate(): String = AppUpdate.state(applicationContext)
+
+        /** Neuestes Release jetzt abfragen; Ergebnis per Ereignis „xenios-app-update“. */
+        @JavascriptInterface
+        fun checkAppUpdate() = AppUpdate.check(applicationContext, manual = true)
+
+        /** Neue APK laden und installieren (fehlt die Erlaubnis, erst die Android-Einstellung öffnen). */
+        @JavascriptInterface
+        fun installAppUpdate() {
+            runOnUiThread { if (!isFinishing) AppUpdate.install(this@MainActivity) }
+        }
+
+        /** Auf dieses Build hat die Oberfläche schon hingewiesen. */
+        @JavascriptInterface
+        fun appUpdateSeen(build: Long) {
+            prefs.updateAnnounced = build
         }
 
         /** Bildschirm anlassen, solange das Dashboard offen ist (Tablet an der Wand). */
