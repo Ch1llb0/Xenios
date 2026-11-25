@@ -36,8 +36,9 @@ export const DEFAULTS = {
     pollBackgroundMs: 10000,  // Keine App offen (nur für Push-Benachrichtigungen)
     slowPollMs: 60000,        // Einstellungen, Zähler, Tank
     // Frontansicht unter „Schalter“: style 'render' (ganze Maschine) oder 'simple' (nur die Taster als Linien);
-    // für den Render Gehäusefarbe und Seite der Dampflanze (Heißwasser gegenüber); editButton: Knopf „Ansicht ändern“
-    look: { style: 'render', color: '#26272b', steamSide: 'left', editButton: true },
+    // für den Render Gehäusefarbe, Seite der Dampflanze (Heißwasser gegenüber) und Ventile ('lever' Hebel,
+    // 'rotary' Drehknopf), Farbe der Griffe (grip); editButton: Knopf „Ansicht ändern“
+    look: { style: 'render', color: '#26272b', steamSide: 'left', valves: 'lever', grip: '#c98a4f', editButton: true },
   },
   grinder: {
     enabled: true,

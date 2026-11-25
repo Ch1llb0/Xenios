@@ -237,12 +237,18 @@ export const serverPage = (part) => (root) => {
     const LOOK_COLORS = [['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß'], ['#c4c7cb', 'Edelstahl'], ['#9e1f24', 'Rot'], ['#2f4a6d', 'Blau']];
     const lookColor = value('machine.look.color') || LOOK_COLORS[0][0];
     const steamSide = value('machine.look.steamSide') === 'right' ? 'right' : 'left';
+    const valves = value('machine.look.valves') === 'rotary' ? 'rotary' : 'lever';
+    const GRIP_COLORS = [['#c98a4f', 'Holz'], ['#e0aa6a', 'Olive'], ['#6e4127', 'Nuss'], ['#1d1e21', 'Schwarz'], ['#eceae4', 'Weiß']];
+    const gripColor = value('machine.look.grip') || GRIP_COLORS[0][0];
+    const gripInput = h('input', { type: 'color', value: gripColor, 'aria-label': 'Eigene Farbe der Griffe' });
+    gripInput.addEventListener('change', () => { change('machine.look.grip', gripInput.value); paint(); });
+    const ownGrip = !GRIP_COLORS.some(([c]) => c === gripColor);
     const colorInput = h('input', { type: 'color', value: lookColor, 'aria-label': 'Eigene Farbe der Xenia' });
     colorInput.addEventListener('change', () => { change('machine.look.color', colorInput.value); paint(); });
     const own = !LOOK_COLORS.some(([c]) => c === lookColor);
     const simple = value('machine.look.style') === 'simple';
     const look = card({ title: 'Aussehen', anchor: 'aussehen' }, 'palette',
-      h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine (Farbe des Gehäuses und Seite der Dampflanze einstellbar) oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
+      h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine (Farbe des Gehäuses, Dampflanze, Ventile und Griffe einstellbar) oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
       h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Ansicht' },
         [['render', 'Render'], ['simple', 'Vereinfacht']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String((simple ? 'simple' : 'render') === v), onclick: () => { change('machine.look.style', v); paint(); } }, label))),
       simple ? null : h('div', { class: 'look-pick', style: { 'margin-top': '12px' } },
@@ -251,7 +257,14 @@ export const serverPage = (part) => (root) => {
             h('span', { class: 'swatch', style: { background: c } }), label)),
           h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, colorInput, 'Eigene')),
         h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Dampflanze', style: { 'margin-top': '8px' } },
-          [['left', 'Dampflanze links'], ['right', 'Dampflanze rechts']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(steamSide === v), onclick: () => { change('machine.look.steamSide', v); paint(); } }, label)))),
+          [['left', 'Dampflanze links'], ['right', 'Dampflanze rechts']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(steamSide === v), onclick: () => { change('machine.look.steamSide', v); paint(); } }, label))),
+        h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Ventile', style: { 'margin-top': '8px' } },
+          [['lever', 'Hebelventile'], ['rotary', 'Drehventile']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(valves === v), onclick: () => { change('machine.look.valves', v); paint(); } }, label))),
+        h('div', { class: 'small muted', style: { margin: '12px 0 6px' } }, 'Griffe (Ventile und Siebträger)'),
+        h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Farbe der Griffe' },
+          GRIP_COLORS.map(([c, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(gripColor === c), onclick: () => { change('machine.look.grip', c); paint(); } },
+            h('span', { class: 'swatch', style: { background: c } }), label)),
+          h('label', { class: 'chip color-chip', 'aria-pressed': String(ownGrip) }, gripInput, 'Eigene'))),
       toggle('Knopf unter der Ansicht', 'Zeigt unter „Schalter“ den Knopf „Ansicht ändern“', 'machine.look.editButton'));
     return [connection, look];
   }

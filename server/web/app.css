@@ -462,7 +462,7 @@ details.adv > summary::-webkit-details-marker { display: none; }
 .machine-svg .grp-shade { fill: #9fa3a8; opacity: .35; }
 .machine-svg .kn-neck { fill: url(#mChrome); stroke: #8a8e93; stroke-width: .6; }
 .machine-svg .kn-wood { fill: url(#mWood); }
-.machine-svg .kn-grain { fill: none; stroke: #5b3a1f; stroke-width: 1; opacity: .35; }
+.machine-svg .kn-grain { fill: none; stroke: var(--grip-grain, #5b3a1f); stroke-width: 1; opacity: .35; }
 .machine-svg .tg-nut { fill: url(#mChrome); stroke: #6d7176; stroke-width: .8; }
 .machine-svg .tg-ring { fill: #d8dbde; stroke: #7d8186; stroke-width: .8; }
 .machine-svg .tg-hole { fill: #3a3c40; }
