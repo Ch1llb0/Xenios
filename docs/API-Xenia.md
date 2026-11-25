@@ -439,6 +439,8 @@ Die Mahlkönig E64 WS ist mit der Xenia gekoppelt (`M2m.CoffeeMachinesConfig` in
 
 Details zur Mühlenseite: [API-Muehle-E64WS.md](API-Muehle-E64WS.md). Druckprofile über den Drehknopf: Xenios kann zwischen Mühle und Xenia vermitteln und Skript 9 gegen ein Profil mit Stopp beim Zielgewicht (Befehl 27) tauschen, siehe [Einrichtung.md, Abschnitt 6](Einrichtung.md#6-grind-by-sync-mit-druckprofilen-optional).
 
+Die alte Xenia (DBL) hat diese Endpunkte nicht. Mit ihr beantwortet Xenios `machine`, `mako`, `status`, `brewratio` und `scripts/execute` selbst, startet den Bezug an der DBL und stoppt ihn am Gewicht der Bluetooth-Waage (`SCALE_WEIGHT`); siehe [Einrichtung.md, Alte Xenia (DBL)](Einrichtung.md#alte-xenia-dbl).
+
 ---
 
 ## 15. Alte Xenia (DBL / offizielle API)

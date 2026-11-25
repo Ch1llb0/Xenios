@@ -1,6 +1,6 @@
 import { pageEnter } from './motion.js'; // zuerst: animiertes Ein- und Ausblenden für die ganze App
 // App-Start: Login, Navigation, Live-Verbindung, Service Worker, Shortcuts.
-import { h, icon, snackbar, closeTopOverlay } from './ui.js';
+import { h, icon, snackbar, closeTopOverlay, dialog } from './ui.js';
 import { api, store, subscribe, connect, disconnect, setUnauthorizedHandler, refreshState, directMode, hasGrinder, hasPaddle } from './api.js';
 import { dashboardView } from './views/dashboard.js';
 import { scriptsView, scriptNewView, scriptEditView, profileBuilderView, discoverView } from './views/scripts.js';
@@ -39,10 +39,10 @@ const $ = (id) => document.getElementById(id);
 let current = null;      // { route, dispose }
 
 // --- Darstellung --------------------------------------------------------------
-// Stil „xenia“ (Standard, wie die Web-Oberfläche der Maschine) oder „material“; dazu optional eigene Akzent- und Aktiv-Farbe.
-// Design (Layout, Schrift, Icons, Navigation) ist immer das der Xenia. Einstellbar sind nur Farben:
-// Farbvorlage (xenia/material), eigene Akzent-/Aktiv-Farbe, Hell/Dunkel und das Zifferblatt der Manometer.
-export const THEME_DEFAULTS = { palette: 'xenia', gauge: 'black', accent: { xenia: '#4f9a1c', material: '#4a5891' }, active: { xenia: '#f5862f', material: '#5c6bc0' } };
+// Design „material“ (Standard, siehe uiPalette) oder „xenia“ (wie die Web-Oberfläche der Maschine); das Design legt
+// Farben, Formen, Schrift, Navigation und Anzeigen fest. Dazu je Gerät: eigene Akzent-/Aktiv-Farbe, Hell/Dunkel und
+// das Zifferblatt der Manometer. Hier nur die Standardfarben je Design.
+export const THEME_DEFAULTS = { accent: { xenia: '#4f9a1c', material: '#4a5891' }, active: { xenia: '#f5862f', material: '#5c6bc0' } };
 export function applyTheme(theme = localStorageGet('theme') || 'system') {
   const root = document.documentElement;
   if (theme === 'system') delete root.dataset.theme;
@@ -445,6 +445,35 @@ subscribe(() => {
   dot.title = !store.connected ? 'Keine Verbindung zum Server' : m && !m.online ? 'Maschine nicht erreichbar' : 'Verbunden';
 });
 
+// Eingestelltes Modell passt nicht zur Maschine (Erkennung wie beim Verbindungstest): Hinweis oben auf jeder Seite,
+// mit Umstellen auf das erkannte Modell
+const MODEL_NAME = { bbs: 'Neue Xenia', classic: 'Alte Xenia (DBL)' };
+let modelHintKey = '';
+subscribe(() => {
+  const mm = window.__authed ? store.machine?.apiMismatch : null;
+  const key = mm ? `${mm.configured}>${mm.detected}` : '';
+  if (key === modelHintKey) return;
+  modelHintKey = key;
+  const box = $('model-hint');
+  box.hidden = !mm;
+  if (!mm) return box.replaceChildren();
+  const fix = directMode ? null : h('button', { class: 'btn tonal', type: 'button', onclick: async () => {
+    fix.disabled = true;
+    try {
+      await api('/api/admin/config', { method: 'PUT', body: { changes: { 'machine.api': mm.detected } } });
+      await refreshState();
+      snackbar(`Auf „${MODEL_NAME[mm.detected]}“ umgestellt`);
+      render(); // aktuelle Seite mit der richtigen Schnittstelle neu laden
+    } catch (e) {
+      snackbar(e.message);
+      fix.disabled = false;
+    }
+  } }, `Auf „${MODEL_NAME[mm.detected]}“ umstellen`);
+  box.replaceChildren(h('div', { class: 'note warn' }, icon('warn', 's18'), h('div', { class: 'grow' },
+    h('div', {}, `Eingestellt ist „${MODEL_NAME[mm.configured]}“, die Maschine antwortet aber wie die ${MODEL_NAME[mm.detected]}. Timer, Einstellungen und Schalter funktionieren so nicht richtig.`),
+    directMode ? h('div', { class: 'small' }, 'In der Einrichtung der App das Modell umstellen.') : fix)));
+});
+
 // Ereignisse aus dem Server als Snackbar; nach einem Bezug mit „Bewerten“ (Einstell-Assistent)
 subscribe((part, ev) => {
   if (part !== 'event' || !ev || ev.topic === 'grinder') return;
@@ -490,6 +519,51 @@ async function showApp() {
   connect();
   $('splash').classList.add('hide');
   handleShortcut();
+  askDesignOnce();
+}
+
+// --- Erster Start: Design wählen ----------------------------------------------------
+// Einmal je Gerät (localStorage „designChosen“). Die Wahl gilt sofort, die App dahinter zeigt sie gleich.
+// Wer schon ein Design gewählt hat, wird nicht gefragt.
+const DESIGN_PREVIEW = {
+  material: '<svg viewBox="0 0 120 80" aria-hidden="true"><rect width="120" height="80" fill="#f4f3fa"/><rect width="120" height="13" fill="#2f3e74"/>'
+    + '<rect x="7" y="18" width="50" height="30" rx="8" fill="#e3e2ec"/><rect x="63" y="18" width="50" height="30" rx="8" fill="#e3e2ec"/>'
+    + '<rect x="13" y="26" width="20" height="3" rx="1.5" fill="#9a9bb0"/><rect x="13" y="37" width="38" height="4" rx="2" fill="#c8c8d8"/><rect x="13" y="37" width="26" height="4" rx="2" fill="#4a5891"/>'
+    + '<rect x="69" y="26" width="20" height="3" rx="1.5" fill="#9a9bb0"/><rect x="69" y="37" width="38" height="4" rx="2" fill="#c8c8d8"/><rect x="69" y="37" width="14" height="4" rx="2" fill="#4a5891"/>'
+    + '<rect x="7" y="52" width="106" height="9" rx="4.5" fill="#4a5891"/><rect y="65" width="120" height="15" fill="#e9e7ef"/>'
+    + '<rect x="9" y="67" width="16" height="7" rx="3.5" fill="#dde1ff"/><circle cx="17" cy="70.5" r="2" fill="#2f3e74"/><circle cx="46" cy="70.5" r="2" fill="#5d5e72"/><circle cx="74" cy="70.5" r="2" fill="#5d5e72"/><circle cx="103" cy="70.5" r="2" fill="#5d5e72"/>'
+    + '<rect x="11" y="76" width="12" height="1.6" rx=".8" fill="#5d5e72"/><rect x="40" y="76" width="12" height="1.6" rx=".8" fill="#5d5e72"/><rect x="68" y="76" width="12" height="1.6" rx=".8" fill="#5d5e72"/><rect x="97" y="76" width="12" height="1.6" rx=".8" fill="#5d5e72"/></svg>',
+  xenia: '<svg viewBox="0 0 120 80" aria-hidden="true"><rect width="120" height="80" fill="#2b2d34"/><rect width="120" height="13" fill="#383c44"/><rect x="8" y="5" width="26" height="3" fill="#c9ccd3"/>'
+    + '<circle cx="32" cy="33" r="14" fill="#f2f2f2" stroke="#8b8f98" stroke-width="1.5"/><circle cx="88" cy="33" r="14" fill="#f2f2f2" stroke="#8b8f98" stroke-width="1.5"/>'
+    + '<path d="M22 41 A11 11 0 1 1 42 41" fill="none" stroke="#4f9a1c" stroke-width="1.6"/><path d="M78 41 A11 11 0 1 1 98 41" fill="none" stroke="#4f9a1c" stroke-width="1.6"/>'
+    + '<line x1="32" y1="33" x2="39" y2="26" stroke="#d0342c" stroke-width="1.4"/><line x1="88" y1="33" x2="83" y2="24" stroke="#d0342c" stroke-width="1.4"/><circle cx="32" cy="33" r="1.8" fill="#333"/><circle cx="88" cy="33" r="1.8" fill="#333"/>'
+    + '<rect x="8" y="52" width="50" height="9" rx="2" fill="#f5862f"/><rect x="62" y="52" width="50" height="9" rx="2" fill="#4a4e57"/><rect y="65" width="120" height="15" fill="#383c44"/>'
+    + '<circle cx="15" cy="72.5" r="2.4" fill="#f5862f"/><circle cx="37" cy="72.5" r="2.4" fill="#c9ccd3"/><circle cx="60" cy="72.5" r="2.4" fill="#c9ccd3"/><circle cx="83" cy="72.5" r="2.4" fill="#c9ccd3"/><circle cx="105" cy="72.5" r="2.4" fill="#c9ccd3"/></svg>',
+};
+function askDesignOnce() {
+  if (localStorageGet('designChosen')) return;
+  if (localStorageGet('uiStyle')) return localStorageSet('designChosen', '1');
+  const opts = [
+    ['material', 'Material', 'Leiste unten mit Beschriftung, runde Formen, flache Anzeigen'],
+    ['xenia', 'Xenia', 'Wie die Oberfläche der Maschine: Manometer, Navigation mit Symbolen'],
+  ];
+  const cards = opts.map(([id, title, sub]) => {
+    const pv = h('span', { class: 'pv' });
+    pv.innerHTML = DESIGN_PREVIEW[id]; // feste Grafik aus diesem Modul
+    return h('button', { type: 'button', class: 'design-opt', role: 'radio', dataset: { id }, onclick: () => pick(id) },
+      pv, h('span', { class: 't' }, title), h('span', { class: 's' }, sub));
+  });
+  const paint = () => cards.forEach((c) => c.setAttribute('aria-checked', String(c.dataset.id === uiPalette())));
+  function pick(id) {
+    localStorageSet('uiStyle', id);
+    applyTheme();
+    paint();
+  }
+  paint();
+  dialog('Design wählen', h('div', {},
+    h('p', { class: 'muted' }, 'So sieht Xenios auf diesem Gerät aus. Später änderbar unter Einstellungen → Darstellung.'),
+    h('div', { class: 'design-pick', role: 'radiogroup', 'aria-label': 'Design' }, cards)),
+  [{ label: 'Weiter', value: true, kind: 'filled' }]).then(() => localStorageSet('designChosen', '1'));
 }
 
 setUnauthorizedHandler(() => showLogin());

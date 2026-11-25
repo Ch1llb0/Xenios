@@ -30,7 +30,7 @@ export function createMockXenia({ speed = 1, api = 'bbs', pages = false } = {}) 
     },
     switches: { SWITCH_SET_LEFT_LEFT_0: 2, SWITCH_SET_LEFT_LEFT_1: 0, SWITCH_SET_RIGHT_LEFT_0: 8, SWITCH_SET_RIGHT_LEFT_1: 0, SWITCH_SET_RIGHT_RIGHT_0: 7, SWITCH_SET_RIGHT_RIGHT_1: 0, MA_BEVERAGE_WEIGHT_SGL_INT_SCALE: 18, MA_BEVERAGE_WEIGHT_DBL_INT_SCALE: 40 },
     timers: { MA_SET_TIMER_ECO_MA: 20, MA_SET_TIMER_POWERDOWN: 10 },
-    tz: 322, view: 1, extractions: 350, energy: 0.729577, tank: 1,
+    tz: 322, view: 1, extractions: 350, energy: 0.729577, tank: 1, ble: 0, // ble: Bluetooth-Waage an der DBL verbunden
     scripts: { 12: { title: 'Blooming Espresso', content: '1;13;3 40 2000;12 4000;4 9000 25000;6;7;' }, 17: { title: '6 Bar', content: '1;13;4 6000 30000;6;7;' } },
     editId: 'none', paddle: false, brewing: null, log: [],
     dbl: { TI_MONDAY_ON1: (6 << 16) | (30 << 8), TI_MONDAY_ON1_BOILER: 1, TI_SATURDAY_ON1: (8 << 16), TI_SATURDAY_ON1_BOILER: 3, TI_SATURDAY_ON2: (14 << 16), TI_SATURDAY_ON2_BOILER: 1 }, // Timer der DBL-Firmware
@@ -150,7 +150,7 @@ export function createMockXenia({ speed = 1, api = 'bbs', pages = false } = {}) 
             return ok();
           case 'GET /api/v2/pump': return json(pick(['PU_SET_BREW_TIMER_1', 'PU_SET_MAX_TIMER', 'PU_MODE']));
           case 'POST /api/v2/pump': return setFrom(['PU_SET_BREW_TIMER_1', 'PU_SET_MAX_TIMER', 'PU_MODE']);
-          case 'GET /api/v2/machine': return json({ MA_TYPE: 3, MA_SUBTYPE: 0, MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 2440, MA_EXTRACTIONS_START: 0, ...pick(['MA_FIX_WATER_SUPPLY', 'MA_HEATUP_FLUSH_DURATION', 'MA_BOILER_START_MODE', 'MA_EXTENDED_THERMAL_STABILITY', 'MA_SET_TIMER_ECO_MA', 'MA_SET_TIMER_POWERDOWN', 'MA_MAX_AMPERE', 'PU_SET_BREW_TIMER_1']), MA_ENERGY_TOTAL_KWH: s.energy, FW_VERSION_MAJOR: 4, FW_VERSION_MINOR: 159, PU_SET_QUANTITY_MEASUREMENT: 2, ESP_FW_MAJOR: 3, ESP_FW_MINOR: 63, BLE: 0, MA_DELAY: 0, BT_SCALE_NAME: '', MA_SN: 'none' });
+          case 'GET /api/v2/machine': return json({ MA_TYPE: 3, MA_SUBTYPE: 0, MA_EXTRACTIONS: s.extractions, MA_OPERATING_HOURS: 2440, MA_EXTRACTIONS_START: 0, ...pick(['MA_FIX_WATER_SUPPLY', 'MA_HEATUP_FLUSH_DURATION', 'MA_BOILER_START_MODE', 'MA_EXTENDED_THERMAL_STABILITY', 'MA_SET_TIMER_ECO_MA', 'MA_SET_TIMER_POWERDOWN', 'MA_MAX_AMPERE', 'PU_SET_BREW_TIMER_1']), MA_ENERGY_TOTAL_KWH: s.energy, FW_VERSION_MAJOR: 4, FW_VERSION_MINOR: 159, PU_SET_QUANTITY_MEASUREMENT: 2, ESP_FW_MAJOR: 3, ESP_FW_MINOR: 63, BLE: s.ble, MA_DELAY: 0, BT_SCALE_NAME: '', MA_SN: 'none' });
           case 'POST /api/v2/machine': return setFrom(['MA_HEATUP_FLUSH_DURATION', 'MA_SET_TIMER_ECO_MA', 'MA_SET_TIMER_POWERDOWN', 'MA_FIX_WATER_SUPPLY', 'MA_MAX_AMPERE', 'MA_BOILER_START_MODE', 'MA_EXTENDED_THERMAL_STABILITY']);
           case 'POST /api/v2/incdec': return setFrom(['BG_SET_TEMP', 'BB_SET_TEMP']);
           case 'POST /api/v2/incdecsb': return setFrom(['SB_SET_PRESS']);

@@ -161,7 +161,7 @@ export function createApp(cfg, hooks = {}) {
     version: VERSION,
     features: cfg.features,
     push: { enabled: push.enabled, publicKey: cfg.push.publicKey, topics: PUSH_TOPICS },
-    machine: { api: cfg.machine.api === 'classic' ? 'classic' : 'bbs' },
+    machine: { api: cfg.machine.api === 'classic' ? 'classic' : 'bbs', look: { color: cfg.machine.look?.color, steamSide: cfg.machine.look?.steamSide, editButton: cfg.machine.look?.editButton !== false } },
     grinder: { enabled: cfg.grinder.enabled, databaseDownload: Boolean(cfg.grinder.allowDatabaseDownload) },
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });

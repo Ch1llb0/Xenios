@@ -212,8 +212,26 @@ export function serverView(root) {
           h('code', { class: 'fp' }, s.grinderPin || 'noch keins (wird beim ersten Kontakt gemerkt)')),
         s.grinderPin ? h('button', { class: 'btn text', onclick: unpin }, 'Vergessen') : null),
       toggle('Datenbank-Download erlauben', 'Die Datenbank der Mühle enthält das WLAN-Passwort im Klartext.', 'grinder.allowDatabaseDownload'));
+    // Aussehen der Xenia für die Frontansicht unter „Schalter“: Gehäusefarbe (Vorlagen oder eigene) und Dampflanze
+    const LOOK_COLORS = [['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß'], ['#c4c7cb', 'Edelstahl'], ['#9e1f24', 'Rot'], ['#2f4a6d', 'Blau']];
+    const lookColor = value('machine.look.color') || LOOK_COLORS[0][0];
+    const steamSide = value('machine.look.steamSide') === 'right' ? 'right' : 'left';
+    const colorInput = h('input', { type: 'color', value: lookColor, 'aria-label': 'Eigene Farbe der Xenia' });
+    colorInput.addEventListener('change', () => { change('machine.look.color', colorInput.value); paint(); });
+    const own = !LOOK_COLORS.some(([c]) => c === lookColor);
+    const look = h('div', { class: 'look-pick' },
+      h('div', {}, 'Aussehen der Xenia'),
+      h('div', { class: 'small muted', style: { margin: '2px 0 8px' } }, 'Für die Frontansicht unter „Schalter“: Farbe des Gehäuses und Seite der Dampflanze (Heißwasser auf der anderen Seite).'),
+      h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Farbe der Xenia' },
+        LOOK_COLORS.map(([c, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(lookColor === c), onclick: () => { change('machine.look.color', c); paint(); } },
+          h('span', { class: 'swatch', style: { background: c } }), label)),
+        h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, colorInput, 'Eigene')),
+      h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Dampflanze', style: { 'margin-top': '8px' } },
+        [['left', 'Dampflanze links'], ['right', 'Dampflanze rechts']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(steamSide === v), onclick: () => { change('machine.look.steamSide', v); paint(); } }, label))),
+      toggle('Knopf unter der Ansicht', 'Zeigt unter „Schalter“ den Knopf „Farbe und Dampflanze ändern“', 'machine.look.editButton'));
     const devices = card('Geräte', 'coffeeLine',
       apiChoice(value('machine.api') === 'classic' ? 'classic' : 'bbs', (v) => { change('machine.api', v); paint(); }),
+      look,
       h('div', { class: 'field-row' }, text('Adresse der Xenia', 'machine.url', { type: 'url', placeholder: 'http://192.168.178.55' }), mTest),
       mBox,
       h('div', { class: 'divider' }),
@@ -294,7 +312,9 @@ export function serverView(root) {
       } catch { return null; }
     })();
     const gbsCard = card('Grind-by-Sync mit Druckprofilen', 'grinder',
-      h('p', { class: 'small muted' }, 'Xenios gibt sich der Mühle gegenüber als Xenia aus und reicht alles an die echte Xenia weiter. Nur der Start per Drehknopf wird gegen das unter Skripte gewählte Profil getauscht; es stoppt wie das Original beim Zielgewicht des Mühlenrezepts.'),
+      h('p', { class: 'small muted' }, value('machine.api') === 'classic'
+        ? 'Alte Xenia: Xenios gibt sich der Mühle gegenüber als neue Xenia aus. Der Drehknopf startet den Bezug an der DBL, und Xenios stoppt ihn am Zielgewicht des Mühlenrezepts – gemessen von der Bluetooth-Waage an der Xenia. Ohne verbundene Waage startet der Drehknopf nichts.'
+        : 'Xenios gibt sich der Mühle gegenüber als Xenia aus und reicht alles an die echte Xenia weiter. Nur der Start per Drehknopf wird gegen das unter Skripte gewählte Profil getauscht; es stoppt wie das Original beim Zielgewicht des Mühlenrezepts.'),
       toggle('Vermittler', 'Unverschlüsselt und ohne Anmeldung, aber nur für die IP der Mühle', 'gbs.enabled'),
       h('div', { class: 'grid2' }, text('Adresse', 'gbs.host'), number('Port', 'gbs.port', 1, 65535)),
       gap(),
@@ -343,7 +363,7 @@ export function serverView(root) {
       inAndroidApp() ? h('button', { class: 'btn outlined wide', style: { 'margin-bottom': '8px' }, onclick: () => window.XeniaApp.reauth() }, icon('wifi', 's18'), 'App-Verbindung ändern') : null,
       h('button', { class: 'btn outlined wide', onclick: logout }, icon('logout', 's18'), 'Abmelden'));
 
-    body.replaceChildren(h('div', { class: 'folds' }, devices, remote, time, notify, recording, security, network, value('grinder.enabled') && value('machine.api') !== 'classic' ? gbsCard : null, system, account));
+    body.replaceChildren(h('div', { class: 'folds' }, devices, remote, time, notify, recording, security, network, value('grinder.enabled') ? gbsCard : null, system, account));
   }
 
   async function loadSessions(box) {

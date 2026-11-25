@@ -109,9 +109,11 @@ export function liveTimes(shot) {
 
 // Gewicht vor dem Tarieren verwerfen: Manche Waagen (Bookoo an der DBL) melden zu Beginn des Bezugs noch kurz den
 // alten Wert (z. B. 290 g), bevor sie auf 0 springen. Ab dem ersten Wert unter 1 g zählt die Kurve; davor 0.
+// Nur in den ersten Sekunden: fällt das Gewicht erst später unter 1 g (Tasse abgenommen), ist das kein Tarieren.
+const TARE_WINDOW_S = 5;
 export function taredCurve(curve) {
   const c = Array.isArray(curve) ? curve : [];
-  const i0 = c.findIndex((p) => Array.isArray(p) && p[2] != null && Number(p[2]) < 1);
+  const i0 = c.findIndex((p) => Array.isArray(p) && Number(p[0]) < TARE_WINDOW_S && p[2] != null && Number(p[2]) < 1);
   if (i0 <= 0) return c;
   return c.map((p, i) => (i < i0 && Array.isArray(p) && p[2] != null ? [p[0], p[1], 0, ...p.slice(3)] : p));
 }

@@ -233,6 +233,10 @@ test('Ausbeute: alter Waagenwert vor dem Tarieren zählt nicht (Bookoo an der DB
   assert.equal(taredCurve(curve)[5][2], 44.2);
   assert.equal(curveYield(curve), 44.2);
   assert.equal(sm({ timeMs: 31000, weight: 293.3, curve }).yieldG, 44.2);
+  // Gewicht fällt erst am Ende unter 1 g (Tasse abgenommen): kein Tarieren, Kurve bleibt
+  const late = [[0, 0, 18], [10, 9, 30], [25, 9, 54], [26, 0, 0.2]];
+  assert.equal(taredCurve(late), late);
+  assert.equal(curveYield(late), 54);
   // Waage von Anfang an tariert: unverändert
   const ok = [[0, 0, 0], [10, 9, 36]];
   assert.equal(taredCurve(ok), ok);

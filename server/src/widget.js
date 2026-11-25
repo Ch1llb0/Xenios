@@ -61,7 +61,10 @@ export function widgetExtras({ m, shots = [], maintenance = null, history = null
   const today = day(now);
   const names = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   out.days = Array.from({ length: 7 }, (_, i) => {
-    const start = today - (6 - i) * 86400e3;
+    // Kalendertag zurückrechnen (nicht 24 h): über eine Zeitumstellung hinweg trifft das sonst nicht Mitternacht
+    const d = new Date(today);
+    d.setDate(d.getDate() - (6 - i));
+    const start = day(d.getTime());
     return { label: names[new Date(start).getDay()], count: shots.filter((s) => day(Date.parse(s.endedAt)) === start).length };
   });
   out.times = shots.filter((s) => !s.estimated).slice(0, 12).reverse().map((s) => {

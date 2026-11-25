@@ -67,6 +67,13 @@ export const FIELDS = {
   publicUrl: (v) => (v === null || v === '' ? null : publicUrl(v)),
   'machine.url': (v) => deviceUrl(v, 'Adresse der Xenia'),
   'machine.api': oneOf('Xenia-Modell', ['bbs', 'classic']),
+  'machine.look.color': (v) => {
+    const s = String(v ?? '').trim().toLowerCase();
+    if (!/^#[0-9a-f]{6}$/.test(s)) throw bad('Farbe der Xenia: #rrggbb');
+    return s;
+  },
+  'machine.look.steamSide': oneOf('Dampflanze', ['left', 'right']),
+  'machine.look.editButton': bool('Knopf „Farbe und Dampflanze ändern“'),
   'grinder.enabled': bool('Mühle'),
   'grinder.url': (v) => deviceUrl(v, 'Adresse der Mühle'),
   'grinder.password': (v) => {
