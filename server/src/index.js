@@ -48,7 +48,7 @@ function lookState(l = {}) {
     color: l.color,
     steamSide: l.steamSide,
     valves: l.valves === 'rotary' ? 'rotary' : 'lever',
-    grip: l.grip,
+    grip: l.grip || null,
     tray: l.tray || null,
     gauge: l.gauge,
     editButton: l.editButton !== false,

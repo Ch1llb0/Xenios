@@ -131,10 +131,12 @@ test('Server-Einstellungen: lesen, ändern, sofort wirksam; Prüfungen', async (
   r = await call('PUT', '/api/admin/config', { changes: { 'machine.look.style': 'simple', 'machine.look.color': '#9E1F24', 'machine.look.steamSide': 'right', 'machine.look.valves': 'rotary', 'machine.look.grip': '#1D1E21', 'machine.look.tray': '#C4C7CB', 'machine.look.gauge': '#F4F4F1', 'machine.look.editButton': false } });
   assert.equal(r.status, 200);
   assert.deepEqual((await call('GET', '/api/state')).json.server.machine.look, { style: 'simple', color: '#9e1f24', steamSide: 'right', valves: 'rotary', grip: '#1d1e21', tray: '#c4c7cb', gauge: '#f4f4f1', editButton: false });
-  // Abtropfgitter zurück auf „wie Gehäuse“
-  r = await call('PUT', '/api/admin/config', { changes: { 'machine.look.tray': null } });
+  // Griffe in Chrom, Abtropfgitter zurück auf „wie Gehäuse“
+  r = await call('PUT', '/api/admin/config', { changes: { 'machine.look.tray': null, 'machine.look.grip': 'chrome' } });
   assert.equal(r.status, 200);
-  assert.equal((await call('GET', '/api/state')).json.server.machine.look.tray, null);
+  const look = (await call('GET', '/api/state')).json.server.machine.look;
+  assert.equal(look.tray, null);
+  assert.equal(look.grip, 'chrome');
   for (const changes of [{ 'nope.key': 1 }, { 'machine.url': 'ftp://1.2.3.4' }, { 'http.port': 70000 }, { 'http.enabled': false, 'https.enabled': false }, { 'https.port': 8080 }, { timezone: 'Mars/Olympus' },
     { 'machine.look.color': 'red' }, { 'machine.look.steamSide': 'oben' }, { 'machine.look.style': 'foto' }, { 'machine.look.valves': 'kugel' }, { 'machine.look.grip': 'holz' }, { 'machine.look.tray': 'silber' }, { 'machine.look.gauge': 'weiß' }]) {
     r = await call('PUT', '/api/admin/config', { changes });

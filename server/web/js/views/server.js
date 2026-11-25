@@ -241,21 +241,21 @@ export const serverPage = (part) => (root) => {
     const colorRow = (label, key, presets, { fallback, same } = {}) => {
       const cur = value(key) || null;
       const shown = cur || fallback;
-      const input = h('input', { type: 'color', value: shown, 'aria-label': `${label}: eigene Farbe` });
+      const input = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(shown || '') ? shown : '#c98a4f', 'aria-label': `${label}: eigene Farbe` });
       input.addEventListener('change', () => { change(key, input.value); paint(); });
       const own = Boolean(cur) && !presets.some(([c]) => c === cur);
       return row(label, h('div', { class: 'chips', role: 'radiogroup', 'aria-label': label },
         same ? h('button', { type: 'button', class: 'chip', 'aria-pressed': String(!cur), onclick: () => { change(key, null); paint(); } }, same) : null,
-        presets.map(([c, text]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String((same ? cur : shown) === c), onclick: () => { change(key, c); paint(); } },
-          h('span', { class: 'swatch', style: { background: c } }), text)),
+        presets.map(([c, text, swatch]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String((same ? cur : shown) === c), onclick: () => { change(key, c); paint(); } },
+          h('span', { class: 'swatch', style: { background: swatch || c } }), text)),
         h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, input, 'Eigene')));
     };
     const BODY = [['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß'], ['#c4c7cb', 'Edelstahl'], ['#9e1f24', 'Rot'], ['#2f4a6d', 'Blau']];
     const TRAY = [['#c4c7cb', 'Edelstahl'], ['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß']];
-    const GRIP = [['#c98a4f', 'Holz'], ['#e0aa6a', 'Olive'], ['#6e4127', 'Nuss'], ['#1d1e21', 'Schwarz'], ['#eceae4', 'Weiß']];
+    const GRIP = [['chrome', 'Chrom', 'linear-gradient(90deg, #7d8186, #f4f6f8, #8a8e93)'], ['#c98a4f', 'Holz'], ['#e0aa6a', 'Olive'], ['#6e4127', 'Nuss'], ['#1d1e21', 'Schwarz'], ['#eceae4', 'Weiß']];
     const GAUGE = [['#141518', 'Schwarz'], ['#f4f4f1', 'Weiß']];
     const simple = value('machine.look.style') === 'simple';
-    // Griffe und Ventile wählbar nur bei der DBL; die neue Xenia hat Chromventile und den Siebträger von vorn
+    // Ventile (Hebel/Drehknopf) nur bei der DBL; Griffe bei beiden, ohne eigene Wahl DBL Holz, neue Xenia Chrom
     const dbl = value('machine.api') === 'classic';
     const look = card({ title: 'Aussehen', anchor: 'aussehen' }, 'palette',
       h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine mit eigenen Farben und Ausstattung oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
@@ -263,7 +263,7 @@ export const serverPage = (part) => (root) => {
       simple ? null : h('div', { class: 'look-pick' },
         colorRow('Gehäuse', 'machine.look.color', BODY, { fallback: BODY[0][0] }),
         colorRow('Abtropfgitter', 'machine.look.tray', TRAY, { fallback: value('machine.look.color') || BODY[0][0], same: 'Wie Gehäuse' }),
-        dbl ? colorRow('Griffe (Ventile und Siebträger)', 'machine.look.grip', GRIP, { fallback: GRIP[0][0] }) : null,
+        colorRow('Griffe (Ventile und Siebträger)', 'machine.look.grip', GRIP, { fallback: dbl ? '#c98a4f' : 'chrome' }),
         colorRow('Manometer', 'machine.look.gauge', GAUGE, { fallback: GAUGE[0][0] }),
         row('Dampflanze', pick('Dampflanze', 'machine.look.steamSide', [['left', 'Links'], ['right', 'Rechts']], value('machine.look.steamSide') === 'right' ? 'right' : 'left')),
         dbl ? row('Ventile', pick('Ventile', 'machine.look.valves', [['lever', 'Hebel'], ['rotary', 'Drehknopf']], value('machine.look.valves') === 'rotary' ? 'rotary' : 'lever')) : null),

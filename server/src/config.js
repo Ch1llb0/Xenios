@@ -37,9 +37,9 @@ export const DEFAULTS = {
     slowPollMs: 60000,        // Einstellungen, Zähler, Tank
     // Frontansicht unter „Schalter“: style 'render' (ganze Maschine) oder 'simple' (nur die Taster als Linien);
     // für den Render Gehäusefarbe, Seite der Dampflanze (Heißwasser gegenüber) und Ventile ('lever' Hebel,
-    // 'rotary' Drehknopf), Farben der Griffe (grip), des Abtropfgitters (tray, null = wie Gehäuse) und der
-    // Manometer (gauge); editButton: Knopf „Ansicht ändern“
-    look: { style: 'render', color: '#26272b', steamSide: 'left', valves: 'lever', grip: '#c98a4f', tray: null, gauge: '#141518', editButton: true },
+    // 'rotary' Drehknopf), Griffe (grip: Farbe oder 'chrome', null = DBL Holz, neue Xenia Chrom), Farben des
+    // Abtropfgitters (tray, null = wie Gehäuse) und der Manometer (gauge); editButton: Knopf „Ansicht ändern“
+    look: { style: 'render', color: '#26272b', steamSide: 'left', valves: 'lever', grip: null, tray: null, gauge: '#141518', editButton: true },
   },
   grinder: {
     enabled: true,
