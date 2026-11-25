@@ -11,11 +11,7 @@
          weist darauf hin. Ohne Erlaubnis aktualisieren die Widgets langsamer. (Kein USE_EXACT_ALARM: das erlaubt Google
          Play nur Wecker- und Kalender-Apps.) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- App-Update aus dem GitHub-Release: neue APK installieren. Der Nutzer erlaubt das einmal („Unbekannte Apps
-         installieren“ für Xenios). Ab Android 12 dazu: das Update der App durch sich selbst ohne Rückfrage (normale
-         Berechtigung, ohne Abfrage erteilt). -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- App-Update: Rechte und Receiver nur in der Variante mit Updater (src/updater/AndroidManifest.xml) -->
 
     <!-- Uhr-Apps sichtbar machen: Name der App, die den nächsten Wecker gestellt hat -->
     <queries>
@@ -202,11 +198,6 @@
                 <action android:name="android.app.action.NEXT_ALARM_CLOCK_CHANGED" />
             </intent-filter>
         </receiver>
-
-        <!-- App-Update: Ergebnis der Installation (nur über das eigene PendingIntent erreichbar) -->
-        <receiver
-            android:name=".UpdateReceiver"
-            android:exported="false" />
 
         <service
             android:name=".PowerTileService"

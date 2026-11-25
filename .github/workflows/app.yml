@@ -59,10 +59,14 @@ jobs:
           XENIOS_KEYSTORE_PASSWORD: ${{ secrets.XENIOS_KEYSTORE_PASSWORD }}
           XENIOS_KEY_ALIAS: ${{ secrets.XENIOS_KEY_ALIAS }}
           XENIOS_KEY_PASSWORD: ${{ secrets.XENIOS_KEY_PASSWORD }}
-        run: gradle --no-daemon assembleRelease lintRelease
+        run: gradle --no-daemon assembleUpdaterRelease assembleManuellRelease lintUpdaterRelease lintManuellRelease
 
-      - name: APK umbenennen
-        run: cp app/app/build/outputs/apk/release/app-release.apk "Xenios-$XENIOS_BUILD_NUMBER.apk"
+      # Zwei Varianten (siehe app/app/build.gradle.kts). Der Name der Updater-APK bleibt Xenios-<Build>.apk:
+      # danach suchen auch ältere Apps mit Updater.
+      - name: APKs umbenennen
+        run: |
+          cp app/app/build/outputs/apk/updater/release/app-updater-release.apk "Xenios-$XENIOS_BUILD_NUMBER.apk"
+          cp app/app/build/outputs/apk/manuell/release/app-manuell-release.apk "Xenios-$XENIOS_BUILD_NUMBER-ohne-Updater.apk"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -74,5 +78,5 @@ jobs:
         if: always()
         with:
           name: lint-report
-          path: app/app/build/reports/lint-results-release.html
+          path: app/app/build/reports/lint-results-*.html
           if-no-files-found: ignore

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Variante mit Updater: wird mit src/main/AndroidManifest.xml zusammengeführt. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- App-Update aus dem GitHub-Release: neue APK installieren. Der Nutzer erlaubt das einmal („Unbekannte Apps
+         installieren“ für Xenios). Ab Android 12 dazu: das Update der App durch sich selbst ohne Rückfrage (normale
+         Berechtigung, ohne Abfrage erteilt). Wegen REQUEST_INSTALL_PACKAGES kann Play Protect vor der App warnen;
+         dafür gibt es die Variante ohne Updater (src/manuell). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+
+    <application>
+        <!-- Ergebnis der Installation (nur über das eigene PendingIntent erreichbar) -->
+        <receiver
+            android:name=".UpdateReceiver"
+            android:exported="false" />
+    </application>
+</manifest>
