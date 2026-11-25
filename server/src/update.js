@@ -72,6 +72,14 @@ export function requestUpdate(dataDir) {
   return readUpdate(dataDir);
 }
 
+// Anforderung zurückziehen (z. B. weil kein Update-Dienst sie abholt). Ein laufendes Update bleibt unberührt.
+export function cancelUpdate(dataDir) {
+  const p = updatePaths(dataDir);
+  fs.rmSync(p.request, { force: true });
+  if (readJson(p.status)?.state === 'queued') fs.rmSync(p.status, { force: true });
+  return readUpdate(dataDir);
+}
+
 export async function fetchLatest({ version = '', fetchImpl = globalThis.fetch, ttlMs = 300e3 } = {}) {
   const useCache = fetchImpl === globalThis.fetch;
   if (useCache && cache.at && Date.now() - cache.at < ttlMs) return { latest: cache.latest, error: cache.error };

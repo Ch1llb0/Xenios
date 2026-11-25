@@ -18,7 +18,15 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
+      # Ganze Historie: die Build-Nummer ist die Zahl der Commits
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # versionCode für Android: muss bei jedem neueren Stand steigen, auch zwischen normalen Builds und Releases.
+      # Die Laufnummer taugt dafür nicht – jeder Workflow zählt für sich (Release #8 lag unter Build #27).
+      - name: Build-Nummer
+        run: echo "XENIOS_BUILD_NUMBER=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v6
         with:
@@ -51,16 +59,15 @@ jobs:
           XENIOS_KEYSTORE_PASSWORD: ${{ secrets.XENIOS_KEYSTORE_PASSWORD }}
           XENIOS_KEY_ALIAS: ${{ secrets.XENIOS_KEY_ALIAS }}
           XENIOS_KEY_PASSWORD: ${{ secrets.XENIOS_KEY_PASSWORD }}
-          XENIOS_BUILD_NUMBER: ${{ github.run_number }}
         run: gradle --no-daemon assembleRelease lintRelease
 
       - name: APK umbenennen
-        run: cp app/app/build/outputs/apk/release/app-release.apk "Xenios-${{ github.run_number }}.apk"
+        run: cp app/app/build/outputs/apk/release/app-release.apk "Xenios-$XENIOS_BUILD_NUMBER.apk"
 
       - uses: actions/upload-artifact@v7
         with:
           name: Xenios-APK
-          path: Xenios-${{ github.run_number }}.apk
+          path: Xenios-*.apk
           retention-days: 30
 
       - uses: actions/upload-artifact@v7

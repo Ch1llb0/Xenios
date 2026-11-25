@@ -75,9 +75,9 @@ function listTab(root) {
       return gbsBox.replaceChildren(h('div', { class: 'section-title' }, 'Grind-by-Sync'),
         h('div', { class: 'card gbs-card' }, h('div', { class: 'row' },
           h('div', { class: 'grow small muted' }, dbl
-            ? 'Grind-by-Sync mit der alten Xenia: Xenios stoppt den Bezug am Gewicht der Bluetooth-Waage. Dafür den Vermittler in den Server-Einstellungen einschalten.'
-            : 'Druckprofile auch beim Start über den Drehknopf der Mühle: dafür den Vermittler in den Server-Einstellungen einschalten.'),
-          h('button', { class: 'btn tonal', onclick: () => navigate('/server') }, 'Einrichten'))));
+            ? 'Grind-by-Sync mit der alten Xenia: Xenios stoppt den Bezug am Gewicht der Bluetooth-Waage. Dafür unter Einstellungen → Mühle & Grind-by-Sync den Vermittler einschalten.'
+            : 'Druckprofile auch beim Start über den Drehknopf der Mühle: dafür unter Einstellungen → Mühle & Grind-by-Sync den Vermittler einschalten.'),
+          h('button', { class: 'btn tonal', onclick: () => navigate('/einstellungen/muehle') }, 'Einrichten'))));
     }
     const editable = dbl || features.scriptEditor;
     const choices = data.scripts.filter((s) => (s.type === 'standard' || s.type === 'pressure') && s.title !== gbs.helperName);

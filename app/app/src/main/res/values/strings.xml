@@ -5,6 +5,8 @@
     <string name="widget_power_desc">Maschine mit einem Tipp ein- oder ausschalten</string>
     <string name="widget_powerns">Xenios – Ein ohne Dampf/Aus</string>
     <string name="widget_powerns_desc">Maschine mit einem Tipp ohne Dampfkessel ein- oder ausschalten</string>
+    <string name="widget_mode">Xenios – Ein/Eco/Aus</string>
+    <string name="widget_mode_desc">Status und Ein, Eco, Aus in einer Zeile</string>
     <string name="widget_switch">Xenios – Schalter</string>
     <string name="widget_switch_desc">Ein, Eco, Aus, Dampfkessel und Ohne Dampf einschalten</string>
     <string name="widget_large">Xenios – Kaffeemaschine groß</string>

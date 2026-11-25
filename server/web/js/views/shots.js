@@ -1,7 +1,7 @@
 // Bezugs-Protokoll: alle Bezüge dauerhaft (Server-Datei bzw. App-Speicher), Statistik, Filter, Pflege, CSV-Export.
 // Ein Bezug öffnet die Analyse (Kurve mit Vergleich, Kennzahlen, Bewertung).
 import { h, icon, fmt, fmtInt, snackbar, sheet, confirmDialog } from '../ui.js';
-import { api, store, subscribe, hasPaddle } from '../api.js';
+import { api, subscribe, hasPaddle } from '../api.js';
 import { navigate } from '../app.js';
 import { isHidden } from '../prefs.js';
 import { shotMetrics, dialIn, brewSeconds } from '../../shared/shot-analysis.js';
@@ -137,7 +137,7 @@ export function shotsView(root) {
           kpi('Heute', fmtInt(today)), kpi('7 Tage', fmtInt(week)), kpi('Gesamt', fmtInt(total)),
           kpi('Ø Zeit', avgTime ? `${fmt(avgTime / 1000)} s` : '–'), kpi('Ø Verhältnis', avgRatio ? `1:${fmt(avgRatio)}` : '–')),
         h('p', { class: 'muted small' }, 'Einen Bezug antippen für Kurve, Vergleich, Kennzahlen und Bewertung. Die Dosis kommt automatisch von der Mühle, wenn kurz vorher gemahlen wurde.'),
-        data.minShotS ? h('button', { class: 'btn text', onclick: () => navigate(store.server?.mode === 'direct' ? '/einstellungen#aufzeichnung' : '/server#aufzeichnung') }, icon('tune', 's18'), `Bezüge unter ${fmtInt(data.minShotS)} s ausgeblendet`) : null),
+        data.minShotS ? h('button', { class: 'btn text', onclick: () => navigate('/einstellungen/bezuege') }, icon('tune', 's18'), `Bezüge unter ${fmtInt(data.minShotS)} s ausgeblendet`) : null),
       h('div', { class: 'row filter-row' }, h('div', { class: 'chips grow' }, chip('all', 'Alle'), chip('rated', 'Bewertet'), chip('ref', 'Referenzen')), beanSel),
       visible.length ? null : h('div', { class: 'empty' }, 'Keine Bezüge für diesen Filter.'),
       ...groups.flatMap((g) => [

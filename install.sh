@@ -109,6 +109,14 @@ apply_tunnel_token() {
   fi
 }
 
+# Erfolg an die App melden (Version aus dem neuen Container); setzt $ver
+report_ok() {
+  ver=$(run_docker exec xenios node -p "require('./package.json').version" 2>/dev/null || echo "")
+  extra=
+  [ -n "$ver" ] && extra=$(printf ',"version":"%s"' "$ver")
+  write_status ok "$extra"
+}
+
 apply_requested() {
   [ -f "$DIR/docker/compose.yaml" ] || die "Kein Xenios unter $DIR (docker/compose.yaml fehlt)"
   heartbeat
@@ -120,10 +128,7 @@ apply_requested() {
   run_docker exec xenios rm -f /data/update.request 2>/dev/null || true
   write_status running
   if apply_update; then
-    ver=$(run_docker exec xenios node -p "require('./package.json').version" 2>/dev/null || echo "")
-    extra=
-    [ -n "$ver" ] && extra=$(printf ',"version":"%s"' "$ver")
-    write_status ok "$extra"
+    report_ok
     heartbeat
     say "Fertig${ver:+ · Xenios $ver}."
   else
@@ -214,6 +219,14 @@ EOF
   say "Neue $envf (HTTPS $port, Image $IMAGE)."
 }
 
+# Update-Dienst nachrüsten: Installationen von Hand oder aus älteren Versionen haben den Timer nicht,
+# dann wartet der Knopf in der App vergeblich
+ensure_helper() {
+  [ -d /run/systemd/system ] || return 0
+  systemctl is-active --quiet xenios-update.timer 2>/dev/null && return 0
+  install_helper
+}
+
 install_helper() {
   unit_dir=/etc/systemd/system
   if [ ! -d /run/systemd/system ]; then
@@ -288,6 +301,10 @@ case $cmd in
   --update|update)
     [ -f "$DIR/docker/compose.yaml" ] || { ensure_repo; }
     apply_update
+    # Eine in der App liegengebliebene Anforderung ist damit erledigt
+    run_docker exec xenios rm -f /data/update.request 2>/dev/null || true
+    report_ok
+    ensure_helper
     heartbeat
     print_done
     exit 0

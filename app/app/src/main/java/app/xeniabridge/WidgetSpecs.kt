@@ -6,6 +6,7 @@ object WidgetSpecs {
     class Row(val name: String?, val weight: Float, val cols: List<Pair<String?, Float>>?, val gap: Float)
     val ROWS: Map<String, List<Row>> = mapOf(
         "power" to listOf(Row("head", 18f, null, 0f), Row(null, 4f, null, 0f), Row("body", 40f, null, 0f)),
+        "mode" to listOf(Row("row", 1f, listOf("head" to 1.6f, "btn_on" to 1f, "btn_eco" to 1f, "btn_off" to 1f), 6f)),
         "switch" to listOf(Row("head", 18f, null, 0f), Row(null, 6f, null, 0f), Row("seg", 36f, listOf("btn_on" to 1f, "btn_eco" to 1f, "btn_off" to 1f), 6f), Row(null, 8f, null, 0f), Row("tg_steam", 26f, null, 0f), Row("tg_nosteam", 26f, null, 0f)),
         "large" to listOf(Row("head", 18f, null, 0f), Row(null, 4f, null, 0f), Row("status", 46f, null, 0f), Row(null, 4f, null, 0f), Row("badges", 18f, null, 0f), Row(null, 8f, null, 0f), Row("seg", 36f, listOf("btn_on" to 1f, "btn_eco" to 1f, "btn_off" to 1f), 6f), Row(null, 8f, null, 0f), Row("tg_steam", 26f, null, 0f), Row("tg_nosteam", 26f, null, 0f)),
         "large_live" to listOf(Row("head", 18f, null, 0f), Row(null, 4f, null, 0f), Row("info", 60f, null, 0f), Row(null, 6f, null, 0f), Row("chart", 60f, null, 0f), Row(null, 8f, null, 0f), Row("stop", 36f, null, 0f)),

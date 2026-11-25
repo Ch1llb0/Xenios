@@ -134,7 +134,7 @@ Der Assistent hat sechs Schritte: Code, Passwort, Xenia, Mühle, Unterwegs, Fert
 2. **Passwort.** App-Passwort, mindestens 10 Zeichen, zweimal. Damit melden sich später alle Geräte an. Gespeichert wird nur ein Hash.
 3. **Xenia.** Adresse `http://192.168.x.x`, ohne Pfad. *Verbindung testen*. Bei der neuen Maschine steht zum Beispiel „Xenia Brew-by-Sync · Firmware 4.226“. Ist die Maschine aus, geht *Weiter* trotzdem.
 4. **Mühle.** Ohne E64 WS den Schalter aus. Dann fehlen Menüpunkt Mühle, Mühlen-Kacheln und Grind-by-Sync; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Mit Mühle: Adresse `https://192.168.x.x` und das **Owner-Passwort** (dasselbe wie auf der Webseite der Mühle unter der Rolle Owner). *Verbindung testen*. Das Passwort liegt danach verschlüsselt in der Konfiguration. Grind-by-Sync gibt es nur zusammen mit der neuen Xenia.
-5. **Unterwegs.** Optional. Die Schritte und Bilder stehen in [Abschnitt 7](#7-von-unterwegs-optional). Noch nicht fertig: *Weiter*. Eintragen und testen geht später unter *Einstellungen → Server & Sicherheit*.
+5. **Unterwegs.** Optional. Die Schritte und Bilder stehen in [Abschnitt 7](#7-von-unterwegs-optional). Noch nicht fertig: *Weiter*. Eintragen und testen geht später unter *Einstellungen → Von unterwegs*.
 6. **Fertig.** Zusammenfassung prüfen, *Einrichtung abschließen*.
 
 ![Assistent, Schritt Code, Feld XXXX-XXXX](bilder/linux-docker/09-assistent-code.png)
@@ -173,7 +173,7 @@ sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.ta
 
 Ohne diesen Abschnitt ist Xenios im Heimnetz fertig. Für Handy außer Haus, installierbare Web-App und Mitteilungen braucht es eine öffentliche HTTPS-Adresse. Dafür reicht der kostenlose Cloudflare-Tarif. Im Router wird kein Port geöffnet; der Tunnel baut nur eine ausgehende Verbindung auf.
 
-Voraussetzung: die Domain liegt bei Cloudflare und gilt dort als aktiv. Im Assistenten, Schritt **Unterwegs**, den Schalter **Cloudflare-Tunnel** einschalten. Dieselben Felder gibt es später unter *Einstellungen → Server & Sicherheit → Von unterwegs*.
+Voraussetzung: die Domain liegt bei Cloudflare und gilt dort als aktiv. Im Assistenten, Schritt **Unterwegs**, den Schalter **Cloudflare-Tunnel** einschalten. Dieselben Felder gibt es später unter *Einstellungen → Von unterwegs*.
 
 1. <https://one.dash.cloudflare.com> → *Networks* → *Tunnels* → **Create a tunnel** → *Cloudflared*. Name `xenios`.
 
@@ -211,7 +211,7 @@ http://xenios:8080
 
 *Bild 16. Published Application mit `http://xenios:8080`.*
 
-5. Die öffentliche Adresse eintragen, zum Beispiel `https://xenios.deine-domain.de`, und **Testen**. Der Server ruft sich selbst über diese Adresse auf. Noch nicht fertig: *Weiter*. Eintragen und testen geht jederzeit unter *Einstellungen → Server & Sicherheit*.
+5. Die öffentliche Adresse eintragen, zum Beispiel `https://xenios.deine-domain.de`, und **Testen**. Der Server ruft sich selbst über diese Adresse auf. Noch nicht fertig: *Weiter*. Eintragen und testen geht jederzeit unter *Einstellungen → Von unterwegs*.
 
 Der Token in `.env` ist ein Geheimnis. Die Datei wird nicht ins Git-Repository übernommen. Rate-Limits und Länderfilter: [Einrichtung, Cloudflare](Einrichtung.md#2-cloudflare-tunnel).
 
@@ -219,7 +219,7 @@ Der Token in `.env` ist ein Geheimnis. Die Datei wird nicht ins Git-Repository �
 
 Eine schon laufende Installation holt den neuen Server, ohne Einrichtung, Passwort, Maschine, Mühle oder Bezüge neu anzulegen. Die Datei `docker/.env` bleibt, das Volume `xenios_xenios-data` auch.
 
-1. In der App *Einstellungen → Server & Sicherheit* öffnen. Dort steht die installierte Version. Der Knopf heißt **Auf x.y.z aktualisieren**, wenn auf GitHub ein neueres Release liegt, sonst **Aktualisieren**. Er prüft GitHub in beiden Fällen.
+1. In der App *Einstellungen → System* öffnen. Dort steht die installierte Version. Der Knopf heißt **Auf x.y.z aktualisieren**, wenn auf GitHub ein neueres Release liegt, sonst **Aktualisieren**. Er prüft GitHub in beiden Fällen.
 2. Den Knopf drücken. Der Dienst `xenios-update.timer` holt Git und das Image und startet neu. Die Seite kommt danach von selbst zurück.
 
 ![Einstellungen, Block Aktualisierung, Knopf und Versionszeile](bilder/linux-docker/17-aktualisieren.png)
@@ -238,7 +238,7 @@ Danach geht der Knopf. Nur holen und neu starten, ohne den Dienst neu zu schreib
 sh /home/test/xenios/install.sh --update
 ```
 
-Am Ende ist `xenios` `healthy`. Im Browser die Seite neu laden. Unter *Server & Sicherheit* steht die neue Version. Die Android-App am Server zeigt dieselbe Oberfläche, dafür ist kein neues APK nötig.
+Am Ende ist `xenios` `healthy`. Im Browser die Seite neu laden. Unter *Einstellungen → System* steht die neue Version. Die Android-App am Server zeigt dieselbe Oberfläche, dafür ist kein neues APK nötig.
 
 Eine feste Version: in `.env` zum Beispiel `XENIOS_IMAGE=ghcr.io/tims1998/xenios:2.1.0`, danach `--update`. Auf einem Windows-PC ohne dieses Skript prüft der Knopf nur, ob eine neuere Version da ist. Geholt wird sie dort mit `git pull` und einem Neustart des Servers, siehe [Einrichtung](Einrichtung.md#1-server-installieren-windows-pc-läuft-dauerhaft).
 
@@ -253,7 +253,7 @@ Der **Direkt-Modus** der Android-App spricht die Maschine ohne diesen Server an.
 | Container weg, Daten bleiben | `docker compose -f /home/test/xenios/docker/compose.yaml down` |
 | Alles löschen, auch die Daten | `docker compose -f /home/test/xenios/docker/compose.yaml down -v` |
 
-In der App unter *Einstellungen → Server & Sicherheit* sichert **Sichern** Konfiguration und Bezüge als ZIP, **Einspielen** liest dieselbe Datei. Zusätzlich das ganze Volume (enthält `secret.key`, also den Schlüssel zum Mühlen-Passwort; die Datei wie ein Passwort behandeln):
+In der App unter *Einstellungen → System* sichert **Sichern** Konfiguration und Bezüge als ZIP, **Einspielen** liest dieselbe Datei. Zusätzlich das ganze Volume (enthält `secret.key`, also den Schlüssel zum Mühlen-Passwort; die Datei wie ein Passwort behandeln):
 
 ```bash
 docker run --rm -v xenios_xenios-data:/d -v /home/test/xenios/docker:/b alpine tar czf /b/xenios-backup.tgz -C /d .
@@ -289,5 +289,5 @@ Die `docker compose`-Befehle enthalten den langen Pfad und gelten von jedem Ordn
 | Seite öffnet nicht | Adresse und Port aus der `.env`, Schema `https://`. Der Browser muss im selben Netz sein. `docker compose -f /home/test/xenios/docker/compose.yaml ps` zeigt `healthy`. |
 | Knopf Aktualisieren zeigt den curl-Befehl | `systemctl is-enabled xenios-update.timer`. Steht dort nicht `enabled`: `sh /home/test/xenios/install.sh` noch einmal. |
 | Maschine nicht erreichbar | Auf dem Server: `curl -m 5 http://192.168.x.x/api/v2/machine` (Adresse der Xenia). Antwortet das nicht, sieht der Server die Maschine nicht: Kabel, gleiches Netz, kein Gast-WLAN. |
-| Verbindungstest will die andere Xenia | Im Assistenten oder unter *Server & Sicherheit* Neue bzw. Alte Xenia umschalten und erneut testen. |
+| Verbindungstest will die andere Xenia | Im Assistenten oder unter *Einstellungen → Modell & Aussehen* Neue bzw. Alte Xenia umschalten und erneut testen. |
 | Falsche Uhr bei Timern | `TZ` in `.env`, danach `sh /home/test/xenios/install.sh --update`. Bei der neuen Xenia zusätzlich *Timer → Uhr stellen*. |

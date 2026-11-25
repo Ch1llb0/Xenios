@@ -1,7 +1,7 @@
-// Einstellungen in drei Bereichen: Hauptseite (Darstellung, Leiste, Komponenten & Funktionen), Maschinen-Einstellungen
-// (eigene Seite, Kategorien wie die Seite der Maschine) und Server- & App-Einstellungen (views/server.js).
+// Einstellungen: die Hauptseite ist nur eine Übersicht in drei Gruppen (App, Kaffeemaschine, Server); jeder Eintrag
+// öffnet eine eigene Seite. Seiten mit Werten des Servers stehen in views/server.js.
 import { h, icon, fmt, fmtInt, snackbar, switchEl, sliderRow, ago } from '../ui.js';
-import { api, store, isClassic, classicPages, refreshState } from '../api.js';
+import { api, store, isClassic, classicPages } from '../api.js';
 import { logout, applyTheme, localStorageGet, localStorageSet, inAndroidApp, navigate, navChoices, THEME_DEFAULTS, uiPalette, gaugeKey, gaugeChoice } from '../app.js';
 import { hiddenTabs, setTabHidden, COMPONENTS, isHidden, setComponentHidden, noSteamOn, setNoSteamOn, onPrefs } from '../prefs.js';
 
@@ -9,6 +9,7 @@ const listButton = (ic, title, sub, onclick) => h('button', { class: 'list-item 
   h('span', { class: 'lead' }, icon(ic)),
   h('span', { class: 'grow' }, h('div', { class: 'title' }, title), sub ? h('div', { class: 'sub' }, sub) : null),
   icon('right', 's20 muted'));
+const go = (path) => () => navigate(path);
 
 // Einklappbare Kategorie (wie die Sektion PID): Kopf mit Icon und Titel, Inhalt erst nach dem Aufklappen sichtbar
 export function fold(title, ic, ...nodes) {
@@ -17,25 +18,52 @@ export function fold(title, ic, ...nodes) {
     h('div', { class: 'fold-body' }, ...nodes.filter(Boolean)));
 }
 
-// --- Hauptseite: Optik und Funktionen direkt, Maschine und Server/App als eigene Seiten -----------------------
+// --- Hauptseite: Übersicht ---------------------------------------------------------------------------------
 export function settingsView(root) {
   const unsubs = [];
   const direct = store.server?.mode === 'direct';
+  const android = inAndroidApp();
+  const group = (title, ...items) => [h('div', { class: 'section-title' }, title), h('div', { class: 'list' }, ...items.filter(Boolean))];
   root.append(
-    h('div', { class: 'section-title' }, 'Darstellung'), themeCard(),
-    h('div', { class: 'section-title' }, 'Navigationsleiste'), navCard(unsubs),
-    h('div', { class: 'section-title' }, 'Komponenten & Funktionen'), componentsCard(),
-    h('div', { class: 'section-title' }, 'Weitere Einstellungen'),
-    h('div', { class: 'list' },
-      listButton('settings', 'Maschinen-Einstellungen', 'Waage, Temperaturen, Dampf, Pumpe, Firmware', () => navigate('/einstellungen/maschine')),
-      direct ? null : listButton('shield', 'Server- & App-Einstellungen', 'Geräte, Zugriff von unterwegs, Zeit, Sicherheit, Benachrichtigungen, Aufzeichnung, Konto', () => navigate('/server')),
-      direct && inAndroidApp() ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null,
-      widgetAlarmButton(unsubs)),
-    // Direkt-Modus: ohne Server-Seite gehört die Aufzeichnung hierher, als Kategorie wie dort
-    direct ? recordingFold() : null,
+    ...group('App auf diesem Gerät',
+      listButton('palette', 'Darstellung', 'Design, Hell/Dunkel, Farben, Manometer', go('/einstellungen/darstellung')),
+      listButton('toggle', 'Leiste & Ansicht', 'Tabs der Leiste, Mühle, Waage und Pflege ausblenden', go('/einstellungen/ansicht')),
+      widgetAlarmButton(unsubs),
+      direct && android ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null),
+    ...group('Kaffeemaschine',
+      listButton('settings', 'Maschine', 'Temperaturen, Dampf, Pumpe, Waage, Wi-Fi, Firmware', go('/einstellungen/maschine')),
+      direct ? null : listButton('coffeeLine', 'Modell & Aussehen', 'Neue oder alte Xenia, Adresse, Ansicht unter „Schalter“', go('/einstellungen/modell')),
+      listButton('shotlog', 'Bezüge', 'Kurze Bezüge aussortieren, Standard-Dosis', go('/einstellungen/bezuege')),
+      direct ? null : listButton('grinder', 'Mühle & Grind-by-Sync', store.server?.grinder?.enabled ? 'Mahlkönig E64 WS, Drehknopf startet Profile' : 'Mahlkönig E64 WS einbinden', go('/einstellungen/muehle'))),
+    ...(direct ? [] : group('Server',
+      listButton('cloud', 'Von unterwegs', 'Zugriff über den Cloudflare-Tunnel', go('/einstellungen/unterwegs')),
+      listButton('bell', 'Benachrichtigungen', 'Push-Meldungen auf diesem Gerät', go('/einstellungen/benachrichtigungen')),
+      listButton('shield', 'Sicherheit', 'Passwort, angemeldete Geräte, HTTPS, Funktionen', go('/einstellungen/sicherheit')),
+      listButton('info', 'System', 'Version und Aktualisierung, Zeitzone, Sicherung, Protokoll', go('/einstellungen/system')))),
+    ...(direct ? [] : group('Konto',
+      android ? listButton('wifi', 'App-Verbindung ändern', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null,
+      listButton('logout', 'Abmelden', null, logout))),
     direct ? h('div', { class: 'card low muted small', style: { 'margin-top': '12px' } }, 'Direkt-Modus: Die App spricht Maschine und Mühle ohne Server im Heimnetz an. Server-Einstellungen gibt es dabei nicht.') : null,
     h('p', { class: 'muted small', style: { 'text-align': 'center', 'margin-top': '24px' } }, `Xenios ${store.server?.version || ''}`));
   return () => unsubs.forEach((u) => u());
+}
+
+// --- Unterseiten der App ---------------------------------------------------------------------------------------
+export function appearanceView(root) {
+  root.append(themeCard());
+}
+
+export function viewPrefsView(root) {
+  const unsubs = [];
+  root.append(
+    h('div', { class: 'section-title' }, 'Leiste'), navCard(unsubs),
+    h('div', { class: 'section-title' }, 'Komponenten'), componentsCard());
+  return () => unsubs.forEach((u) => u());
+}
+
+// Bezüge: gilt auf dem Server bzw. im Direkt-Modus in der App
+export function shotPrefsView(root) {
+  root.append(shotFilterCard());
 }
 
 // Android-App: Erlaubnis „Wecker und Erinnerungen“, damit sich die Widgets alle 5 s aktualisieren
@@ -56,17 +84,6 @@ function widgetAlarmButton(unsubs) {
     h('span', { class: 'lead' }, icon('timer')),
     h('span', { class: 'grow' }, h('div', { class: 'title' }, 'Widgets'), sub),
     icon('right', 's20 muted'));
-}
-
-// Direkt-Modus: Kategorie „Aufzeichnung“; nach einem Sprung (#aufzeichnung) offen und im Blick
-function recordingFold() {
-  const f = fold('Aufzeichnung', 'shotlog', shotFilterCard());
-  if (location.hash === '#aufzeichnung') {
-    f.open = true;
-    history.replaceState(history.state, '', location.pathname);
-    setTimeout(() => f.scrollIntoView({ block: 'start', behavior: 'smooth' }), 450);
-  }
-  return h('div', { style: { 'margin-top': '12px' } }, f);
 }
 
 // --- Maschinen-Einstellungen: Kategorien wie die Seite der Maschine, eingeklappt ------------------------------
@@ -165,7 +182,7 @@ export function machineSettingsView(root) {
         !full ? h('p', { class: 'muted small' }, 'Pumpenwerte sind bei dieser Firmware nur in der Original-Oberfläche einstellbar.') : null));
       if (!features.settings) {
         for (const el of Object.values(slots)) el.querySelectorAll('input,select').forEach((x) => { x.disabled = true; });
-        slots.maschine.append(h('p', { class: 'muted small' }, 'Ändern ist unter Einstellungen → Komponenten & Funktionen ausgeschaltet.'));
+        slots.maschine.append(h('p', { class: 'muted small' }, 'Ändern ist unter Einstellungen → Sicherheit → Funktionen ausgeschaltet.'));
       }
     } catch (e) {
       slots.maschine.replaceChildren(h('div', { class: 'muted small' }, e.message));
@@ -269,44 +286,16 @@ function navCard(unsubs) {
   return h('div', {}, h('p', { class: 'muted small' }, 'Welche Seiten in der Leiste stehen (gilt für dieses Gerät). Ausgeblendete Seiten bleiben über Links erreichbar; „Einstellungen“ steht immer in der Leiste.'), list);
 }
 
-// Komponenten ausblenden (je Gerät) und Funktionen ein-/ausschalten (gilt auf dem Server für alle Geräte)
-const FEATURES = [
-  ['features.paddle', 'speed', 'Paddle', 'Pumpe direkt steuern (auch für den Backflush nötig); aus: Tab „Paddle“ verschwindet'],
-  ['features.scriptEditor', 'list', 'Skript-Editor', 'Skripte anlegen, ändern, löschen'],
-  ['features.settings', 'settings', 'Maschinen-Einstellungen ändern', 'Temperaturen, Druck, Timer, Tastenbelegung; aus: Tab „Schalter“ und Kachel „Sollwerte“ verschwinden'],
-  ['features.clockSync', 'clock', 'Uhr stellen', 'Uhrzeit und Zeitzone der Maschine setzen'],
-];
+// Komponenten ausblenden (gilt für dieses Gerät)
 function componentsCard() {
-  const featureList = h('div', { class: 'list' });
-  const featureBox = h('div', { hidden: true }, h('p', { class: 'muted small', style: { 'margin-top': '14px' } }, 'Funktionen gelten für alle Geräte (Einstellung des Servers).'), featureList);
-  if (store.server?.mode !== 'direct') {
-    (async () => {
-      try {
-        const cfg = await api('/api/admin/config');
-        featureBox.hidden = false;
-        featureList.replaceChildren(FEATURES.map(([key, ic, title, sub]) => {
-          const locked = cfg.locked.includes(key);
-          return prefRow(ic, title, locked ? `${sub} · durch die Server-Konfiguration festgelegt` : sub, switchEl({ checked: Boolean(cfg.values[key]), disabled: locked, label: title, onChange: async (on, input) => {
-            try {
-              await api('/api/admin/config', { method: 'PUT', body: { changes: { [key]: on } } });
-              await refreshState().catch(() => {});
-              window.dispatchEvent(new CustomEvent('xenios-prefs', { detail: 'features' })); // Leiste und Tabs neu
-              snackbar(`${title}: ${on ? 'ein' : 'aus'}`);
-            } catch (e) { input.checked = !on; snackbar(e.message); }
-          } }));
-        }));
-      } catch { /* ohne Admin-Zugriff: nur Komponenten */ }
-    })();
-  }
   return h('div', {}, h('p', { class: 'muted small' }, 'Ausgeblendete Komponenten verschwinden aus Leiste, Startseite, Dashboard und Bezügen (gilt für dieses Gerät).'),
-    // Mühle nur, wenn eine eingerichtet ist (Server- & App-Einstellungen → Geräte); sonst gibt es nichts auszublenden
+    // Mühle nur, wenn eine eingerichtet ist (Einstellungen → Mühle & Grind-by-Sync); sonst gibt es nichts auszublenden
     h('div', { class: 'list' }, COMPONENTS.filter((c) => c.id !== 'grinder' || store.server?.grinder?.enabled).map((c) => prefRow(c.id === 'grinder' ? 'grinder' : c.id === 'scale' ? 'scale' : 'check', c.title, c.sub,
-      switchEl({ checked: !isHidden(c.id), label: `${c.title} anzeigen`, onChange: (on) => setComponentHidden(c.id, !on) })))),
-    featureBox);
+      switchEl({ checked: !isHidden(c.id), label: `${c.title} anzeigen`, onChange: (on) => setComponentHidden(c.id, !on) })))));
 }
 
 // Bezüge unter einer Mindestdauer aussortieren (Backflush, Spülen, Fehlbezüge); gilt auf dem Server bzw. in der App
-export function shotFilterCard() {
+function shotFilterCard() {
   const box = h('div', { class: 'card' }, h('div', { class: 'muted small' }, 'Lade …'));
   (async () => {
     try {

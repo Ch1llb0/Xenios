@@ -636,9 +636,14 @@ body { transition: background-color .3s, color .3s; }
 .wheel-sep { position: relative; font-size: 26px; font-weight: 600; color: var(--on-secondary-container); }
 button.time-field { height: 48px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--outline); background: transparent; text-align: left; font-size: 16px; font-variant-numeric: tabular-nums; width: 100%; }
 
-/* Server-Einstellungen */
+/* Unterseiten der Einstellungen (Karten mit Kopfzeile) */
 .setting-card { padding: 16px 16px 14px; }
-.card-head { display: flex; align-items: center; gap: 8px; }
+.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.card-head h3 { margin: 0; }
+/* Sprung zu einer Karte (z. B. „Ansicht ändern“): unter der Kopfleiste stehen lassen und kurz hervorheben */
+.setting-card[data-anchor] { scroll-margin-top: 72px; }
+.setting-card.flash { animation: card-flash 1.8s var(--ease-emph) .35s; }
+@keyframes card-flash { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 25%, 60% { box-shadow: 0 0 0 2px var(--primary); } }
 .card-head svg { color: var(--primary); }
 .setting-card h4 { margin: 12px 0 4px; font-size: 12px; font-weight: 600; color: var(--on-surface-variant); text-transform: uppercase; letter-spacing: .6px; }
 .toggle-row { padding: 8px 0; }
@@ -1056,6 +1061,26 @@ details.fold[open] > summary { border-bottom: 1px solid var(--outline-variant); 
 .machine-svg.render, .machine-svg.render.dbl { max-width: 340px; }
 .machine-svg.render .body { stroke: rgba(0,0,0,.45); stroke-width: .8; }
 .machine-svg.render .mbtn .halo { fill: var(--primary); }
+/* Vereinfachte Ansicht: nur Linien in den Farben des Designs, Form der Taster und Schalter bleibt */
+.machine-svg.schema { max-width: 380px; }
+.machine-svg.schema .front, .machine-svg.schema .body { fill: none; stroke: var(--outline); stroke-width: 1.2; }
+.machine-svg.schema .sym { stroke: var(--on-surface-variant); }
+.machine-svg.schema .mbtn .halo { fill: var(--on-surface); }
+.machine-svg.schema .mbtn .cap { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1; }
+.machine-svg.schema .mbtn .cap-in { fill: none; stroke: var(--outline-variant); }
+.machine-svg.schema .mbtn .glyph path { stroke: var(--on-surface); }
+.machine-svg.schema .mbtn:hover .halo, .machine-svg.schema .mbtn:focus-visible .halo { opacity: .08; }
+.machine-svg.schema .mbtn.sel .halo { opacity: .14; }
+.machine-svg.schema .tg-nut { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1; }
+.machine-svg.schema .tg-ring { fill: none; stroke: var(--outline); }
+.machine-svg.schema .tg-hole { fill: var(--on-surface-variant); }
+.machine-svg.schema .tg-stem { stroke: var(--on-surface-variant); }
+.machine-svg.schema .tg-head { fill: var(--surface-container-lowest); stroke: var(--on-surface); stroke-width: 1; }
+.machine-svg.schema .lever-side .pos-ring { fill: var(--surface-container-lowest); stroke: var(--on-surface-variant); stroke-width: 1.2; }
+.machine-svg.schema .lever-side .pos-no { fill: var(--on-surface); }
+.machine-svg.schema .lever-side.sel .halo { opacity: .12; }
+.machine-svg.schema .lever-side.sel .pos-ring { fill: var(--on-surface); stroke: var(--on-surface); }
+.machine-svg.schema .lever-side.sel .pos-no { fill: var(--surface-container-lowest); }
 /* Server-Einstellungen → Geräte: Farbe der Xenia */
 .look-pick { margin: 4px 0 12px; }
 .look-pick .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--outline); margin-right: 6px; vertical-align: -1px; }

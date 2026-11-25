@@ -209,7 +209,7 @@ export function showSetup(root, { onDone }) {
       paste,
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', {}, 'Öffentliche Adresse'), url), test),
       result,
-      h('p', { class: 'muted small' }, 'Noch nicht fertig? Einfach weiter. Eintragen und testen geht jederzeit unter Einstellungen → Server & Sicherheit.'));
+      h('p', { class: 'muted small' }, 'Noch nicht fertig? Einfach weiter. Eintragen und testen geht jederzeit unter Einstellungen → Von unterwegs.'));
     const next = h('button', { class: 'btn filled', type: 'submit' }, 'Weiter', icon('right', 's18'));
     const form = h('form', {},
       h('p', { class: 'muted' }, 'Optional: Xenios von unterwegs erreichen, über einen Cloudflare-Tunnel. Ohne Portfreigabe im Router und mit echtem Zertifikat; damit lässt sich die App auch installieren und Push nutzen.'),
@@ -235,7 +235,7 @@ export function showSetup(root, { onDone }) {
         row('Unterwegs', st.tunnel.enabled && st.tunnel.url ? st.tunnel.url : 'später einrichten'),
         st.tunnel.token.trim() ? row('Tunnel-Token', 'wird übernommen') : null,
         row('Zeitzone', st.timezone || 'System')),
-      h('p', { class: 'muted small' }, 'Alles lässt sich später unter Einstellungen → Server ändern: Ports, Zertifikat, Funktionen, Zeitzone, Passwort.'),
+      h('p', { class: 'muted small' }, 'Alles lässt sich später unter Einstellungen ändern: Modell und Mühle unter Kaffeemaschine, Zugänge, Passwort, Funktionen und Zeitzone unter Server.'),
       e, nav(() => go(4), finish));
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();

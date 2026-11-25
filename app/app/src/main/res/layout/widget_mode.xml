@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Erzeugt (widgets_gen): Bild des Widgets und deckungsgleiche Klickflächen -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <ImageView
+        android:id="@+id/img"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+    <LinearLayout
+        android:id="@+id/ov_mode"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+            <FrameLayout
+                android:id="@+id/head"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.6" />
+            <FrameLayout
+                android:id="@+id/btn_on"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp" />
+            <FrameLayout
+                android:id="@+id/btn_eco"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp" />
+            <FrameLayout
+                android:id="@+id/btn_off"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

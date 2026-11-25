@@ -2,7 +2,7 @@
 // Kennzahlen, zugeordneter Mahlvorgang der Mühle, Bewertung mit Notizen und der Einstell-Assistent.
 // Dazu die Schnellbewertung direkt nach einem Bezug (Geschmack, Stärke, Mahlgrad → nächster Schritt).
 import { h, icon, fmt, fmtInt, snackbar, fullscreen, sheet, switchEl } from '../ui.js';
-import { api, hasGrinder, store } from '../api.js';
+import { api, hasGrinder } from '../api.js';
 import { shotChart } from '../gauge.js';
 import { targetCurve, shotMetrics, curveYield, STRENGTH } from '../../shared/shot-analysis.js';
 import { TASTE } from '../../shared/machine-core.js';
@@ -151,7 +151,7 @@ function paint(root, d, close, onChange, page = false) {
       k('Ausbeute', m.yieldG !== null ? fmt(m.yieldG) : null, 'g'),
       m.doseG !== null ? k(m.doseAssumed ? 'Dosis (Standard)' : 'Dosis', fmt(m.doseG), 'g')
         // Ohne Dosis kein Verhältnis: direkt zur Einstellung „Standard-Dosis“
-        : h('button', { class: 'kpi kpi-link', type: 'button', onclick: () => navigate(store.server?.mode === 'direct' ? '/einstellungen#aufzeichnung' : '/server#aufzeichnung') },
+        : h('button', { class: 'kpi kpi-link', type: 'button', onclick: () => navigate('/einstellungen/bezuege') },
           h('div', { class: 'k' }, 'Dosis'), h('div', { class: 'v' }, '–'), h('div', { class: 'muted small' }, 'Standard-Dosis festlegen')),
       k('Verhältnis', m.ratio !== null ? `1:${fmt(m.ratio)}` : null),
       k('Vorbrühen', m.preinfusionS !== null ? fmt(m.preinfusionS) : null, 's'),

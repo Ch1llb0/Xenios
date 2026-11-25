@@ -8,8 +8,8 @@ import { controlsView, paddleView } from './views/controls.js';
 import { shotsView } from './views/shots.js';
 import { timerView } from './views/timer.js';
 import { grinderView } from './views/grinder.js';
-import { settingsView, machineSettingsView } from './views/settings.js';
-import { serverView } from './views/server.js';
+import { settingsView, machineSettingsView, appearanceView, viewPrefsView, shotPrefsView } from './views/settings.js';
+import { serverPage } from './views/server.js';
 import { showSetup } from './setup.js';
 import { quickRate, shotPageView } from './views/shot-detail.js';
 import { hiddenTabs, onPrefs, powerOnBody } from './prefs.js';
@@ -25,14 +25,27 @@ const ROUTES = [
   { path: '/muehle', label: 'Mühle', icon: 'grinder', view: grinderView, title: 'Mühle' },
   // Einstellungen: immer in der Leiste, lässt sich nicht ausblenden
   { path: '/einstellungen', label: 'Einstellungen', short: 'Einstell.', icon: 'settings', view: settingsView, title: 'Einstellungen', fixed: true },
-  { path: '/einstellungen/maschine', label: 'Maschine', icon: 'settings', view: machineSettingsView, title: 'Maschinen-Einstellungen', nav: false, back: '/einstellungen' },
   { path: '/bezuege/bezug', label: 'Bezug', icon: 'coffeeLine', view: shotPageView, title: 'Bezug', nav: false, back: '/bezuege' },
   { path: '/skripte/neu', label: 'Skript erstellen', icon: 'add', view: scriptNewView, title: 'Skript erstellen', nav: false, back: '/skripte' },
   { path: '/skripte/bearbeiten', label: 'Skript bearbeiten', icon: 'edit', view: scriptEditView, title: 'Skript bearbeiten', nav: false, back: '/skripte' },
   { path: '/skripte/profil', label: 'Druckprofil erstellen', icon: 'profile', view: profileBuilderView, title: 'Druckprofil erstellen', nav: false, back: '/skripte' },
   { path: '/skripte/entdecken', label: 'Profile entdecken', icon: 'explore', view: discoverView, title: 'Profile entdecken', nav: false, back: '/skripte' },
-  { path: '/server', label: 'Server', icon: 'shield', view: serverView, title: 'Server- & App-Einstellungen', nav: false, back: '/einstellungen' },
+  // Unterseiten der Einstellungen; server: nur mit Server (nicht im Direkt-Modus der App)
+  ...[
+    ['darstellung', 'Darstellung', appearanceView],
+    ['ansicht', 'Leiste & Ansicht', viewPrefsView],
+    ['maschine', 'Maschine', machineSettingsView],
+    ['modell', 'Modell & Aussehen', serverPage('modell'), true],
+    ['bezuege', 'Bezüge', shotPrefsView],
+    ['muehle', 'Mühle & Grind-by-Sync', serverPage('muehle'), true],
+    ['unterwegs', 'Von unterwegs', serverPage('unterwegs'), true],
+    ['benachrichtigungen', 'Benachrichtigungen', serverPage('benachrichtigungen'), true],
+    ['sicherheit', 'Sicherheit', serverPage('sicherheit'), true],
+    ['system', 'System', serverPage('system'), true],
+  ].map(([id, title, view, server]) => ({ path: `/einstellungen/${id}`, label: title, icon: 'settings', view, title, nav: false, back: '/einstellungen', server })),
 ];
+// Frühere Adressen der Einstellungen (Lesezeichen, alte Links)
+const MOVED = { '/server': '/einstellungen', '/server#aufzeichnung': '/einstellungen/bezuege', '/einstellungen#aufzeichnung': '/einstellungen/bezuege' };
 
 const $ = (id) => document.getElementById(id);
 
@@ -203,10 +216,11 @@ applyTheme();
 
 // --- Navigation ---------------------------------------------------------------
 // Alle Seiten, die in die untere Leiste können (die Mühle nur, wenn eingerichtet und nicht ausgeblendet)
-// Ausgeschaltete Funktionen (Einstellungen → Komponenten & Funktionen) blenden ihre Seiten aus: Paddle ohne
+// Ausgeschaltete Funktionen (Einstellungen → Sicherheit → Funktionen) blenden ihre Seiten aus: Paddle ohne
 // Pumpensteuerung, Schalter (Tastenbelegung) ohne „Maschinen-Einstellungen ändern“.
 export function routeAvailable(r) {
   if (r.path === '/muehle' && !hasGrinder()) return false;
+  if (r.server && store.server?.mode === 'direct') return false;
   if (r.feature && store.server?.features?.[r.feature] === false) return false;
   if (r.path === '/paddle' && store.machine?.info && !hasPaddle()) return false; // erst entscheiden, wenn die Firmware bekannt ist
   return true;
@@ -358,8 +372,10 @@ export function setTabs(tabs, active, onSelect) {
 
 function render() {
   if (location.pathname === '/dashboard') return navigate('/', { replace: true });
+  const moved = MOVED[location.pathname + location.hash] || MOVED[location.pathname];
+  if (moved) return navigate(moved, { replace: true });
   const want = ROUTES.find((r) => r.path === location.pathname);
-  if (want && !routeAvailable(want)) return navigate('/', { replace: true });
+  if (want && !routeAvailable(want)) return navigate(want.back || '/', { replace: true });
   const route = ROUTES.find((r) => r.path === location.pathname) || ROUTES.find((r) => r.path === '/');
   // Zurück im Verlauf: an die gemerkte Stelle der Seite
   const restore = restoreY;

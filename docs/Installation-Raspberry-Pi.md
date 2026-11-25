@@ -154,7 +154,7 @@ Assistent:
 
 1. **Code.** Einrichtungscode aus dem Protokoll, *Weiter*.
 2. **Passwort.** Mindestens 10 Zeichen, zweimal. Gilt für alle Geräte. Gespeichert wird nur ein Hash.
-3. **Xenia.** Oben **Neue Xenia** (Brew-by-Sync, aktuelle Firmware) oder **Alte Xenia** (DBL, ältere offizielle API). Adresse `http://192.168.x.x`, ohne Pfad. *Verbindung testen*. Passt die Wahl nicht zur Maschine, steht unter dem Ergebnis: „Die Maschine antwortet wie die alte API – oben Alte Xenia wählen.“ oder der Satz für die neue API. Dann die andere Schaltfläche und noch einmal testen. Ist die Maschine aus, geht *Weiter* trotzdem; ändern später unter *Einstellungen → Server & Sicherheit*. Dieselbe Umschaltung hat die Android-App im Direkt-Modus ([Android-App](Android-App.md)).
+3. **Xenia.** Oben **Neue Xenia** (Brew-by-Sync, aktuelle Firmware) oder **Alte Xenia** (DBL, ältere offizielle API). Adresse `http://192.168.x.x`, ohne Pfad. *Verbindung testen*. Passt die Wahl nicht zur Maschine, steht unter dem Ergebnis: „Die Maschine antwortet wie die alte API – oben Alte Xenia wählen.“ oder der Satz für die neue API. Dann die andere Schaltfläche und noch einmal testen. Ist die Maschine aus, geht *Weiter* trotzdem; ändern später unter *Einstellungen → Modell & Aussehen*. Dieselbe Umschaltung hat die Android-App im Direkt-Modus ([Android-App](Android-App.md)).
 4. **Mühle.** Ohne E64 WS den Schalter aus. Dann fehlen Menüpunkt Mühle, Mühlen-Kacheln und Grind-by-Sync; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Mit Mühle: `https://192.168.x.x` und das **Owner-Passwort** (dieselbe Rolle Owner wie auf der Webseite der Mühle). *Verbindung testen*. Das Passwort wird verschlüsselt gespeichert. Grind-by-Sync gibt es nur zusammen mit der neuen Xenia.
 5. **Unterwegs.** Aus lassen, bis [Abschnitt 7](#7-von-unterwegs-optional) dran ist.
 6. **Fertig.** *Einrichtung abschließen*, danach mit dem App-Passwort anmelden.
@@ -220,7 +220,7 @@ Die Domain liegt bei Cloudflare und gilt dort als aktiv.
 docker compose -f ~/xenios/docker/compose.yaml ps
 ```
 
-`xenios` ist `healthy`, `cloudflared` läuft. Dasselbe Feld gibt es später unter *Einstellungen → Server & Sicherheit → Von unterwegs*.
+`xenios` ist `healthy`, `cloudflared` läuft. Dasselbe Feld gibt es später unter *Einstellungen → Von unterwegs*.
 
 4. Im Tunnel **Add route → Published Application**: Subdomain `xenios`, eigene Domain, Typ **HTTP**, URL:
 
@@ -234,7 +234,7 @@ http://xenios:8080
 
 *Bild 16. Published Application mit `http://xenios:8080`.*
 
-5. In der App *Einstellungen → Server & Sicherheit → Von unterwegs*: `https://xenios.deine-domain.de` eintragen und **Testen**.
+5. In der App *Einstellungen → Von unterwegs*: `https://xenios.deine-domain.de` eintragen und **Testen**.
 
 Weitere Härtung (Rate-Limit, Länderfilter): [Einrichtung, Cloudflare](Einrichtung.md#2-cloudflare-tunnel).
 
@@ -242,7 +242,7 @@ Weitere Härtung (Rate-Limit, Länderfilter): [Einrichtung, Cloudflare](Einricht
 
 Eine schon laufende Installation holt den neuen Server, ohne Einrichtung, Passwort, Maschine, Mühle oder Bezüge neu anzulegen. Die Datei `docker/.env` bleibt.
 
-1. In der App *Einstellungen → Server & Sicherheit* öffnen. Dort steht die installierte Version. Der Knopf heißt **Auf x.y.z aktualisieren**, wenn auf GitHub ein neueres Release liegt, sonst **Aktualisieren**.
+1. In der App *Einstellungen → System* öffnen. Dort steht die installierte Version. Der Knopf heißt **Auf x.y.z aktualisieren**, wenn auf GitHub ein neueres Release liegt, sonst **Aktualisieren**.
 2. Den Knopf drücken. Der Dienst `xenios-update.timer` holt Git und das Image und startet neu. Die Seite kommt danach von selbst zurück.
 
 ![Einstellungen, Block Aktualisierung, Knopf und Versionszeile](bilder/raspberry-pi/17-aktualisieren.png)
@@ -272,7 +272,7 @@ Eine feste Version: in `~/xenios/docker/.env` zum Beispiel `XENIOS_IMAGE=ghcr.io
 | Container weg, Daten bleiben | `docker compose down` |
 | Container und Daten weg | `docker compose down -v` |
 
-In der App unter *Einstellungen → Server & Sicherheit* sichert **Sichern** Konfiguration und Bezüge als ZIP, **Einspielen** liest dieselbe Datei. Zusätzlich das ganze Volume (enthält `secret.key`; die Datei wie ein Passwort aufbewahren und vom Pi herunterkopieren, eine Karte geht irgendwann kaputt):
+In der App unter *Einstellungen → System* sichert **Sichern** Konfiguration und Bezüge als ZIP, **Einspielen** liest dieselbe Datei. Zusätzlich das ganze Volume (enthält `secret.key`; die Datei wie ein Passwort aufbewahren und vom Pi herunterkopieren, eine Karte geht irgendwann kaputt):
 
 ```bash
 cd ~/xenios/docker
@@ -312,7 +312,7 @@ Befehle mit `docker compose` im Ordner `~/xenios/docker`, oder mit `-f ~/xenios/
 | Seite öffnet nicht | `https://` und die Adresse aus der `.env`. Browser im selben Netz. `docker compose ps` zeigt `healthy`. |
 | Knopf Aktualisieren zeigt den curl-Befehl | `systemctl is-enabled xenios-update.timer`. Steht dort nicht `enabled`: `sh ~/xenios/install.sh` noch einmal. |
 | Xenia nicht erreichbar | Auf dem Pi: `curl -m 5 http://192.168.x.x/api/v2/machine`. Ohne Antwort: Kabel, gleiches Netz, Gast-WLAN aus. |
-| Verbindungstest will die andere Xenia | Im Assistenten oder unter *Server & Sicherheit* Neue bzw. Alte Xenia umschalten und erneut testen. |
+| Verbindungstest will die andere Xenia | Im Assistenten oder unter *Einstellungen → Modell & Aussehen* Neue bzw. Alte Xenia umschalten und erneut testen. |
 | Pi wird heiß, startet neu, Blitzsymbol | Offizielles Netzteil, Gehäuse mit Lüfter beim Pi 5. |
 | Karte voll oder schreibt nicht mehr | `df -h`. Sicherung aus Abschnitt 8 auf eine neue Karte oder eine SSD mitnehmen. |
 | Timer zur falschen Zeit | `TZ` in `.env`, `sh ~/xenios/install.sh --update`. Bei der neuen Xenia zusätzlich *Timer → Uhr stellen*. |
