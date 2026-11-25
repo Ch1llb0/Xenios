@@ -240,7 +240,7 @@ export class XeniaClient {
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('text/html')) {
       // Unbekannte Pfade liefern die HTML-Startseite mit HTTP 200.
-      const err = new Error(`Unbekannter Endpunkt ${apiPath}`);
+      const err = new Error(`Unbekannter Endpunkt ${apiPath} – passt das Modell (neue/alte Xenia) unter Einstellungen → Geräte?`);
       err.status = 404;
       throw err;
     }
@@ -298,6 +298,8 @@ export class Machine extends Emitter {
       scale: { weight: null, rate: null },
       // Bluetooth-Waage an der alten Xenia (DBL): verbunden? (BLE in /api/v2/machine); null = unbekannt
       scaleLink: null,
+      // Eingestelltes Modell passt nicht zur Maschine: { configured, detected } ('bbs' | 'classic'); null = passt/unbekannt
+      apiMismatch: null,
       flow: { volume: null, rate: null, ml: null },
       shot: { running: false, timeMs: 0, startedAt: null, curve: [] },
       lastShot: null,
@@ -374,7 +376,8 @@ export class Machine extends Emitter {
       const d = await this.client.get(this.livePath);
       this._applyLive(normalizeLive(d));
       this._markOnline();
-      await this._readScaleLink(d);
+      // nicht abwarten: hängt /api/v2/machine, soll die schnelle Abfrage (laufender Bezug) nicht stehen bleiben
+      this._readScaleLink(d).catch(() => {});
     } catch (e) {
       // Ein einzelner Aussetzer (WLAN der Maschine, Zeitüberschreitung) ist noch nicht „offline“: gleich noch einmal
       // fragen. Sonst meldet z. B. ein Widget, das genau dann nachsieht, bis zum nächsten Update „Offline“.
@@ -395,7 +398,23 @@ export class Machine extends Emitter {
     const single = await this.client.get('/api/v2/overview_single');
     let general = {};
     if (this.api.general) {
-      try { general = await this.client.get('/api/v2/general'); } catch (e) { log.debug(`general nicht lesbar: ${e.message}`); }
+      try {
+        general = await this.client.get('/api/v2/general');
+        this._noteApi('bbs');
+      } catch (e) {
+        log.debug(`general nicht lesbar: ${e.message}`);
+        if (e.status === 404) this._noteApi('classic');
+      }
+    } else if (!this.state.info || Date.now() >= (this._apiCheckAt || 0)) {
+      // Alte Xenia eingestellt: gelegentlich nachsehen, ob doch eine neue antwortet (nach dem Start, nach Änderungen,
+      // sonst alle 5 min)
+      this._apiCheckAt = Date.now() + 5 * 60_000;
+      try {
+        const g = await this.client.get('/api/v2/general');
+        if (g && typeof g === 'object' && ('BG_SET_TEMP' in g || 'BB_SET_TEMP' in g)) this._noteApi('bbs');
+      } catch (e) {
+        if (e.status === 404) this._noteApi('classic');
+      }
     }
     // Live-Abfrage der alten API ist schon /overview; ein zweites Mal nur, wenn wir diagram/get pollen
     const overview = this.livePath === '/api/v2/overview' ? (this._lastDiag || await this.client.get('/api/v2/overview')) : await this.client.get('/api/v2/overview');
@@ -633,6 +652,17 @@ export class Machine extends Emitter {
   _event(topic, msg) {
     log.info(`Ereignis ${topic}: ${msg.title} – ${msg.body}`);
     this.emit('event', { topic, ...msg, at: new Date().toISOString() });
+  }
+
+  // Passt das eingestellte Modell? Wie der Verbindungstest beim Einrichten: /api/v2/general hat nur die neue Xenia.
+  _noteApi(detected) {
+    const mismatch = detected !== this.apiId ? { configured: this.apiId, detected } : null;
+    const key = (x) => (x ? `${x.configured}>${x.detected}` : '');
+    if (key(mismatch) === key(this.state.apiMismatch)) return;
+    this.state.apiMismatch = mismatch;
+    const name = { bbs: 'neue Xenia', classic: 'alte Xenia (DBL)' };
+    if (mismatch) log.warn(`Eingestellt ist ${name[mismatch.configured]}, die Maschine antwortet aber wie die ${name[mismatch.detected]} – unter Einstellungen → Geräte umstellen`);
+    this.emit('state');
   }
 
   // Alte Xenia: alle 10 s nachsehen, ob die Bluetooth-Waage verbunden ist. Ein Gewicht ungleich 0 zählt sofort.

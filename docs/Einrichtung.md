@@ -23,7 +23,7 @@
    - der Einrichtungscode
    - das **App-Passwort** (mind. 10 Zeichen, nur als scrypt-Hash gespeichert)
    - welche Xenia und ihre Adresse, mit Verbindungstest. **Neue Xenia** ist Brew-by-Sync (aktuelle Firmware). **Alte Xenia** ist die DBL mit der älteren offiziellen API (`machine.api` = `classic`). Passt die Wahl nicht, sagt der Test das („Die Maschine antwortet wie die alte API – oben Alte Xenia wählen.“ oder umgekehrt). Bei der alten API gibt es kein Paddle, keinen Wochenplan der Maschine und kein „Uhr stellen“; Xenios blendet das aus und zählt die Bezugszeit selbst. Ein, Aus, Eco, Dampf, Temperatur und die Skriptliste bleiben. Dieselbe Umschaltung hat die Android-App im Direkt-Modus.
-   - optional Adresse und **Owner-Passwort der Mühle**, mit Test der Anmeldung (verschlüsselt in `config.json`). Ohne Mühle bleiben Mühlen-Navigation, Kacheln und Grind-by-Sync aus; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Grind-by-Sync gibt es nur mit Mühle und neuer Xenia.
+   - optional Adresse und **Owner-Passwort der Mühle**, mit Test der Anmeldung (verschlüsselt in `config.json`). Ohne Mühle bleiben Mühlen-Navigation, Kacheln und Grind-by-Sync aus; Dosis und Mahlgrad trägt man beim Bezug selbst ein. Grind-by-Sync braucht die Mühle; mit der alten Xenia zusätzlich eine Bluetooth-Waage an der Maschine (siehe Abschnitt 6).
 
    Ohne Browser geht es auch im Terminal: `npm run setup`.
 5. **Autostart** (als Administrator in PowerShell):
@@ -129,7 +129,7 @@ Alles lässt sich in der App unter **Einstellungen → Server & Sicherheit** än
 
 ## 6. Grind-by-Sync mit Druckprofilen (optional)
 
-Grind-by-Sync setzt eine eingebundene Mühle und die **neue** Xenia voraus. Bei alter API oder ohne Mühle zeigt die App den Vermittler nicht.
+Grind-by-Sync setzt eine eingebundene Mühle voraus. Mit der **neuen** Xenia vermittelt Xenios nur; mit der **alten** Xenia (DBL) übernimmt Xenios die Rolle der neuen Xenia (siehe [Alte Xenia (DBL)](#alte-xenia-dbl)). Ohne Mühle zeigt die App den Vermittler nicht.
 
 Normal startet der Drehknopf der E64 WS nach einem GbS-Mahlvorgang das fest eingebaute Skript 9 der Xenia. Mit dem Vermittler startet er stattdessen ein Druckprofil aus der App, und die Mühle lernt trotzdem weiter.
 
@@ -145,5 +145,20 @@ Normal startet der Drehknopf der E64 WS nach einem GbS-Mahlvorgang das fest eing
 **Ohne Docker:** Port 80 braucht unter Linux Rechte: `sudo setcap cap_net_bind_service=+ep "$(readlink -f "$(which node)")"`. Unter Windows die Firewall-Freigabe für Port 80 erlauben. Heimnetz-HTTP muss dann auf einem anderen Port als 80 laufen.
 
 **Mit Docker:** In `docker/compose.yaml` die Zeile `- "80:8082"` aktivieren und `docker compose up -d`. Xenios muss die echte IP der Mühle sehen. Beim normalen Docker unter Linux ist das so, bei rootless Docker und Docker Desktop oft nicht. Wird die Mühle abgewiesen, steht die gesehene IP im Log und unter *Skripte → Grind-by-Sync*.
+
+### Alte Xenia (DBL)
+
+Die DBL kennt die Grind-by-Sync-Schnittstelle nicht (kein `/api/v2/mako`, kein Skript 9, kein Stopp am Gewicht). Xenios beantwortet die Abfragen der Mühle deshalb selbst und gibt sich als neue Xenia aus: Typ und Seriennummer kommen von der DBL, Status, Temperatur und Tank aus ihren Live-Daten, die Firmware-Nummer ist die der neuen Xenia (4.226). Ablauf:
+
+1. Mahlen über ein GbS-Rezept: Die Mühle meldet das Zielgewicht (`brewratio`), Xenios merkt es sich.
+2. Drehknopf: Xenios startet an der DBL „Espresso endlos“ (Skript 2) oder das unter **Skripte → Grind-by-Sync** gewählte Skript, unverändert.
+3. Xenios liest das Gewicht der **Bluetooth-Waage an der Xenia** (z. B. Bookoo, gekoppelt über die Original-Oberfläche der Maschine) und stoppt den Bezug 1 s Durchfluss vor dem Zielgewicht (`scripts/stop`, sonst `paddle/stop`).
+4. Danach meldet die „Xenia“ 6 s lang Status 4 mit der Bezugszeit. Daraus lernt die Mühle wie bei der neuen Xenia.
+
+Voraussetzungen und Grenzen:
+- Die Waage muss an der DBL verbunden sein (Anzeige „Waage verbunden“). Ist sie getrennt, startet der Drehknopf nichts; der Grund steht unter **Skripte → Grind-by-Sync**.
+- Tasse vor dem Drehknopf auf die Waage stellen. Ob die Waage tariert, ist egal: Xenios zählt ab dem niedrigsten Wert.
+- Sicherheitsgrenzen: kommt nach 15 s kein Gewicht, stoppt Xenios und meldet der Mühle einen Abbruch; nach 75 s ebenso. Fällt der Server mitten im Bezug aus, beendet ihn die DBL nach ihrer **Max. Bezugszeit** (Maschinen-Einstellungen → Pumpe).
+- Ungetestet an echter Hardware (Stand der Umsetzung): ob die Mühle die DBL-Seriennummer annimmt, ob die DBL Skript 2 über `scripts/execute` startet und ob sie den Wassertank meldet. Meldet die Mühle „tank is empty“ oder startet nichts, steht der Grund im Server-Log (`gbs`).
 
 **Zurück:** In der Mühle wieder die IP der Xenia eintragen. Läuft Xenios nicht, findet die Mühle keine Xenia und Grind-by-Sync geht nicht.

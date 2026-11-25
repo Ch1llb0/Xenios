@@ -5,9 +5,11 @@
 // Eigene Umsetzung nach der Protokollbeschreibung in docs/API-Xenia.md (Abschnitt 14).
 import path from 'node:path';
 import net from 'node:net';
+// Alte Xenia (DBL): Xenios beantwortet die Abfragen der Mühle selbst und stoppt am Gewicht (gbs-dbl.js).
 import { buildScript, httpError } from './machine.js';
 import { JsonStore } from './store.js';
 import { logger } from './log.js';
+import { DblBrew, DBL_DEFAULT_SCRIPT } from './gbs-dbl.js';
 
 const log = logger('gbs');
 
@@ -61,6 +63,12 @@ export class GbsProxy {
     this.state = { lastContact: null, lastStart: null, lastError: null, refused: null };
     this._chain = Promise.resolve();
     this._unknown = new Set();
+    this.dbl = new DblBrew(machine);
+  }
+
+  // Alte Xenia: Xenios spielt der Mühle die neue Xenia vor, statt durchzureichen
+  get emulating() {
+    return this.machine.apiId === 'classic';
   }
 
   // Erlaubte IP: fest eingetragen oder aus der Adresse der Mühle (nur wenn dort eine IP steht)
@@ -132,6 +140,7 @@ export class GbsProxy {
       enabled: Boolean(this.cfg.gbs.enabled), port: this.cfg.gbs.port, grinderIp: this.grinderIp(),
       scriptId: d.scriptId, extend: d.extend !== false, helperId: d.helper?.id ?? null, helperName: HELPER_NAME,
       lastGrind: d.lastGrind, ...this.state,
+      ...(this.emulating ? { mode: 'dbl', defaultScriptId: DBL_DEFAULT_SCRIPT, dbl: this.dbl.view() } : { mode: 'proxy' }),
     };
   }
 
@@ -141,7 +150,8 @@ export class GbsProxy {
       if (scriptId !== null) {
         const n = Number(scriptId);
         if (!Number.isInteger(n) || n < 10 || n > 199) throw httpError(400, 'Profil: eigenes Skript (ID 10–199) oder keins');
-        if (!this.cfg.features.scriptEditor) throw httpError(403, 'Skript-Editor ist deaktiviert (das Profil wird als Skript auf der Maschine angelegt)');
+        // Alte Xenia: das Skript läuft unverändert, Xenios schreibt nichts auf die Maschine
+        if (!this.emulating && !this.cfg.features.scriptEditor) throw httpError(403, 'Skript-Editor ist deaktiviert (das Profil wird als Skript auf der Maschine angelegt)');
         if (n === d.helper?.id) throw httpError(400, 'Das Hilfsskript selbst kann nicht gewählt werden');
         scriptId = n;
       }
@@ -153,8 +163,17 @@ export class GbsProxy {
     }
     this.state.lastError = null;
     this.store.save();
-    if (d.scriptId && d.lastGrind) this.prepare();
+    if (d.scriptId && d.lastGrind && !this.emulating) this.prepare();
     return this.view();
+  }
+
+  // Mahlergebnis der Mühle (brewratio) merken: Zielgewicht für den nächsten Drehknopf
+  _noteGrind(text) {
+    const j = parseBody(text);
+    const weight = Number(j.SYNC_BEVERAGE_WEIGHT);
+    this.store.data.lastGrind = { weight: Number.isFinite(weight) ? weight : null, filter: j.SYNC_FILTER ?? null, at: new Date().toISOString() };
+    this.store.save();
+    log.info(`Mühle meldet Mahlvorgang: Ziel ${Number.isFinite(weight) ? `${weight} g` : 'unbekannt'}`);
   }
 
   // --- Anfragen der Mühle ---
@@ -188,13 +207,10 @@ export class GbsProxy {
     }
     const type = req.headers['content-type'];
     try {
+      if (this.emulating) return await this._emulate(key, p, text, type, send);
       if (key === 'POST /api/v2/brewratio') {
         const r = await this.machine.client.raw('POST', p, text, type);
-        const j = parseBody(text);
-        const weight = Number(j.SYNC_BEVERAGE_WEIGHT);
-        this.store.data.lastGrind = { weight: Number.isFinite(weight) ? weight : null, filter: j.SYNC_FILTER ?? null, at: new Date().toISOString() };
-        this.store.save();
-        log.info(`Mühle meldet Mahlvorgang: Ziel ${Number.isFinite(weight) ? `${weight} g` : 'unbekannt'}`);
+        this._noteGrind(text);
         if (this.store.data.scriptId) this.prepare();
         return send(r.status, r.type, r.body);
       }
@@ -231,6 +247,50 @@ export class GbsProxy {
     this.state.lastStart = { at: new Date().toISOString(), swapped: Boolean(plan), title: plan?.title ?? null, weight: plan ? Math.round(plan.weight) : null, ok };
     log.info(plan ? `Drehknopf: „${plan.title}“ bis ${Math.round(plan.weight)} g gestartet (Skript ${plan.id})` : 'Drehknopf: Original-Skript 9 gestartet');
     return send(r.status, r.type, r.body);
+  }
+
+  // Alte Xenia: Abfragen der Mühle selbst beantworten (nur die, die sie braucht); den Rest wie bisher durchreichen
+  async _emulate(key, p, text, type, send) {
+    if (!this.machine.state.online) return send(502, null, '{}');
+    switch (key) {
+      case 'GET /api/v2/machine': return send(200, null, JSON.stringify(await this.dbl.identity()));
+      case 'GET /api/v2/mako': return send(200, null, JSON.stringify(this.dbl.mako()));
+      case 'GET /api/v2/status': return send(200, null, JSON.stringify({ MA_STATUS: this.dbl.mako().MA_STATUS }));
+      case 'POST /api/v2/brewratio':
+        this._noteGrind(text);
+        return send(200, 'text/plain', '');
+      case 'POST /api/v2/scripts/execute': return this._startDbl(text, send);
+      default: {
+        const r = await this.machine.client.raw(key.split(' ')[0], p, key.startsWith('GET') ? undefined : text, type);
+        return send(r.status, r.type, r.body);
+      }
+    }
+  }
+
+  async _startDbl(text, send) {
+    const id = Number(parseBody(text).ID);
+    if (id !== 9) {
+      log.warn(`Mühle wollte Skript ${parseBody(text).ID} starten – nur Skript 9 (Drehknopf) wird angenommen`);
+      return send(403, null, '{}');
+    }
+    const { scriptId, lastGrind } = this.store.data;
+    const run = scriptId ?? DBL_DEFAULT_SCRIPT;
+    const title = scriptId
+      ? (await this.machine.scripts().catch(() => [])).find((s) => s.id === scriptId)?.title ?? `Skript ${scriptId}`
+      : this.machine.builtinScripts()[DBL_DEFAULT_SCRIPT] ?? `Skript ${DBL_DEFAULT_SCRIPT}`;
+    const weight = Number(lastGrind?.weight);
+    try {
+      const r = await this.dbl.start({ scriptId: run, weight, title });
+      if (r.repeat) return send(200, 'text/plain', '');
+      this.state.lastError = null;
+      this.state.lastStart = { at: new Date().toISOString(), swapped: true, title, weight: Math.round(weight * 10) / 10, ok: true };
+      return send(200, 'text/plain', '');
+    } catch (e) {
+      this.state.lastError = e.message;
+      this.state.lastStart = { at: new Date().toISOString(), swapped: true, title, weight: Number.isFinite(weight) ? Math.round(weight * 10) / 10 : null, ok: false };
+      log.warn(`Drehknopf: Bezug an der DBL nicht gestartet: ${e.message}`);
+      return send(e.status && e.status < 500 ? e.status : 502, null, '{}');
+    }
   }
 }
 

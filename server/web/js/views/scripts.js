@@ -1,6 +1,6 @@
 // Skripte: Liste, Start/Stopp, Editor, Export/Import.
 import { h, icon, fmt, snackbar, sheet, confirmDialog, fullscreen, sliderRow, switchEl, ago } from '../ui.js';
-import { api, store, subscribe, machineOn, scriptActive, directMode, hasGrinder, isClassic } from '../api.js';
+import { api, store, subscribe, machineOn, scriptActive, directMode, hasGrinder } from '../api.js';
 import { navigate } from '../app.js';
 import { shotChart } from '../gauge.js';
 import { targetCurve, profileSteps } from '../../shared/shot-analysis.js';
@@ -65,45 +65,55 @@ function listTab(root) {
     listEl,
   );
 
-  // Grind-by-Sync: welches Profil der Drehknopf der Mühle startet (nur mit Server)
+  // Grind-by-Sync: welches Profil der Drehknopf der Mühle startet (nur mit Server). Alte Xenia (DBL): Xenios spielt
+  // der Mühle die neue Xenia vor und stoppt den Bezug selbst am Gewicht der Bluetooth-Waage.
+  const STOPPED = { weight: 'am Gewicht gestoppt', machine: 'von der Maschine beendet', noweight: 'abgebrochen: kein Gewicht von der Waage', max: 'abgebrochen: zu lang', nostart: 'nicht angelaufen' };
   function paintGbs() {
-    if (!hasGrinder() || isClassic()) return gbsBox.replaceChildren();
-    if (!gbs) return gbsBox.replaceChildren();
+    if (!hasGrinder() || !gbs) return gbsBox.replaceChildren();
+    const dbl = gbs.mode === 'dbl';
     if (!gbs.enabled) {
       return gbsBox.replaceChildren(h('div', { class: 'section-title' }, 'Grind-by-Sync'),
         h('div', { class: 'card gbs-card' }, h('div', { class: 'row' },
-          h('div', { class: 'grow small muted' }, 'Druckprofile auch beim Start über den Drehknopf der Mühle: dafür den Vermittler in den Server-Einstellungen einschalten.'),
+          h('div', { class: 'grow small muted' }, dbl
+            ? 'Grind-by-Sync mit der alten Xenia: Xenios stoppt den Bezug am Gewicht der Bluetooth-Waage. Dafür den Vermittler in den Server-Einstellungen einschalten.'
+            : 'Druckprofile auch beim Start über den Drehknopf der Mühle: dafür den Vermittler in den Server-Einstellungen einschalten.'),
           h('button', { class: 'btn tonal', onclick: () => navigate('/server') }, 'Einrichten'))));
     }
+    const editable = dbl || features.scriptEditor;
     const choices = data.scripts.filter((s) => (s.type === 'standard' || s.type === 'pressure') && s.title !== gbs.helperName);
-    const sel = h('select', { class: 'text', 'aria-label': 'Profil für den Drehknopf', disabled: !features.scriptEditor },
-      h('option', { value: '', selected: !gbs.scriptId }, 'Original der Xenia (Skript 9)'),
+    const sel = h('select', { class: 'text', 'aria-label': 'Profil für den Drehknopf', disabled: !editable },
+      h('option', { value: '', selected: !gbs.scriptId }, dbl ? `${data.builtin?.[gbs.defaultScriptId] || 'Espresso endlos'} (Skript ${gbs.defaultScriptId})` : 'Original der Xenia (Skript 9)'),
       choices.map((s) => h('option', { value: String(s.id), selected: s.id === gbs.scriptId }, `${s.title} (ID ${s.id})`)),
       gbs.scriptId && !choices.some((s) => s.id === gbs.scriptId) ? h('option', { value: String(gbs.scriptId), selected: true }, `Skript ${gbs.scriptId}${data.scripts.length ? ' (nicht mehr da)' : ''}`) : null);
     sel.addEventListener('change', () => saveGbs({ scriptId: sel.value ? Number(sel.value) : null }));
     const g = gbs.lastGrind;
     const st = gbs.lastStart;
+    const last = gbs.dbl?.last;
     const lines = [
       gbs.lastContact ? `Mühle zuletzt: ${ago(gbs.lastContact)}` : 'Die Mühle hat sich noch nicht gemeldet (Host in der Mühle umgestellt?)',
       g ? `Letztes Rezept: ${g.weight ? `${fmt(g.weight)} g` : 'Zielgewicht unbekannt'} · ${ago(g.at)}` : 'Noch kein Mahlvorgang über Grind-by-Sync',
-      st ? `Letzter Start: ${st.swapped ? `${st.title} bis ${st.weight} g` : 'Original-Skript 9'}${st.ok ? '' : ' (von der Xenia abgelehnt)'} · ${ago(st.at)}` : null,
+      st ? `Letzter Start: ${st.swapped ? `${st.title} bis ${st.weight != null ? fmt(st.weight, st.weight % 1 ? 1 : 0) : '?'} g` : 'Original-Skript 9'}${st.ok ? '' : ' (abgelehnt)'} · ${ago(st.at)}` : null,
+      last ? `Letzter Bezug: ${fmt(last.timeMs / 1000)} s · ${last.weightG !== null ? `${fmt(last.weightG)} g von ${fmt(last.target, 0)} g` : 'ohne Gewicht'} · ${STOPPED[last.stoppedBy] || last.stoppedBy}` : null,
     ].filter(Boolean);
+    const scaleOff = dbl && store.machine?.scaleLink?.connected === false;
     gbsBox.replaceChildren(h('div', { class: 'section-title' }, 'Grind-by-Sync'),
       h('div', { class: 'card gbs-card' },
+        dbl ? h('p', { class: 'small muted' }, `Alte Xenia: Xenios gibt sich der Mühle gegenüber als neue Xenia aus, startet den Bezug an der DBL und stoppt ihn am Gewicht der Bluetooth-Waage (${fmt(gbs.dbl?.leadS ?? 1)} s Durchfluss vor dem Ziel). Tasse vor dem Drehknopf auf die Waage stellen.`) : null,
         h('label', { class: 'field' }, h('span', {}, 'Profil für den Drehknopf der Mühle'), sel),
-        h('div', { class: 'row toggle-row' },
+        dbl ? null : h('div', { class: 'row toggle-row' },
           h('div', { class: 'grow' }, h('div', {}, 'Bis zum Zielgewicht laufen lassen'),
             h('div', { class: 'small muted' }, 'Hält den letzten Druck bis zu 30 s länger, damit der Bezug am Gewicht endet. Sonst wäre die Bezugszeit immer gleich und die Mühle lernt nichts.')),
           switchEl({ checked: gbs.extend, disabled: !features.scriptEditor, label: 'Bis zum Zielgewicht laufen lassen', onChange: (on) => saveGbs({ extend: on }) })),
         h('div', { class: 'small muted gbs-status' }, lines.map((l) => h('div', {}, l))),
-        gbs.lastError ? h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, `${gbs.lastError} – die Mühle startet dann das Original-Skript 9.`)) : null,
+        scaleOff && !gbs.lastError ? h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, 'Bluetooth-Waage an der Xenia nicht verbunden – der Drehknopf startet dann keinen Bezug.')) : null,
+        gbs.lastError ? h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, `${gbs.lastError} – ${dbl ? 'der Bezug wurde nicht gestartet.' : 'die Mühle startet dann das Original-Skript 9.'}`)) : null,
         gbs.refused && !gbs.lastContact ? h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, `Verbindung von ${gbs.refused.ip} abgewiesen – stimmt die IP der Mühle (${gbs.grinderIp || 'fehlt'})?`)) : null,
-        features.scriptEditor ? null : h('p', { class: 'small muted' }, 'Der Skript-Editor ist aus: Xenios legt das Profil als Skript „Xenios GbS“ auf der Maschine an und braucht ihn dafür.')));
+        editable ? null : h('p', { class: 'small muted' }, 'Der Skript-Editor ist aus: Xenios legt das Profil als Skript „Xenios GbS“ auf der Maschine an und braucht ihn dafür.')));
   }
   async function saveGbs(change) {
     try {
       gbs = await api('/api/gbs', { method: 'PUT', body: change });
-      snackbar(change.scriptId === null ? 'Drehknopf startet wieder das Original' : 'Gespeichert');
+      snackbar(change.scriptId === null ? (gbs.mode === 'dbl' ? 'Drehknopf startet wieder die Vorgabe' : 'Drehknopf startet wieder das Original') : 'Gespeichert');
     } catch (e) {
       snackbar(e.message);
     }
@@ -163,7 +173,7 @@ function listTab(root) {
   }
 
   async function load() {
-    if (!directMode && hasGrinder() && !isClassic()) gbs = await api('/api/gbs').catch(() => null);
+    if (!directMode && hasGrinder()) gbs = await api('/api/gbs').catch(() => null);
     try {
       data = await api('/api/machine/scripts');
       paint();

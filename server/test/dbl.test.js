@@ -167,3 +167,31 @@ test('DBL: Bezugsgewicht speichern sendet alle sechs Belegungen mit und meldet, 
   assert.equal(typeof r.applied, 'boolean');
   for (const k of Object.keys(before)) if (k.startsWith('SWITCH_SET_')) assert.equal(xenia.state.switches[k], before[k], `${k} unverändert`);
 });
+
+test('Falsches Modell eingestellt: wird erkannt und gemeldet, nach dem Umstellen nicht mehr', async () => {
+  // DBL, aber „Neue Xenia“ eingestellt
+  const wrong = new Machine({ machine: { ...DEFAULTS.machine, url: m.cfg.url, api: 'bbs' }, features: DEFAULTS.features }, { history: new MemoryStore({ shots: [] }) });
+  wrong._stopped = true;
+  await wrong.refreshSlow();
+  assert.deepEqual(wrong.state.apiMismatch, { configured: 'bbs', detected: 'classic' });
+  wrong.cfg.api = 'classic';
+  wrong.state.info = null; // wie nach einer Änderung in den Server-Einstellungen
+  await wrong.refreshSlow();
+  assert.equal(wrong.state.apiMismatch, null);
+  // richtig eingestellte DBL: kein Hinweis
+  await m.refreshSlow();
+  assert.equal(m.state.apiMismatch, null);
+
+  // neue Xenia, aber „Alte Xenia“ eingestellt
+  const bbs = createMockXenia();
+  const port = await listen(bbs.server);
+  const old = new Machine({ machine: { ...DEFAULTS.machine, url: `http://127.0.0.1:${port}`, api: 'classic' }, features: DEFAULTS.features }, { history: new MemoryStore({ shots: [] }) });
+  old._stopped = true;
+  try {
+    await old.refreshSlow();
+    assert.deepEqual(old.state.apiMismatch, { configured: 'classic', detected: 'bbs' });
+  } finally {
+    bbs.server.close();
+    bbs.stop();
+  }
+});

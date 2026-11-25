@@ -127,7 +127,12 @@ test('Server-Einstellungen: lesen, ändern, sofort wirksam; Prüfungen', async (
   assert.equal(readConfigFile(cfgFile).features.paddle, false);
   r = await call('GET', '/api/machine/paddle');
   assert.equal(r.status, 403);
-  for (const changes of [{ 'nope.key': 1 }, { 'machine.url': 'ftp://1.2.3.4' }, { 'http.port': 70000 }, { 'http.enabled': false, 'https.enabled': false }, { 'https.port': 8080 }, { timezone: 'Mars/Olympus' }]) {
+  // Aussehen der Xenia (Frontansicht unter „Schalter“): kommt mit dem Server-Zustand zur App
+  r = await call('PUT', '/api/admin/config', { changes: { 'machine.look.color': '#9E1F24', 'machine.look.steamSide': 'right', 'machine.look.editButton': false } });
+  assert.equal(r.status, 200);
+  assert.deepEqual((await call('GET', '/api/state')).json.server.machine.look, { color: '#9e1f24', steamSide: 'right', editButton: false });
+  for (const changes of [{ 'nope.key': 1 }, { 'machine.url': 'ftp://1.2.3.4' }, { 'http.port': 70000 }, { 'http.enabled': false, 'https.enabled': false }, { 'https.port': 8080 }, { timezone: 'Mars/Olympus' },
+    { 'machine.look.color': 'red' }, { 'machine.look.steamSide': 'oben' }]) {
     r = await call('PUT', '/api/admin/config', { changes });
     assert.equal(r.status, 400, JSON.stringify(changes));
   }
