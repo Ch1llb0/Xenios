@@ -649,6 +649,18 @@ if ('serviceWorker' in navigator && !directMode) {
   });
 }
 
+// Android-App: einmal je neuer Version auf ein App-Update hinweisen (die App prüft höchstens einmal am Tag von selbst)
+function announceAppUpdate() {
+  if (!window.__authed) return;
+  let s;
+  try { s = JSON.parse(window.XeniaApp.appUpdate()); } catch { return; }
+  if (!s.available || s.phase || s.latestBuild === s.announced) return;
+  try { window.XeniaApp.appUpdateSeen(s.latestBuild); } catch { /* egal */ }
+  snackbar(`App-Update ${s.latest} verfügbar`, { action: 'Ansehen', onAction: () => navigate('/einstellungen'), duration: 10000 });
+}
+const appUpdates = typeof window.XeniaApp?.appUpdate === 'function';
+if (appUpdates) window.addEventListener('xenios-app-update', announceAppUpdate);
+
 // --- Start ------------------------------------------------------------------------
 (async () => {
   try {
@@ -659,7 +671,7 @@ if ('serviceWorker' in navigator && !directMode) {
     // Notbetrieb der Android-App: Server weg, die App spricht die Maschine direkt an
     if (window.XeniaApp?.fallback?.()) {
       snackbar('Server nicht erreichbar – direkt mit der Maschine verbunden', { action: 'Server', onAction: () => window.XeniaApp.retryServer(), duration: 10000 });
-    }
+    } else if (appUpdates) announceAppUpdate();
   } catch {
     // Offline: App-Hülle zeigen, Verbindung wird erneut versucht
     showLogin({ offline: true });

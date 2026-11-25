@@ -59,6 +59,36 @@ Ohne Server entfallen Push-Benachrichtigungen, die weiteren Schaltzeiten, das Ei
 3. Bei beiden Geräten dort „Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“ anhaken.
 4. Prüfen: `http://<IP>/` zeigt die Xenia-Oberfläche. Für die Mühle `https://<IP>/` öffnen und die Zertifikatswarnung bestätigen.
 
+## App-Update
+
+*Einstellungen → App auf diesem Gerät → App-Update* zeigt die installierte Version (z. B. `2.4.0 (380)`) und, falls es eine gibt, die neue. Der Knopf heißt dann **Installieren**, sonst **Prüfen**. Apps ohne diese Funktion zeigen den Eintrag nicht; die erste Version mit App-Update einmal von Hand installieren (siehe [Installieren](#installieren)).
+
+**Im Server-Modus** kommt die Oberfläche vom Server und ist mit jedem Server-Update aktuell, auch ohne neue APK. Ein App-Update braucht es nur für die nativen Teile: Widgets, Schnelleinstellungs-Kachel, Wecker-Meldung, Shortcuts, Notbetrieb und den Direkt-Modus (dort steckt die ganze Oberfläche in der APK).
+
+**Ablauf**
+1. **Prüfen:** Beim Öffnen der App höchstens einmal am Tag, dazu jederzeit über „Prüfen“. Die App fragt `https://api.github.com/repos/TimS1998/Xenios/releases/latest` ab, sucht das Asset `Xenios-<Build>.apk` und vergleicht `<Build>` mit der eigenen Build-Nummer (`versionCode`, die Zahl der Commits). Mitgeschickt wird nur die Build-Nummer im User-Agent. Offline oder bei gebremstem Zugriff (GitHub erlaubt ohne Anmeldung 60 Anfragen pro Stunde) passiert beim automatischen Prüfen nichts, der nächste Versuch kommt frühestens nach einer Stunde. Auf Knopfdruck steht der Grund im Eintrag.
+2. **Hinweis:** Gibt es eine neue Version, erscheint einmal ein Hinweis unten in der App („App-Update … verfügbar“, „Ansehen“ öffnet die Einstellungen). Eine Android-Benachrichtigung gibt es nicht.
+3. **Laden:** „Installieren“ lädt die APK in den Cache der App. Geladen wird nur ein Asset aus einem Release dieses Repos (`https://github.com/TimS1998/Xenios/releases/download/…`). Größe und SHA-256 müssen zu den Angaben von GitHub passen. Danach prüft die App Paketname, Build-Nummer und Signaturschlüssel der APK.
+4. **Installieren:** über den `PackageInstaller` von Android (Session). Android beendet die App dabei und ersetzt sie. Danach die App wieder öffnen; Anmeldung, Einstellungen und Widgets bleiben.
+
+Die Adresse des Repos steht fest in [`AppUpdate.kt`](../app/app/src/main/java/app/xeniabridge/AppUpdate.kt). Ein Fork mit eigenen Releases muss sie dort ändern.
+
+**Einmal nötig: „Unbekannte Apps installieren“ für Xenios.** Fehlt die Erlaubnis, öffnet „Installieren“ die passende Android-Einstellung (meist *Apps → Spezieller App-Zugriff → Unbekannte Apps installieren*). Wer sie erlaubt und innerhalb von 10 Minuten zur App zurückkehrt, muss nicht noch einmal tippen: Das Update läuft dann von selbst weiter.
+
+**Ohne Rückfrage oder mit Dialog?** Ab Android 12 bittet die App darum, das Update ohne Rückfrage zu installieren (`setRequireUserAction(USER_ACTION_NOT_REQUIRED)` mit der Berechtigung `UPDATE_PACKAGES_WITHOUT_USER_ACTION`, die Android ohne Abfrage erteilt). Laut [Android-Dokumentation](https://developer.android.com/reference/android/content/pm/PackageInstaller.SessionParams#setRequireUserAction(int)) gelingt das nur, wenn alles zutrifft:
+- „Unbekannte Apps installieren“ ist für Xenios erlaubt.
+- Es ist ein Update, und der Installer ist der bisherige Installer der App, ihr „Update-Owner“ oder die App selbst. Xenios aktualisiert sich selbst; dieser Fall steht ausdrücklich in der Liste. Ob die erste Installation über den Browser oder einen Dateimanager lief, spielt deshalb keine Rolle.
+- Die neue APK zielt auf eine ausreichend neue Android-Version (`targetSdk`). Android 16 verlangt mindestens 34, die Version danach 35; Xenios hat 36. Hebt Android die Grenze weiter an, kommt wieder der Dialog, bis die App nachzieht.
+
+Sonst zeigt Android den üblichen Bestätigungsdialog, und die App öffnet ihn selbst. Das ist der Fall:
+- unter **Android 11**: Die Installation ohne Rückfrage gibt es dort noch nicht, also immer mit Dialog.
+- wenn ein **App-Store** die App installiert und dabei die Update-Zuständigkeit für sich beansprucht hat (Android 14+). Dann fragt Android bei Updates aus anderer Quelle nach.
+- bei der **Entwickler-Verifizierung** von Android für Apps außerhalb des Play Store: Ist sie nicht erreichbar oder schlägt sie fehl, fragt Android nach oder bricht die Installation ab. Für die Installation von Hand gilt dasselbe.
+
+Ist die App beim Dialog nicht im Vordergrund, erscheint er beim nächsten Öffnen. Bricht man ihn ab, bleibt die geladene APK im Cache und „Installieren“ startet ohne neuen Download.
+
+**Was Android immer verlangt:** Das Update muss mit **demselben Schlüssel** signiert sein wie die installierte App (siehe [APK bauen](#apk-bauen)). Eine Release-App lässt sich deshalb nicht per Knopf durch eine APK mit Debug-Schlüssel ersetzen und umgekehrt; die App meldet das vor der Installation. Ein älteres Build installiert Android nie über ein neueres.
+
 ## Noch nicht enthalten
 - **Push-Benachrichtigungen** in der App. Die Web-App nutzt Web-Push, das in einer WebView nicht verfügbar ist. Native Push bräuchte Firebase Cloud Messaging. Bis dahin: Benachrichtigungen über die Web-App in Chrome.
 
@@ -97,6 +127,8 @@ Ordner `app/` in Android Studio öffnen und *Run* drücken. Für eine Release-AP
    - **Mit Server:** Adresse und App-Passwort. Die Oberfläche kommt vom Server. Nach einem Server-Update reicht die vorhandene App, siehe [Linux, Aktualisieren](Installation-Linux-Docker.md#8-aktualisieren-und-sichern).
    - **Direkt im Heimnetz:** **Neue Xenia** oder **Alte Xenia**, dazu die IP der Maschine und optional die Mühle. Diese Wahl und die Oberfläche dafür liegen in der APK. Ab Release 2.2.0 ist die alte Xenia im Direkt-Modus enthalten.
 4. Widgets: Startbildschirm lange drücken → *Widgets* → *Xenios*. Kachel: Schnelleinstellungen bearbeiten → *Xenios* hineinziehen.
+
+Spätere Versionen kommen über *Einstellungen → App-Update*, ohne Herunterladen von Hand (siehe [App-Update](#app-update)).
 
 ## Test mit der Simulation
 ```bash

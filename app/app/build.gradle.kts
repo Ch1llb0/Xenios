@@ -49,6 +49,11 @@ android {
         }
     }
 
+    // BuildConfig.VERSION_CODE (Build-Nummer) und VERSION_NAME: Vergleich mit dem Release beim App-Update
+    buildFeatures {
+        buildConfig = true
+    }
+
     lint {
         // Bericht ja, aber die APK trotzdem bauen
         abortOnError = false

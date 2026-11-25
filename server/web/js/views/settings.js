@@ -29,6 +29,7 @@ export function settingsView(root) {
       listButton('palette', 'Darstellung', 'Design, Hell/Dunkel, Farben, Manometer', go('/einstellungen/darstellung')),
       listButton('toggle', 'Leiste & Ansicht', 'Tabs der Leiste, Mühle, Waage und Pflege ausblenden', go('/einstellungen/ansicht')),
       widgetAlarmButton(unsubs),
+      appUpdateItem(unsubs),
       direct && android ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null),
     ...group('Kaffeemaschine',
       listButton('settings', 'Maschine', 'Temperaturen, Dampf, Pumpe, Waage, Wi-Fi, Firmware', go('/einstellungen/maschine')),
@@ -84,6 +85,39 @@ function widgetAlarmButton(unsubs) {
     h('span', { class: 'lead' }, icon('timer')),
     h('span', { class: 'grow' }, h('div', { class: 'title' }, 'Widgets'), sub),
     icon('right', 's20 muted'));
+}
+
+// Android-App: neue APK aus dem GitHub-Release laden und installieren. Ältere Apps ohne diese Brückenfunktion: kein Eintrag.
+function appUpdateItem(unsubs) {
+  if (!inAndroidApp() || typeof window.XeniaApp?.appUpdate !== 'function') return null;
+  const sub = h('div', { class: 'sub' });
+  const btn = h('button', { type: 'button', class: 'btn tonal' });
+  const item = h('div', { class: 'list-item' },
+    h('span', { class: 'lead' }, icon('download')),
+    h('span', { class: 'grow' }, h('div', { class: 'title' }, 'App-Update'), sub),
+    btn);
+  const paint = () => {
+    let s;
+    try { s = JSON.parse(window.XeniaApp.appUpdate()); } catch { item.hidden = true; return; }
+    const lines = s.phase === 'checking' ? ['Sucht nach einer neuen Version …']
+      : s.phase === 'downloading' ? [`Lädt ${s.latest} … ${s.progress} %`]
+      : s.phase === 'installing' ? ['Wird installiert. Xenios schließt sich dabei und ist danach aktualisiert.']
+      : [
+        `Installiert: ${s.installed}` + (s.available ? ` · neu: ${s.latest}` : s.checkedAt ? ' · aktuell' : ''),
+        s.error || (s.available && !s.allowed ? 'Einmal „Unbekannte Apps installieren“ für Xenios erlauben' : null),
+        !s.error && !s.available && s.checkedAt ? `Geprüft ${ago(new Date(s.checkedAt).toISOString())}` : null,
+      ];
+    sub.replaceChildren(...lines.filter(Boolean).flatMap((t, i) => (i ? [h('br'), t] : [t])));
+    btn.disabled = Boolean(s.phase);
+    btn.textContent = s.available ? 'Installieren' : 'Prüfen';
+    btn.onclick = () => {
+      try { if (s.available) window.XeniaApp.installAppUpdate(); else window.XeniaApp.checkAppUpdate(); } catch { /* ältere App */ }
+    };
+  };
+  paint();
+  window.addEventListener('xenios-app-update', paint);
+  unsubs.push(() => window.removeEventListener('xenios-app-update', paint));
+  return item;
 }
 
 // --- Maschinen-Einstellungen: Kategorien wie die Seite der Maschine, eingeklappt ------------------------------
