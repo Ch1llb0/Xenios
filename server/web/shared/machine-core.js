@@ -2,7 +2,7 @@
 // Läuft im Server (Node) und in der Android-App im Direkt-Modus (Browser): Speicher, Logger und fetch werden übergeben.
 import { Emitter, MemoryStore } from './emitter.js';
 import { logger } from './log.js';
-import { dialIn, STRENGTH } from './shot-analysis.js';
+import { dialIn, STRENGTH, shotPhases, taredCurve, curveYield } from './shot-analysis.js';
 import { MACHINE_API, CLASSIC_SETTING_FIELDS, machineApiId, normalizeLive } from './machine-api.js';
 
 export { MACHINE_API, CLASSIC_SETTING_FIELDS, machineApiId } from './machine-api.js';
@@ -23,6 +23,10 @@ export const MA_TYPE = {
   0: 'Undefiniert', 1: 'Xenia 2K', 2: 'Xenia Dual Boiler', 3: 'Xenia Brew-by-Sync', 4: 'Xenia 303', 5: 'Xenia 2K + L',
 };
 
+// MA_TYPE aus /api/v2/machine bei der alten Firmware (so benennt die Startseite der Original-Oberfläche
+// die Modelle; an einer „Xenia DB + L“ mit Firmware 4.159 geprüft: MA_TYPE 3)
+export const CLASSIC_TYPE = { 1: 'Xenia 2K', 2: 'Xenia Dual Boiler', 3: 'Xenia Dual Boiler + L', 4: 'Xenia 303', 5: 'Xenia 2K + L' };
+
 // Grenzen wie in der offiziellen Web-Oberfläche (general.html).
 export const SETTING_LIMITS = {
   BG_SET_TEMP: [60, 96], BG_SET_ECO_TEMP: [40, 95], BG_SET_TEMP_HYST: [2, 5],
@@ -31,6 +35,9 @@ export const SETTING_LIMITS = {
   SB_SET_PRESS: [0, 1.8], SB_SET_ECO_PRESS: [0, 1], SB_SET_PRESS_HYST: [0.1, 0.3],
   MA_BOILER_START_MODE: [1, 2], MA_FAST_HEATUP_TYPE: [0, 1], MA_HEATUP_FLUSH_DURATION: [1, 20],
   MA_START_EXTRACTIONCOUNTER_EVENT: [0, 2],
+  // Alte Xenia mit Seiten-API (DBL, Firmware 4.1xx): Werte der Original-Seiten „Pumpe“ und „Maschine“
+  PU_SET_BREW_TIMER_1: [15, 60], MA_SET_TIMER_ECO_MA: [1, 240], MA_SET_TIMER_POWERDOWN: [1, 240],
+  MA_FIX_WATER_SUPPLY: [0, 1], MA_EXTENDED_THERMAL_STABILITY: [0, 1],
 };
 export const SETTING_LABELS = {
   BG_SET_TEMP: 'Brühgruppe', BG_SET_ECO_TEMP: 'Brühgruppe Eco', BG_SET_TEMP_HYST: 'Hysterese Brühgruppe',
@@ -38,13 +45,31 @@ export const SETTING_LABELS = {
   PU_SET_MAX_TIMER: 'Max. Bezugszeit', SB_SET_PRESS: 'Dampfdruck', SB_SET_ECO_PRESS: 'Dampfdruck Eco', SB_SET_PRESS_HYST: 'Hysterese Dampf',
   MA_BOILER_START_MODE: 'Startmodus', MA_FAST_HEATUP_TYPE: 'Aufheiz-Spülung', MA_HEATUP_FLUSH_DURATION: 'Spüldauer',
   MA_START_EXTRACTIONCOUNTER_EVENT: 'Start Bezugszähler',
+  PU_SET_BREW_TIMER_1: 'Bezugszeit Espresso', MA_SET_TIMER_ECO_MA: 'Eco-Timer', MA_SET_TIMER_POWERDOWN: 'Abschalt-Timer',
+  MA_FIX_WATER_SUPPLY: 'Wasserversorgung', MA_EXTENDED_THERMAL_STABILITY: 'Thermische Stabilität',
 };
+
+// Alte Xenia mit Seiten-API: je Seite der Original-Oberfläche ein Endpunkt, der immer alle Felder der Seite erwartet.
+// „keep“ sind Felder, die Xenios nicht ändert (Heizleistung, Pumpenmodus, Stromgrenze), aber unverändert mitsendet.
+export const CLASSIC_PAGES = [
+  { path: '/api/v2/brewgroup', read: '/api/v2/boilerandbrewgroup', fields: ['BG_SET_TEMP', 'BG_SET_ECO_TEMP', 'BG_SET_TEMP_HYST'], keep: ['BG_SET_POWER'] },
+  { path: '/api/v2/brewboiler', read: '/api/v2/boilerandbrewgroup', fields: ['BB_SET_TEMP', 'BB_SET_ECO_TEMP', 'BB_SET_TEMP_HYST'], keep: ['BB_MODE', 'BB_SET_POWER'] },
+  { path: '/api/v2/steamboiler', read: '/api/v2/boilerandbrewgroup', fields: ['SB_SET_PRESS', 'SB_SET_ECO_PRESS', 'SB_SET_PRESS_HYST'], keep: ['SB_SET_POWER'] },
+  { path: '/api/v2/pump', read: '/api/v2/pump', fields: ['PU_SET_BREW_TIMER_1', 'PU_SET_MAX_TIMER'], keep: ['PU_MODE'] },
+  { path: '/api/v2/machine', read: '/api/v2/machine', fields: ['MA_HEATUP_FLUSH_DURATION', 'MA_SET_TIMER_ECO_MA', 'MA_SET_TIMER_POWERDOWN', 'MA_FIX_WATER_SUPPLY', 'MA_BOILER_START_MODE', 'MA_EXTENDED_THERMAL_STABILITY'], keep: ['MA_MAX_AMPERE'] },
+];
 // Reihenfolge/Felder, die die offizielle Oberfläche beim Speichern sendet.
 export const GENERAL_FIELDS = [
   'BB_SET_TEMP', 'BB_SET_ECO_TEMP', 'BB_SET_TEMP_HYST', 'BG_SET_TEMP', 'BG_SET_ECO_TEMP', 'BG_SET_TEMP_HYST',
   'PU_SET_MAX_TIMER', 'SB_SET_PRESS', 'SB_SET_ECO_PRESS', 'SB_SET_PRESS_HYST', 'MA_BOILER_START_MODE',
   'MA_FAST_HEATUP_TYPE', 'MA_HEATUP_FLUSH_DURATION', 'MA_START_EXTRACTIONCOUNTER_EVENT',
 ];
+
+function checkLimit(k, value) {
+  const [min, max] = SETTING_LIMITS[k];
+  const v = Number(value);
+  if (!Number.isFinite(v) || v < min || v > max) throw httpError(400, `${SETTING_LABELS[k] || k} muss zwischen ${min} und ${max} liegen`);
+}
 
 export const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THUSRDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']; // "THUSRDAY" ist so in der Firmware
 
@@ -80,9 +105,14 @@ export const SCRIPT_OPS = {
 // Eingebaute Skripte (IDs < 10), z. B. für die Tastenbelegung.
 // Skript 9 (Bezug per Drehknopf der Mühle, Grind-by-Sync) ist bewusst nicht dabei: an einem Taster funktioniert es nicht.
 export const BUILTIN_SCRIPTS = { 0: 'Keine', 2: 'Dauerbezug', 7: 'Einfache Dosis', 8: 'Doppelte Dosis' };
+// Alte Xenia (DBL): so heißen die festen Abläufe auf der Schalter-Seite der Original-Oberfläche.
+// „Espresso“ läuft die eingestellte Bezugszeit (PU_SET_BREW_TIMER_1).
+export const CLASSIC_BUILTIN_SCRIPTS = { 0: 'Keine', 1: 'Espresso (Bezugszeit)', 2: 'Espresso endlos', 7: 'Single', 8: 'Double' };
 
 // Kürzere Pumpvorgänge sind kein Bezug (Spülen, Rückspülen von Hand) und kommen nicht ins Protokoll.
+// Standardwert; einstellbar unter Bezüge → Filter (history.data.settings.minShotS, 0–60 s).
 export const MIN_SHOT_MS = 15000;
+export const MIN_SHOT_LIMITS = { min: 0, max: 60 };
 
 // Antwortet die Maschine einmal nicht, wird so bald erneut gefragt; erst der zweite Fehlschlag in Folge gilt als offline.
 const RETRY_AFTER_FAIL_MS = 1500;
@@ -266,6 +296,8 @@ export class Machine extends Emitter {
       pressure: { pump: null, steam: null, steamSet: null, pumpSet: null },
       power: { group: null, boiler: null, pump: null },
       scale: { weight: null, rate: null },
+      // Bluetooth-Waage an der alten Xenia (DBL): verbunden? (BLE in /api/v2/machine); null = unbekannt
+      scaleLink: null,
       flow: { volume: null, rate: null, ml: null },
       shot: { running: false, timeMs: 0, startedAt: null, curve: [] },
       lastShot: null,
@@ -289,7 +321,7 @@ export class Machine extends Emitter {
     this._lastDiag = null;
     this._shotClock = null;   // Fallback, wenn die Firmware keine EXTRACTION_TIME_MS liefert (alte Xenia)
     this._repairHistory();
-    this.state.lastShot = this.history.data.shots?.[0] || null;
+    this.state.lastShot = this.listedShots()[0] || null;
   }
 
   get apiId() {
@@ -339,9 +371,10 @@ export class Machine extends Emitter {
         await this.refreshSlow();
         this._slowAt = Date.now() + this.cfg.slowPollMs;
       }
-      const d = await this.client.get(this.api.livePath);
+      const d = await this.client.get(this.livePath);
       this._applyLive(normalizeLive(d));
       this._markOnline();
+      await this._readScaleLink(d);
     } catch (e) {
       // Ein einzelner Aussetzer (WLAN der Maschine, Zeitüberschreitung) ist noch nicht „offline“: gleich noch einmal
       // fragen. Sonst meldet z. B. ein Widget, das genau dann nachsieht, bis zum nächsten Update „Offline“.
@@ -365,7 +398,10 @@ export class Machine extends Emitter {
       try { general = await this.client.get('/api/v2/general'); } catch (e) { log.debug(`general nicht lesbar: ${e.message}`); }
     }
     // Live-Abfrage der alten API ist schon /overview; ein zweites Mal nur, wenn wir diagram/get pollen
-    const overview = this.api.livePath === '/api/v2/overview' ? (this._lastDiag || await this.client.get('/api/v2/overview')) : await this.client.get('/api/v2/overview');
+    const overview = this.livePath === '/api/v2/overview' ? (this._lastDiag || await this.client.get('/api/v2/overview')) : await this.client.get('/api/v2/overview');
+    if (!this.api.general && this._caps?.pages) {
+      try { this._diagExtractionMs = num((await this.client.get('/api/v2/diagram/get')).EXTRACTION_TIME_MS); } catch { /* optional */ }
+    }
     this._applySlow(single, general, overview);
     if (!this.state.info) {
       try {
@@ -386,6 +422,11 @@ export class Machine extends Emitter {
           tzIndex: info.TZ_IND,
           api: this.apiId,
         };
+        if (!this.api.general) {
+          this.state.info.caps = await this.classicCaps().catch(() => undefined);
+          // Alte Firmware: eigene Modellnummern (MA_TYPE 3 ist hier die DB + L, nicht die Brew-by-Sync)
+          if (CLASSIC_TYPE[num(machine.MA_TYPE)]) this.state.info.typeName = CLASSIC_TYPE[num(machine.MA_TYPE)];
+        }
       } catch (e) {
         log.debug(`Info nicht lesbar: ${e.message}`);
       }
@@ -407,9 +448,10 @@ export class Machine extends Emitter {
     };
     s.settings = {};
     for (const k of [...GENERAL_FIELDS, 'BB_FILL_LEVEL', 'MA_FIX_WATER_SUPPLY', 'VIEW']) s.settings[k] = num(general[k]);
-    s.temp.groupSet = num(single.BG_SET_TEMP ?? general.BG_SET_TEMP);
-    s.temp.boilerSet = num(single.BB_SET_TEMP ?? general.BB_SET_TEMP);
-    s.pressure.steamSet = num(single.SB_SET_PRESS ?? general.SB_SET_PRESS);
+    // Ein gerade erst gespeicherter Sollwert gilt 5 s lang vor dem (evtl. noch alten) Wert der Maschine
+    s.temp.groupSet = this._recentSaved('groupSet') ?? num(single.BG_SET_TEMP ?? general.BG_SET_TEMP);
+    s.temp.boilerSet = this._recentSaved('boilerSet') ?? num(single.BB_SET_TEMP ?? general.BB_SET_TEMP);
+    s.pressure.steamSet = this._recentSaved('steamSet') ?? num(single.SB_SET_PRESS ?? general.SB_SET_PRESS);
     s.pressure.pumpSet = num(single.PU_SET_PRESS);
     const tankOk = num(single.PU_SENS_WATER_TANK_LEVEL) === 1;
     if (s.tankOk !== null && s.tankOk && !tankOk) this._event('tank', { title: 'Wassertank leer', body: 'Bitte Wasser nachfüllen.' });
@@ -439,7 +481,13 @@ export class Machine extends Emitter {
     const st = MA_STATUS[status] || { key: 'unknown', label: `Status ${status}` };
     s.statusKey = st.key;
     s.statusLabel = st.label;
-    s.steamOn = num(d.SB_STATUS) === 2;
+    // Paddle-Pumpen (Status 5) zählt die Maschine womöglich als Bezug: wie einen live gesehenen Start merken,
+    // damit der Zählerabgleich daraus keinen „nachträglichen“ Bezug ohne Dauer macht (vergessen nach 3 min).
+    if (status === 5 && prevStatus !== 5) this._liveStarts.push(Date.now());
+    // Dampfkessel an: neue Firmware SB_STATUS 2; alte Firmware wie deren Original-Oberfläche „alles außer 1 (aus)“,
+    // die DBL meldet beim Aufheizen einen anderen Wert als 2
+    const sb = num(d.SB_STATUS);
+    s.steamOn = this.api.general ? sb === 2 : sb !== null && sb !== 1;
     s.temp.groupRaw = num(d.BG_SENS_TEMP_A);
     s.temp.boilerRaw = num(d.BB_SENS_TEMP_A);
     s.temp.group = this._temp(s.temp.groupRaw, this._offsets.bg);
@@ -457,9 +505,10 @@ export class Machine extends Emitter {
         this._shotClock = Date.now();
         this._liveStarts.push(this._shotClock);
         s.shot = { running: true, timeMs: 0, startedAt: new Date().toISOString(), curve: [] };
+        s.lastFault = null;
         // Hat die App kurz vorher ein Skript gestartet, gehört es zu diesem Bezug (für die Zielkurve in der Analyse)
         const p = this._pendingScript;
-        if (p && Date.now() - p.at < 20e3) s.shot.script = { id: p.id, title: p.title ?? BUILTIN_SCRIPTS[p.id] ?? null, steps: p.steps ?? null };
+        if (p && Date.now() - p.at < 20e3) s.shot.script = { id: p.id, title: p.title ?? this.builtinScripts()[p.id] ?? null, steps: p.steps ?? null };
         this._pendingScript = null;
         this.kick(this.cfg.pollActiveMs);
       }
@@ -504,7 +553,12 @@ export class Machine extends Emitter {
       if (was === 'off' && (status === 1 || status === 2)) this._event('power', { title: 'Xenia eingeschaltet', body: status === 2 ? 'Eco-Modus' : 'Heizt auf …', tag: 'power' });
       if ((prevStatus === 1 || prevStatus === 2) && status === 0) this._event('power', { title: 'Xenia ausgeschaltet', body: 'Automatisch oder am Gerät ausgeschaltet.', tag: 'power' });
     }
-    if (status === 6 && prevStatus !== 6) this._event('fault', { title: 'Xenia meldet eine Störung', body: 'Bitte die Maschine prüfen.', tag: 'fault' });
+    if (status === 6 && prevStatus !== 6) {
+      // Lief gerade ein Bezug bzw. Skript, den Abbruch festhalten (Dashboard „Status“ zeigt ihn bis zum nächsten Bezug)
+      const what = s.shot.running ? (s.shot.script?.title ? `Skript „${s.shot.script.title}“` : 'Bezug') : this._backflush ? 'Backflush' : null;
+      s.lastFault = { at: new Date().toISOString(), text: what ? `${what} mit Störung abgebrochen` : 'Die Maschine meldet eine Störung' };
+      this._event('fault', { title: 'Xenia meldet eine Störung', body: what ? `${what} wurde abgebrochen. Bitte die Maschine prüfen.` : 'Bitte die Maschine prüfen.', tag: 'fault' });
+    }
     if (prevStatus !== status) this.kick(this.cfg.pollActiveMs);
     this.emit('state');
   }
@@ -512,26 +566,37 @@ export class Machine extends Emitter {
   _finishShot(finalMs) {
     const s = this.state;
     const timeMs = Math.max(finalMs || 0, s.shot.timeMs || 0);
-    const curve = s.shot.curve;
+    // Gewicht vor dem Tarieren der Waage (alter Wert zu Beginn) verwerfen
+    const curve = taredCurve(s.shot.curve);
     const maxPressure = curve.reduce((m, p) => Math.max(m, p[1] || 0), 0);
     const shot = {
       id: shotId(),
       endedAt: new Date().toISOString(),
       startedAt: s.shot.startedAt,
       timeMs,
-      weight: s.scale.weight || null,
+      // Ausbeute: höchster Wert der Waage nach dem Tarieren – setzt sie am Ende schon zurück, bleibt er erhalten
+      weight: round(Math.max(s.scale.weight || 0, curveYield(curve) || 0), 1) || null,
       volumeMl: s.flow.ml || s.flow.volume || null,
       maxPressure: round(maxPressure, 1),
       groupTemp: s.temp.group,
       curve: curve.slice(0, 300),
       ...(s.shot.script ? { script: s.shot.script } : {}),
     };
+    // Vorbrühen, Bezugszeit (ohne Vorbrühen) und ersten Tropfen festhalten – bleiben auch, wenn die Kurve später entfällt
+    const ph = shotPhases({ timeMs, curve });
+    shot.preinfusionMs = ph.preMs;
+    shot.brewMs = ph.brewMs;
+    shot.firstDropMs = ph.firstDropMs;
+    // Dosis: die Waage misst nur die Ausbeute; ohne Mühle gilt die eingestellte Standard-Dosis (änderbar am Bezug)
+    const defDose = this.defaultDoseG;
+    if (defDose) shot.doseDefaultG = defDose;
     s.shot = { running: false, timeMs: 0, startedAt: null, curve: [] };
-    s.lastShot = shot;
-    if (timeMs >= MIN_SHOT_MS) {
+    // Zu kurze Pumpvorgänge (Spülen, Backflush, Fehlbezug) erscheinen weder im Protokoll noch als „letzter Bezug“
+    if (timeMs >= this.minShotMs) {
+      s.lastShot = shot;
       shot.no = (s.counters?.extractions ?? null) !== null ? s.counters.extractions + this._liveStarts.length : null;
       this._log(shot);
-      const parts = [`${fmt(timeMs / 1000)} s`];
+      const parts = [`${fmt((shot.brewMs ?? timeMs) / 1000)} s`];
       if (shot.weight) parts.push(`${fmt(shot.weight)} g`);
       else if (shot.volumeMl) parts.push(`${fmt(shot.volumeMl, 0)} ml`);
       if (shot.maxPressure) parts.push(`max. ${fmt(shot.maxPressure)} bar`);
@@ -570,6 +635,25 @@ export class Machine extends Emitter {
     this.emit('event', { topic, ...msg, at: new Date().toISOString() });
   }
 
+  // Alte Xenia: alle 10 s nachsehen, ob die Bluetooth-Waage verbunden ist. Ein Gewicht ungleich 0 zählt sofort.
+  async _readScaleLink(d) {
+    if (this.apiId !== 'classic') return;
+    const weighs = (num(d?.SCALE_WEIGHT) || 0) !== 0;
+    if (Date.now() >= (this._scaleLinkAt || 0)) {
+      this._scaleLinkAt = Date.now() + 10_000;
+      try {
+        const mm = await this.client.get('/api/v2/machine');
+        if (mm && 'BLE' in mm) this._ble = (num(mm.BLE) || 0) > 0;
+      } catch { /* optional */ }
+    }
+    if (this._ble === undefined && !weighs) return;
+    const connected = Boolean(this._ble) || weighs;
+    if (this.state.scaleLink?.connected !== connected) {
+      this.state.scaleLink = { connected };
+      this.emit('state');
+    }
+  }
+
   snapshot() {
     return { ...this.state, api: this.apiId, shot: { ...this.state.shot, curve: this.state.shot.curve.slice(-120) } };
   }
@@ -577,6 +661,9 @@ export class Machine extends Emitter {
   // Bezugs-Protokoll: bis zu 2000 Einträge, Druckkurven nur für die neuesten 100 (Speicherplatz)
   _log(shot) {
     const h = this.history.data;
+    // Ohne Mühle und eigene Angabe gilt die Standard-Dosis – auch für nachträglich (über den Zähler) erfasste Bezüge
+    const defDose = this.defaultDoseG;
+    if (defDose && shot.doseDefaultG == null && shot.dose?.g == null && shot.notes?.doseG == null) shot.doseDefaultG = defDose;
     h.shots.unshift(shot);
     h.shots = h.shots.slice(0, 2000);
     for (let i = 100; i < h.shots.length && h.shots[i].curve; i++) delete h.shots[i].curve;
@@ -604,7 +691,8 @@ export class Machine extends Emitter {
     this._liveStarts.splice(0, used);
     const missed = count - prev - used;
     // Werte der letzten Abfrage nur übernehmen, wenn sie nicht zu einem schon live protokollierten Bezug gehören
-    const diag = this._lastDiag || {};
+    const diag = { ...(this._lastDiag || {}) };
+    if (num(diag.EXTRACTION_TIME_MS) === null && this._diagExtractionMs != null) diag.EXTRACTION_TIME_MS = this._diagExtractionMs;
     const lastLogged = h.shots[0];
     const stale = Boolean(lastLogged && !lastLogged.estimated && Math.abs((lastLogged.timeMs || 0) - (num(diag.EXTRACTION_TIME_MS) || 0)) < 500);
     // älteste zuerst eintragen, damit der neueste oben im Protokoll steht
@@ -623,7 +711,8 @@ export class Machine extends Emitter {
         no: count - i,
         estimated: true, // nicht live erfasst: Zeitpunkt = Zeitpunkt der Zählerprüfung
       };
-      if (i === 0) this.state.lastShot = shot;
+      // Zu kurze (Spülen/Backflush) bleiben im Speicher, werden aber nicht gelistet (listedShots)
+      if (i === 0 && timeMs && timeMs >= this.minShotMs) this.state.lastShot = shot;
       this._log(shot);
     }
     this.history.save();
@@ -636,6 +725,18 @@ export class Machine extends Emitter {
     const list = this.history.data.shots;
     if (!Array.isArray(list)) return;
     let removed = 0;
+    // Ältere Bezüge: Gewicht vor dem Tarieren der Waage steckte in Kurve und Ausbeute (z. B. 293 g statt 44 g)
+    let fixed = 0;
+    for (const shot of list) {
+      if (!Array.isArray(shot.curve) || !shot.curve.length) continue;
+      const tared = taredCurve(shot.curve);
+      if (tared === shot.curve) continue;
+      shot.curve = tared;
+      const y = curveYield(tared);
+      if (y) shot.weight = y;
+      fixed++;
+    }
+    if (fixed) this.history.save();
     for (let i = 0; i < list.length - 1; i++) {
       const dup = list[i];
       const live = list[i + 1];
@@ -650,7 +751,7 @@ export class Machine extends Emitter {
     // Zu kurze Einträge aus älteren Versionen (Spülen, Rückspülen), solange niemand etwas dazu notiert hat
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i];
-      if (s.timeMs && s.timeMs < MIN_SHOT_MS && !s.notes && !s.dose) {
+      if (s.timeMs && s.timeMs < Math.min(MIN_SHOT_MS, this.minShotMs) && !s.notes && !s.dose) {
         list.splice(i, 1);
         removed++;
       }
@@ -729,21 +830,75 @@ export class Machine extends Emitter {
   }
 
   // Protokoll-Einträge; Druckkurven nur für die ersten `curves` (Datenmenge)
+  // Mindestdauer eines Bezugs (ms). Kürzere werden nicht protokolliert und ältere nicht mehr gelistet.
+  get minShotMs() {
+    const v = Number(this.history.data.settings?.minShotS);
+    return Number.isFinite(v) && v >= MIN_SHOT_LIMITS.min && v <= MIN_SHOT_LIMITS.max ? Math.round(v * 1000) : MIN_SHOT_MS;
+  }
+
+  // Standard-Dosis (g) für neue Bezüge ohne Mühle; null = keine
+  get defaultDoseG() {
+    const v = Number(this.history.data.settings?.defaultDoseG);
+    return Number.isFinite(v) && v >= 3 && v <= 40 ? v : null;
+  }
+
+  shotSettings() {
+    return { minShotS: this.minShotMs / 1000, limits: MIN_SHOT_LIMITS, defaultMinShotS: MIN_SHOT_MS / 1000, defaultDoseG: this.defaultDoseG };
+  }
+
+  setShotSettings({ minShotS, defaultDoseG } = {}) {
+    const next = { ...(this.history.data.settings || {}) };
+    if (minShotS !== undefined) {
+      const v = Number(minShotS);
+      if (!Number.isFinite(v) || v < MIN_SHOT_LIMITS.min || v > MIN_SHOT_LIMITS.max) throw httpError(400, `Mindestdauer muss zwischen ${MIN_SHOT_LIMITS.min} und ${MIN_SHOT_LIMITS.max} s liegen`);
+      next.minShotS = Math.round(v);
+    }
+    if (defaultDoseG !== undefined) {
+      if (defaultDoseG === null || defaultDoseG === '') delete next.defaultDoseG;
+      else {
+        const d = Number(defaultDoseG);
+        if (!Number.isFinite(d) || d < 3 || d > 40) throw httpError(400, 'Standard-Dosis muss zwischen 3 und 40 g liegen');
+        next.defaultDoseG = Math.round(d * 10) / 10;
+        // Bisherige Bezüge ganz ohne Dosis bekommen sie ebenfalls, damit auch dort das Verhältnis erscheint
+        for (const shot of this.history.data.shots || []) {
+          if (shot.doseDefaultG == null && shot.dose?.g == null && shot.notes?.doseG == null) shot.doseDefaultG = next.defaultDoseG;
+        }
+      }
+    }
+    this.history.data.settings = next;
+    this.history.save();
+    const last = this.listedShots()[0] || null;
+    if (!this.state.shot.running) this.state.lastShot = last;
+    this.emit('state');
+    return this.shotSettings();
+  }
+
+  // Bezüge, die gelistet werden: ohne zu kurze (bewertete/notierte bleiben immer sichtbar)
+  listedShots() {
+    const min = this.minShotMs;
+    // Zu kurz oder Dauer unbekannt (nachträglich erkannt, ohne Bezugszeit) → nicht listen, außer bewertet/mit Dosis
+    const short = (s) => (s.timeMs ? s.timeMs < min : Boolean(s.estimated)) || (s.timeMs === 0);
+    return this.history.data.shots.filter((s) => !(short(s) && !s.notes && !s.dose));
+  }
+
   shots(limit = 30, { curves = limit } = {}) {
-    return this.history.data.shots.slice(0, limit).map((s, i) => (i < curves ? s : { ...s, curve: undefined }));
+    return this.listedShots().slice(0, limit).map((s, i) => (i < curves ? s : { ...s, curve: undefined }));
   }
 
   shotsCsv() {
     const cell = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
     const text = (v) => (v ? `"${String(v).replace(/"/g, '""').replace(/[\r\n]+/g, ' ')}"` : '');
-    const rows = [['Nr', 'Ende', 'Dauer (s)', 'Gewicht (g)', 'Menge (ml)', 'Max. Druck (bar)', 'Brühgruppe (°C)', 'Live erfasst',
+    const rows = [['Nr', 'Ende', 'Bezugszeit (s)', 'Vorbrühen (s)', 'Gesamt (s)', 'Erster Tropfen (s)', 'Gewicht (g)', 'Menge (ml)', 'Max. Druck (bar)', 'Brühgruppe (°C)', 'Live erfasst',
       'Dosis (g)', 'Verhältnis 1:', 'Rezept Mühle', 'Skript', 'Bohne', 'Mahlgrad', 'Bewertung', 'Geschmack', 'Stärke', 'Notiz']];
-    for (const s of this.history.data.shots) {
+    for (const s of this.listedShots()) {
       const n = s.notes || {};
       const yieldG = n.yieldG ?? s.weight;
-      const ratio = s.dose?.g && yieldG ? Math.round((yieldG / s.dose.g) * 10) / 10 : null;
-      rows.push([s.no ?? '', s.endedAt, cell(s.timeMs ? Math.round(s.timeMs / 100) / 10 : null), cell(s.weight), cell(s.volumeMl), cell(s.maxPressure), cell(s.groupTemp), s.estimated ? 'nein' : 'ja',
-        cell(s.dose?.g), cell(ratio), s.dose?.recipe ?? '', text(s.script?.title), text(n.bean), text(n.grind), n.rating ?? '', TASTE[n.taste] ?? '', STRENGTH[n.strength] ?? '', text(n.text)]);
+      const doseG = n.doseG ?? s.dose?.g ?? s.doseDefaultG ?? null;
+      const ratio = doseG && yieldG ? Math.round((yieldG / doseG) * 10) / 10 : null;
+      const ph = shotPhases(s);
+      const sec = (ms) => (ms ? Math.round(ms / 100) / 10 : null);
+      rows.push([s.no ?? '', s.endedAt, cell(sec(ph.brewMs)), cell(sec(ph.preMs)), cell(sec(s.timeMs)), cell(sec(ph.firstDropMs)), cell(s.weight), cell(s.volumeMl), cell(s.maxPressure), cell(s.groupTemp), s.estimated ? 'nein' : 'ja',
+        cell(doseG), cell(ratio), s.dose?.recipe ?? '', text(s.script?.title), text(n.bean), text(n.grind), n.rating ?? '', TASTE[n.taste] ?? '', STRENGTH[n.strength] ?? '', text(n.text)]);
     }
     return '﻿' + rows.map((r) => r.join(';')).join('\r\n') + '\r\n';
   }
@@ -885,6 +1040,30 @@ export class Machine extends Emitter {
 
   // --- Aktionen ---------------------------------------------------------------
 
+  // Nach dem Speichern von Einstellungen: Sollwerte sofort im Zustand zeigen und die Maschine neu lesen. Mehrere
+  // Speichervorgänge kurz hintereinander könnten sonst einen noch alten Wert lesen und bis zur nächsten langsamen
+  // Abfrage (1 min) anzeigen; deshalb nach 3 s noch einmal lesen.
+  _settingsSaved(changes) {
+    const s = this.state;
+    const v = (k) => (k in changes && Number.isFinite(Number(changes[k])) ? Number(changes[k]) : null);
+    if (v('BG_SET_TEMP') !== null) s.temp.groupSet = v('BG_SET_TEMP');
+    if (v('BB_SET_TEMP') !== null) s.temp.boilerSet = v('BB_SET_TEMP');
+    if (v('SB_SET_PRESS') !== null) s.pressure.steamSet = v('SB_SET_PRESS');
+    this._savedSet = { at: Date.now(), groupSet: v('BG_SET_TEMP') ?? this._recentSaved('groupSet'), boilerSet: v('BB_SET_TEMP') ?? this._recentSaved('boilerSet'), steamSet: v('SB_SET_PRESS') ?? this._recentSaved('steamSet') };
+    this.emit('state');
+    this._slowAt = 0;
+    this._acted();
+    clearTimeout(this._rereadTimer);
+    this._rereadTimer = setTimeout(() => { this._slowAt = 0; if (!this._stopped) this.kick(); }, 3000);
+    this._rereadTimer.unref?.();
+  }
+
+  // Kurz zuvor gespeicherter Sollwert (5 s): hat Vorrang vor einem noch alten Wert aus der Maschine
+  _recentSaved(key) {
+    const r = this._savedSet;
+    return r && Date.now() - r.at < 5000 ? r[key] ?? null : null;
+  }
+
   _acted() {
     this._lastAppAction = Date.now();
     setTimeout(() => this.kick(), 300);
@@ -925,12 +1104,44 @@ export class Machine extends Emitter {
     return { ok: true };
   }
 
+  // Alte Xenia: Kann die Firmware die Seiten-API der Original-Oberfläche (/api/v2/brewgroup, /pump, /paddle …)?
+  // Die DBL mit Firmware 4.1xx kann es, ältere Stände nur inc_dec. Ergebnis wird gemerkt.
+  async classicCaps() {
+    if (this.api.general) return { pages: false, paddle: true };
+    if (this._caps) return this._caps;
+    let pages = false;
+    try {
+      const d = await this.client.get('/api/v2/boilerandbrewgroup');
+      pages = d && typeof d === 'object' && ('BG_SET_TEMP' in d || 'BB_SET_TEMP' in d);
+    } catch (e) {
+      if (e.status === 502) throw e; // offline: später erneut prüfen
+    }
+    this._caps = { pages, paddle: pages };
+    if (this.state.info) this.state.info.caps = this._caps;
+    return this._caps;
+  }
+
+  builtinScripts() {
+    return this.api.general ? BUILTIN_SCRIPTS : CLASSIC_BUILTIN_SCRIPTS;
+  }
+
+  // Live-Abfrage: neue Xenia über diagram/get. Alte Xenia immer über overview: nur dort steht das Gewicht einer
+  // per Bluetooth verbundenen Waage (SCALE_WEIGHT, PU_SENS_SCALE_RATE). Die Bezugszeit der Maschine holt bei der
+  // DBL mit Seiten-API die langsame Abfrage aus diagram/get (für nachträglich erkannte Bezüge).
+  get livePath() {
+    return this.api.general ? this.api.livePath : '/api/v2/overview';
+  }
+
+  get hasPaddle() {
+    return this.api.paddle || Boolean(this._caps?.paddle);
+  }
+
   async readSettings() {
     if (this.api.general) return this.client.get('/api/v2/general');
     const single = await this.client.get('/api/v2/overview_single');
     let machine = {};
     try { machine = await this.client.get('/api/v2/machine'); } catch { /* optional */ }
-    return {
+    const out = {
       BG_SET_TEMP: num(single.BG_SET_TEMP), BB_SET_TEMP: num(single.BB_SET_TEMP),
       SB_SET_PRESS: num(single.SB_SET_PRESS), PU_SET_PRESS: num(single.PU_SET_PRESS),
       MA_SET_TIMER_ECO_MA: num(machine.MA_SET_TIMER_ECO_MA),
@@ -938,9 +1149,19 @@ export class Machine extends Emitter {
       MA_FIX_WATER_SUPPLY: num(machine.MA_FIX_WATER_SUPPLY),
       MA_HEATUP_FLUSH_EN: num(machine.MA_HEATUP_FLUSH_EN),
     };
+    const caps = await this.classicCaps().catch(() => ({ pages: false }));
+    if (!caps.pages) return out;
+    // Seiten-API: alle Werte, die die Original-Seiten anzeigen
+    const reads = {};
+    for (const pg of CLASSIC_PAGES) {
+      if (!(pg.read in reads)) reads[pg.read] = pg.read === '/api/v2/machine' ? machine : await this.client.get(pg.read).catch(() => ({}));
+      for (const k of [...pg.fields, ...pg.keep]) if (k in reads[pg.read]) out[k] = num(reads[pg.read][k]);
+    }
+    out._pages = true;
+    return out;
   }
 
-  // Neue Xenia: POST /api/v2/general (alle Felder). Alte Xenia: inc_dec / inc_dec_sb.
+  // Neue Xenia: POST /api/v2/general (alle Felder). Alte Xenia: Seiten-API bzw. incdec / incdecsb.
   async updateSettings(changes) {
     if (!this.features.settings) throw httpError(403, 'Einstellungen ändern ist deaktiviert');
     if (!this.api.general) return this._updateClassicSettings(changes);
@@ -957,30 +1178,71 @@ export class Machine extends Emitter {
     }
     for (const k of Object.keys(changes)) if (!GENERAL_FIELDS.includes(k)) throw httpError(400, `Unbekannte Einstellung ${k}`);
     await this.client.post('/api/v2/general', body);
-    this._slowAt = 0;
-    this._acted();
+    this._settingsSaved(changes);
     return { ok: true };
   }
 
   async _updateClassicSettings(changes) {
+    const caps = await this.classicCaps();
+    if (caps.pages) return this._updateClassicPages(changes);
     for (const k of Object.keys(changes)) {
       if (!CLASSIC_SETTING_FIELDS.includes(k)) throw httpError(400, `Unbekannte Einstellung ${k}`);
-      const [min, max] = SETTING_LIMITS[k];
-      const v = Number(changes[k]);
-      if (!Number.isFinite(v) || v < min || v > max) throw httpError(400, `${SETTING_LABELS[k] || k} muss zwischen ${min} und ${max} liegen`);
+      checkLimit(k, changes[k]);
     }
+    // Die Original-Startseite nutzt incdec/incdecsb, die alte API-Doku inc_dec/inc_dec_sb: beides versuchen
+    const post = async (paths, body) => {
+      let last;
+      for (const p of paths) {
+        try { return await this.client.post(p, body); } catch (e) { last = e; if (e.status !== 404) throw e; }
+      }
+      throw last;
+    };
     if ('BG_SET_TEMP' in changes || 'BB_SET_TEMP' in changes) {
       const cur = await this.client.get('/api/v2/overview_single');
-      await this.client.post('/api/v2/inc_dec', {
+      await post(['/api/v2/incdec', '/api/v2/inc_dec'], {
         BG_SET_TEMP: String(changes.BG_SET_TEMP ?? cur.BG_SET_TEMP),
         BB_SET_TEMP: String(changes.BB_SET_TEMP ?? cur.BB_SET_TEMP),
       });
     }
     if ('SB_SET_PRESS' in changes) {
-      await this.client.post('/api/v2/inc_dec_sb', { SB_SET_PRESS: String(changes.SB_SET_PRESS) });
+      await post(['/api/v2/incdecsb', '/api/v2/inc_dec_sb'], { SB_SET_PRESS: String(changes.SB_SET_PRESS) });
     }
-    this._slowAt = 0;
-    this._acted();
+    this._settingsSaved(changes);
+    return { ok: true };
+  }
+
+  // Seiten-API: je betroffener Seite aktuelle Werte lesen, Änderungen einsetzen, alle Felder der Seite senden
+  // (wie die Original-Oberfläche). Fehlt ein Feld in der Antwort der Maschine, wird nichts gesendet.
+  async _updateClassicPages(changes) {
+    const known = new Set(CLASSIC_PAGES.flatMap((pg) => pg.fields));
+    for (const k of Object.keys(changes)) {
+      if (!known.has(k)) throw httpError(400, `Unbekannte Einstellung ${k}`);
+      if (k === 'MA_HEATUP_FLUSH_DURATION') {
+        const v = Number(changes[k]);
+        if (!Number.isInteger(v) || v < 0 || v > 20) throw httpError(400, 'Spüldauer muss zwischen 0 und 20 s liegen');
+      } else checkLimit(k, changes[k]);
+    }
+    const reads = {};
+    for (const pg of CLASSIC_PAGES) {
+      if (!pg.fields.some((k) => k in changes)) continue;
+      reads[pg.read] ??= await this.client.get(pg.read);
+      const cur = reads[pg.read];
+      const body = {};
+      for (const k of [...pg.fields, ...pg.keep]) {
+        const v = k in changes ? Number(changes[k]) : num(cur[k]);
+        if (v === null || !Number.isFinite(v)) {
+          if (pg.keep.includes(k) && k === 'PU_MODE') continue; // Maschinen ohne Pumpenmodus (pump2)
+          throw httpError(502, `Die Maschine liefert „${SETTING_LABELS[k] || k}“ nicht – nichts gespeichert`);
+        }
+        body[k] = String(v);
+      }
+      for (const [t, e] of [['BG_SET_TEMP', 'BG_SET_ECO_TEMP'], ['BB_SET_TEMP', 'BB_SET_ECO_TEMP']]) {
+        if (t in body && Number(body[t]) < Number(body[e])) throw httpError(400, `${SETTING_LABELS[e]} darf nicht über ${SETTING_LABELS[t]} liegen`);
+      }
+      const path = pg.path === '/api/v2/pump' && !('PU_MODE' in body) ? '/api/v2/pump2' : pg.path;
+      await this.client.post(path, body);
+    }
+    this._settingsSaved(changes);
     return { ok: true };
   }
 
@@ -1022,7 +1284,7 @@ export class Machine extends Emitter {
     const pending = { id: Number(id), at: Date.now(), title, steps };
     this._pendingScript = pending;
     if (steps) return;
-    this.readScript(id).then((r) => { pending.title = title ?? (r.title || BUILTIN_SCRIPTS[id] || null); pending.steps = r.steps; }).catch(() => {});
+    this.readScript(id).then((r) => { pending.title = title ?? (r.title || this.builtinScripts()[id] || null); pending.steps = r.steps; }).catch(() => {});
   }
 
   async stopScript() {
@@ -1130,28 +1392,61 @@ export class Machine extends Emitter {
   async setSwitches({ singleDoseG, doubleDoseG, buttons }) {
     if (!this.features.settings) throw httpError(403, 'Einstellungen ändern ist deaktiviert');
     const cur = await this.client.get('/api/v2/switches');
-    const single = singleDoseG ?? cur.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE;
-    const double = doubleDoseG ?? cur.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE;
-    for (const v of [single, double]) if (!(Number(v) > 0 && Number(v) < 200)) throw httpError(400, 'Gewicht muss zwischen 1 und 199 g liegen');
-    const body = { MA_BEVERAGE_WEIGHT_SGL_INT_SCALE: String(single), MA_BEVERAGE_WEIGHT_DBL_INT_SCALE: String(double) };
+    const classic = !this.api.general;
+    const body = {};
+    // Dosis-Gewichte: Die DBL-Oberfläche sendet sie nie (dort feste Mengen), also nur auf ausdrücklichen Wunsch
+    if (!classic || singleDoseG !== undefined || doubleDoseG !== undefined) {
+      const single = singleDoseG ?? cur.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE;
+      const double = doubleDoseG ?? cur.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE;
+      for (const v of [single, double]) if (!(Number(v) > 0 && Number(v) < 200)) throw httpError(400, 'Gewicht muss zwischen 1 und 199 g liegen');
+      body.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE = String(single);
+      body.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE = String(double);
+    }
     if (buttons && typeof buttons === 'object') {
-      const valid = new Set([0, ...Object.keys(BUILTIN_SCRIPTS).map(Number), ...(await this.scripts()).map((s) => s.id)]);
+      const valid = new Set([0, ...Object.keys(this.builtinScripts()).map(Number), ...(await this.scripts()).map((s) => s.id)]);
+      // Immer alle sechs Belegungen senden (wie die Schalter-Seite der Original-Oberfläche): Die DBL setzt
+      // fehlende Felder auf „keine“, sonst löscht das Ändern von ③ die Belegung von ④ und umgekehrt.
       for (const key of ['LEFT_LEFT', 'RIGHT_LEFT', 'RIGHT_RIGHT']) {
-        const b = buttons[key];
-        if (!b) continue;
+        const b = buttons[key] || {};
         for (const [press, idx] of [['short', 0], ['long', 1]]) {
-          if (b[press] === undefined) continue;
+          const field = `SWITCH_SET_${key}_${idx}`;
+          if (b[press] === undefined) {
+            const keep = num(cur[field]);
+            if (keep === null) throw httpError(502, `Die Maschine liefert ${field} nicht – nichts gespeichert`);
+            body[field] = String(keep);
+            continue;
+          }
           const id = Number(b[press]);
           if (!Number.isInteger(id) || !valid.has(id)) throw httpError(400, `Unbekanntes Skript ${b[press]} für Taster ${key}`);
-          body[`SWITCH_SET_${key}_${idx}`] = String(id);
+          body[field] = String(id);
         }
       }
     }
+    if (!Object.keys(body).length) return { ok: true };
+    const weights = 'MA_BEVERAGE_WEIGHT_SGL_INT_SCALE' in body;
+    if (classic && weights) {
+      // Die DBL setzt nicht gesendete Belegungen auf „keine“: immer alle sechs mitsenden
+      for (const key of ['LEFT_LEFT', 'RIGHT_LEFT', 'RIGHT_RIGHT']) for (const idx of [0, 1]) {
+        const field = `SWITCH_SET_${key}_${idx}`;
+        if (field in body) continue;
+        const keep = num(cur[field]);
+        if (keep === null) throw httpError(502, `Die Maschine liefert ${field} nicht – nichts gespeichert`);
+        body[field] = String(keep);
+      }
+    }
     await this.client.post('/api/v2/switches', body);
-    return { ok: true };
+    if (classic && weights) {
+      // Die Original-Oberfläche der DBL schreibt diese Werte nie: prüfen, ob die Firmware sie übernommen hat
+      const after = await this.client.get('/api/v2/switches');
+      const applied = Number(after.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE) === Number(body.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE)
+        && Number(after.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE) === Number(body.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE);
+      return { ok: true, applied, singleDoseG: num(after.MA_BEVERAGE_WEIGHT_SGL_INT_SCALE), doubleDoseG: num(after.MA_BEVERAGE_WEIGHT_DBL_INT_SCALE) };
+    }
+    return { ok: true, applied: true };
   }
 
   async timers() {
+    if (!this.api.weeklyTimers && (await this.classicCaps().catch(() => ({}))).pages) return this._dblTimers();
     if (!this.api.weeklyTimers) {
       let eco = null, off = null, type = this.state.info?.type ?? null;
       try {
@@ -1182,7 +1477,60 @@ export class Machine extends Emitter {
     };
   }
 
+  // Xenia DBL (Seiten-API): GET/POST /api/v2/timer. Je Tag zwei EINSCHALTzeiten (ON1, ON2) mit eigener
+  // Kesselwahl (TI_<Tag>_ON<n>_BOILER: 1 Brühkessel, 2 Dampf, 3 beide); ausgeschaltet wird über den Abschalt-Timer.
+  async _dblTimers() {
+    const d = await this.client.get('/api/v2/timer');
+    let m = {};
+    try { m = await this.client.get('/api/v2/machine'); } catch { /* optional */ }
+    const days = DAYS.map((day) => ({
+      day,
+      starts: [1, 2].map((n) => {
+        const on = timerToMinutes(d[`TI_${day}_ON${n}`]);
+        const boilers = num(d[`TI_${day}_ON${n}_BOILER`]) || 0;
+        return { on, brew: Boolean(boilers & 1), steam: Boolean(boilers & 2), enabled: boilers !== 0 && on !== null };
+      }),
+    }));
+    return {
+      days, ecoAfterMin: num(m.MA_SET_TIMER_ECO_MA), offAfterMin: num(m.MA_SET_TIMER_POWERDOWN),
+      machineType: num(d.MA_TYPE ?? m.MA_TYPE), clock: null, weekly: 'starts',
+    };
+  }
+
+  async _saveDblTimers({ days, ecoAfterMin, offAfterMin }) {
+    if (days !== undefined) {
+      if (!Array.isArray(days) || days.length !== 7) throw httpError(400, '7 Tage erwartet');
+      const msg = {};
+      days.forEach((d, i) => {
+        const key = DAYS[i];
+        const starts = Array.isArray(d.starts) ? d.starts : [];
+        [1, 2].forEach((n) => {
+          const st = starts[n - 1] || {};
+          const on = st.enabled && st.on !== null && st.on !== undefined ? Math.max(0, Math.min(1439, Math.round(Number(st.on)))) : null;
+          if (st.enabled && (on === null || !Number.isFinite(on))) throw httpError(400, `${key}: Einschaltzeit ${n} fehlt`);
+          msg[`TI_${key}_ON${n}_STATUS`] = on === null ? 0 : ((st.brew ? 1 : 0) | (st.steam ? 2 : 0)) || 1;
+          msg[`TI_${key}_ON${n}`] = on === null ? 0 : on * 60;
+        });
+      });
+      await this.client.post('/api/v2/timer', msg);
+    }
+    const ch = {};
+    if (ecoAfterMin !== undefined && ecoAfterMin !== null) ch.MA_SET_TIMER_ECO_MA = Number(ecoAfterMin);
+    if (offAfterMin !== undefined && offAfterMin !== null) ch.MA_SET_TIMER_POWERDOWN = Number(offAfterMin);
+    if (Object.keys(ch).length) {
+      const cur = await this.client.get('/api/v2/machine');
+      const eco = ch.MA_SET_TIMER_ECO_MA ?? num(cur.MA_SET_TIMER_ECO_MA);
+      const off = ch.MA_SET_TIMER_POWERDOWN ?? num(cur.MA_SET_TIMER_POWERDOWN);
+      // wie die Original-Oberfläche: Abschalten muss später kommen als Eco
+      if (eco !== null && off !== null && off <= eco) throw httpError(400, '„Ausschalten nach“ muss länger sein als „Eco-Modus nach“');
+      await this._updateClassicPages(ch);
+    }
+    return { ok: true };
+  }
+
   async saveTimers({ days, ecoAfterMin, offAfterMin }) {
+    if (!this.features.settings) throw httpError(403, 'Einstellungen ändern ist deaktiviert');
+    if (!this.api.weeklyTimers && (await this.classicCaps()).pages) return this._saveDblTimers({ days, ecoAfterMin, offAfterMin });
     if (!this.api.weeklyTimers) {
       const cur = await this.client.get('/api/v2/machine');
       await this.client.post('/api/v2/machine', {
@@ -1229,7 +1577,7 @@ export class Machine extends Emitter {
 
   // Paddle (direkte Pumpensteuerung) – nur auf ausdrücklichen Wunsch aus der App.
   async paddleState() {
-    if (!this.api.paddle) throw httpError(409, 'Paddle gibt es auf der alten Xenia nicht über die API');
+    if (!this.hasPaddle) throw httpError(409, 'Paddle gibt es auf dieser Xenia nicht über die API');
     if (!this.features.paddle) throw httpError(403, 'Paddle ist deaktiviert');
     const d = await this.client.get('/api/v2/paddle/press');
     this._paddleUntil = Date.now() + 5000;
@@ -1240,7 +1588,7 @@ export class Machine extends Emitter {
   }
 
   async paddlePower(level) {
-    if (!this.api.paddle) throw httpError(409, 'Paddle gibt es auf der alten Xenia nicht über die API');
+    if (!this.hasPaddle) throw httpError(409, 'Paddle gibt es auf dieser Xenia nicht über die API');
     if (!this.features.paddle) throw httpError(403, 'Paddle ist deaktiviert');
     const lv = clampInt(level, 0, 100);
     this._lastAppAction = Date.now();
@@ -1257,7 +1605,7 @@ export class Machine extends Emitter {
 
   // Backflush im Hintergrund starten: je Runde Druck aufbauen, halten, über paddle/stop entlasten.
   async runBackflush() {
-    if (!this.api.paddle) throw httpError(409, 'Backflush braucht die direkte Pumpensteuerung, die alte Xenia hat sie nicht');
+    if (!this.hasPaddle) throw httpError(409, 'Backflush braucht die direkte Pumpensteuerung, diese Xenia hat sie nicht');
     if (!this.features.paddle) throw httpError(403, 'Backflush braucht die Paddle-Steuerung, sie ist deaktiviert');
     if (this._backflush) throw httpError(409, 'Backflush läuft schon');
     if (this.state.status !== 1) throw httpError(409, 'Maschine muss eingeschaltet und bereit sein');

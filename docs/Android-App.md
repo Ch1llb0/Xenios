@@ -5,16 +5,33 @@ Native App (Kotlin, ohne Fremd-Bibliotheken, ab Android 11) im Ordner [`app/`](.
 | Funktion | Beschreibung |
 |---|---|
 | **App-Fenster** | Die komplette Web-App (Dashboard, Home, Skripte, Schalter, Paddle, Timer, Mühle, Einstellungen). Sie ist immer auf dem Stand des Servers, ohne App-Update. |
-| **Dashboard (Tablet)** | Übersicht nur zum Ansehen, hochkant und quer: Status, Instrumente, Live-Druckkurve während eines Bezugs (erscheint dann ganz oben), letzter Bezug und Mahlvorgang, Bezüge pro Tag, Bezugszeiten, Mahlgewichte, Verlauf. Über das Regler-Symbol oben rechts lassen sich Kacheln ein-/ausblenden, verschieben und auf volle Breite stellen; die Auswahl gilt pro Gerät. Dort auch „Beim Start öffnen“ und „Bildschirm anlassen“ (für ein Tablet an der Wand). |
-| **Widget „Kaffeemaschine Ein/Aus“** (1×1) | Ein Tipp schaltet ein (aus Aus oder Eco) bzw. aus. Die Farbe zeigt den Zustand: grau = aus, blau = heizt, grün = bereit, gelb = Eco, rot = offline. |
-| **Widget „Kaffeemaschine“** (3×2, veränderbar) | Status, Brühtemperatur mit Ziel, Dampfdruck, Tank-Warnung und die Knöpfe **Ein / Eco / Aus**. Ist die Maschine aus, ist nur „Ein“ bedienbar. Antippen der Kopfzeile öffnet die App, ↻ aktualisiert. |
-| **Widget „Kaffeemaschine schmal“** (4×1) | Status und Temperatur, Ein / Eco / Aus in einer Zeile. |
-| **Widget „Kaffeemaschine groß“** (4×2) | Status, Brühgruppe mit Ziel, Brühkessel, Dampfdruck, **nächstes geplantes Einschalten** (Wecker oder Server-Zeitplan) und Ein / Eco / Aus. |
-| **Schnelleinstellungs-Kachel** | Im Benachrichtigungs-Schatten: zeigt Aus/Heizt auf/Bereit/Eco und schaltet Ein/Aus. |
+| **Dashboard (Tablet)** | Übersicht, hochkant und quer: Schalter (Ein/Eco/Aus, Dampf, „Ohne Dampf einschalten“), Status, Instrumente (Druck, Brühgruppe, Brühkessel, Dampf), Live-Druckkurve während eines Bezugs (erscheint dann ganz oben), letzter Bezug und Mahlvorgang, Bezüge pro Tag, Bezugszeiten, Mahlgewichte, Verlauf. Über das Regler-Symbol oben rechts lassen sich Kacheln ein-/ausblenden, verschieben und in Breite (1–3 Spalten oder ganze Breite) und Höhe (1–4 Zellen) einstellen; Kacheln einer Zeile sind gleich hoch. Die Auswahl gilt pro Gerät. Dort auch „Beim Start öffnen“ und „Bildschirm anlassen“ (für ein Tablet an der Wand). |
+| **Widgets** | 11 Widgets, in der Auswahl in dieser Reihenfolge (siehe unten). Symbole wie die Kacheln auf Home; Farben, Formen, Schrift und Anzeigen folgen dem Design der App (Material oder Xenia, hell/dunkel). Titel „Xenios – Name“, wo Platz ist. |
+| **Schnelleinstellungs-Kachel** | Im Benachrichtigungs-Schatten: zeigt Aus/Heizt auf/Bereit/Eco und schaltet Ein/Aus. Nach dem Tippen zeigt sie sofort „Schaltet ein/aus …“ und wartet auf die Bestätigung der Maschine; weitere Tipps werden so lange ignoriert. |
 | **Wecker-Automatik** | Die App meldet dem Server den nächsten Wecker des Handys (Android stellt nur den nächsten bereit; die Uhr-App von Google und die meisten Wecker-Apps tragen ihn dort ein). Der Server schaltet die Maschine eine einstellbare Zeit vorher ein. Bei mehreren Handys zählt der früheste. Einstellungen: *Timer → Wecker* (an/aus, Vorlauf, Dampfkessel, frühester/spätester Wecker, Wochentage, welche Handys zählen). „Wecker prüfen“ meldet den Wecker des Handys, auf dem die App gerade offen ist, sofort; „Alle Wecker in der Uhr-App ansehen“ öffnet die Wecker-Liste. Eine vollständige Liste aller Wecker gibt Android anderen Apps nicht heraus. Einträge verschwinden von selbst, sobald die Anmeldung des Handys endet oder es einen Tag lang keinen künftigen Wecker gemeldet hat; abgewählte Handys bleiben stehen, solange ihre Anmeldung gilt. |
 | **App-Shortcuts** | Langdruck auf das App-Symbol: Einschalten, Eco, Ausschalten (ohne die App zu öffnen), Timer und Dashboard. Manche Launcher zeigen nur vier davon, dann fehlt der letzte („Dashboard“). Für ein Tablet stattdessen im Dashboard „Beim Start öffnen“ einschalten. |
 
-Widgets aktualisieren sich beim Schalten, beim Verlassen der App, alle 30 min und während des Aufheizens alle 2 min. Klappt ein automatisches Update nicht (Netz nach dem Aufwachen noch nicht da, Netzwechsel), bleibt der letzte Stand stehen und das Widget versucht es nach 1, 2, 5 und dann alle 15 min erneut (bei ausgeschaltetem Bildschirm beim nächsten Einschalten); erst nach mehreren Fehlschlägen zeigt es den Fehler. Ist die Maschine wirklich offline, sieht es im selben Takt wieder nach. „Offline“ heißt: Der Server erreicht die Maschine nicht. Der Server meldet das erst, wenn sie zweimal in Folge nicht antwortet.
+### Widgets
+
+| Widget | Größe | Inhalt |
+|---|---|---|
+| **Ein/Aus** | 2×1 | Ein Tipp schaltet ein (aus Aus oder Eco) bzw. aus; „Ohne Dampf einschalten“ der App gilt. |
+| **Ein ohne Dampf/Aus** | 2×1 | Ein Tipp schaltet ohne Dampfkessel ein bzw. aus, unabhängig von der Einstellung. |
+| **Kaffeemaschine groß** | 4×3 | Status (Brühgruppe, Dampf, nächstes geplantes Einschalten), Plaketten Tank, Dampf, Waage verbunden (alte Xenia), Bezüge heute; Ein/Eco/Aus, Dampfkessel, „Ohne Dampf einschalten“. |
+| **Schalter** | 4×2 | Wie die Kachel „Schalter“: Ein/Eco/Aus, Dampfkessel, „Ohne Dampf einschalten“, Zustand oben rechts. |
+| **Instrumente** | 4×2 (2×2 bei schmalem Widget) | Druck, Brühgruppe, Brühkessel, Dampfkessel mit Zielen – Manometer (Xenia) oder flache Anzeigen (Material). |
+| **Verlauf (10 min)** | 4×2 | Temperaturen und Drücke der letzten 10 Minuten. |
+| **Letzter Bezug** | 2×2 | Bezugszeit, Ausbeute, Verhältnis und Kurve. |
+| **Bezüge** | 4×2 | Letzter Bezug und Bezüge pro Tag. |
+| **Bezüge groß** | 4×3 | Letzter Bezug, Bezüge pro Tag und Bezugszeiten. |
+| **Sollwerte** | 2×2 | Brühgruppe, Brühkessel und Dampfdruck mit −/+. |
+| **Pflege** | 2×1 | Wann der nächste Backflush fällig ist. |
+
+Alle Widgets lassen sich in der Größe ändern; gezeichnet wird für jede Größe ein eigenes, passendes Bild (nichts wird gestreckt). Die Klickflächen der Widgets erzeugt [`app/tools/widgets_gen.py`](../app/tools/widgets_gen.py) zusammen mit `WidgetSpecs.kt`.
+
+**Schalten:** Nach einem Tipp zeigt das Widget sofort den erwarteten Zustand („Schaltet ein …“, der gedrückte Knopf ist hervorgehoben und pulsiert), bis die Maschine ihn meldet (jede Sekunde nachgesehen, höchstens 8 s). So lange werden weitere Tipps auf Schalter ignoriert. Sollwerte und „Ohne Dampf einschalten“ ändern sich ebenfalls sofort; schnelle Tipps auf −/+ addieren sich.
+
+**Aktualisierung:** Bei eingeschaltetem Bildschirm alle 5 s (kürzer lässt Android für Wecker nicht zu), solange die App selbst nicht offen ist; ohne Verbindung nach 5, 10, 30 und dann alle 60 s. Bei ausgeschaltetem Bildschirm wird nichts abgefragt und das Handy nicht geweckt; beim Einschalten oder Entsperren aktualisieren sich die Widgets sofort. Für den 5-Sekunden-Takt braucht die App die Erlaubnis **„Wecker und Erinnerungen“** (`SCHEDULE_EXACT_ALARM`): bis Android 13 automatisch erteilt, ab Android 14 einmal zu erlauben. Liegt ein Widget auf dem Startbildschirm und fehlt die Erlaubnis, weist die App einmalig darauf hin; *Einstellungen → Widgets* zeigt den Stand und öffnet die Einstellung. Ohne Erlaubnis bündelt Android die Wecker und die Widgets aktualisieren sich langsamer. Klappt ein Update nicht, bleibt der letzte Stand stehen; erst nach mehreren Fehlschlägen zeigt das Widget den Fehler. „Offline“ heißt: Der Server erreicht die Maschine nicht (zweimal in Folge keine Antwort).
 
 ## Anmeldung und Sicherheit
 - Beim ersten Start fragt die App nach der **Server-Adresse** (Cloudflare, z. B. `https://xenia.example.com`), optional einer **lokalen Adresse** (z. B. `http://192.168.178.32`) und dem **App-Passwort**. Mindestens eine Adresse ist nötig.
@@ -36,7 +53,7 @@ Bei der Einrichtung „Direkt im Heimnetz“ wählen und dieselbe Umschaltung wi
 Ohne Server entfallen Push-Benachrichtigungen, die weiteren Schaltzeiten, das Einschalten vor dem Wecker und der Zugriff von unterwegs.
 
 **IP-Adressen finden**
-1. In der Einrichtung **„Im WLAN suchen“** tippen. Die App fragt alle Geräte im eigenen WLAN ab (x.x.x.1–254).
+1. In der Einrichtung **„Im WLAN suchen“** tippen. Die App fragt alle Geräte im eigenen WLAN ab (x.x.x.1–254); ein Fortschrittsbalken zeigt, wie viele Adressen abgefragt und wie viele Geräte gefunden sind. Dieselbe Suche gibt es bei „Mit Server“ für den Xenios-Server (HTTPS Port 8443, HTTP 80/8080), jeweils mit Anleitung daneben.
 2. Oder in der Fritz!Box: `fritz.box` → *Heimnetz → Netzwerk → Netzwerkverbindungen*. Die Maschine heißt meist **ESP32-…** bzw. **espressif**, die Mühle **hemro_hsg_…** (Hemro).
 3. Bei beiden Geräten dort „Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“ anhaken.
 4. Prüfen: `http://<IP>/` zeigt die Xenia-Oberfläche. Für die Mühle `https://<IP>/` öffnen und die Zertifikatswarnung bestätigen.

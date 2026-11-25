@@ -28,6 +28,8 @@ object Api {
         /** Nächstes geplantes Einschalten (Wecker oder Server-Zeitplan) in ms, mit Grund. */
         val nextAt: Long? = null,
         val nextReason: String? = null,
+        /** Vollständige Antwort von /api/widget (Bezüge, Verlauf, laufender Bezug …); im Direkt-Modus null */
+        val raw: org.json.JSONObject? = null,
     ) {
         /** Eingeschaltet im Sinne von „nicht Aus/Eco“ (an, Bezug, Nachlauf, Paddle, Störung). */
         val isOn: Boolean get() = online && status != null && status != "off" && status != "eco"
@@ -75,6 +77,7 @@ object Api {
 
     private fun reachable(base: String): Boolean = try {
         val conn = URL(base.trimEnd('/') + "/healthz").openConnection() as HttpURLConnection
+        LocalTls.prepare(conn)
         try {
             conn.connectTimeout = 1200
             conn.readTimeout = 1500
@@ -88,6 +91,7 @@ object Api {
 
     fun call(base: String, method: String, path: String, body: JSONObject?, token: String?): JSONObject {
         val conn = URL(base.trimEnd('/') + path).openConnection() as HttpURLConnection
+        LocalTls.prepare(conn)
         try {
             conn.requestMethod = method
             conn.connectTimeout = 6000
@@ -157,14 +161,36 @@ object Api {
             steamSet = dbl("steamSet"),
             nextAt = o.optJSONObject("next")?.optLong("at")?.takeIf { it > 0 },
             nextReason = o.optJSONObject("next")?.optString("reason"),
+            raw = o,
         )
     }
 
-    /** mode: "on" | "off" | "eco" */
-    fun power(context: Context, mode: String) {
-        if (Prefs(context).direct) return DirectMachine.power(context, mode)
-        serverOrDirect(context, { request(context, "POST", "/api/machine/power", JSONObject().put("mode", mode)); Unit }) { DirectMachine.power(context, mode) }
+    /** Dampfkessel ein/aus (nur mit Server) */
+    fun steam(context: Context, on: Boolean) {
+        request(context, "POST", "/api/machine/steam", JSONObject().put("on", on))
     }
+
+    /** Laufendes Skript bzw. laufenden Bezug stoppen (nur mit Server) */
+    fun stopScript(context: Context) {
+        request(context, "POST", "/api/machine/scripts/stop", JSONObject())
+    }
+
+    /** Sollwert setzen, z. B. BG_SET_TEMP (nur mit Server) */
+    fun setTarget(context: Context, key: String, value: Double) {
+        request(context, "POST", "/api/machine/settings", JSONObject().put("changes", JSONObject().put(key, value)))
+    }
+
+    /** mode: "on" | "off" | "eco" | "on_nosteam" (ein, nur Brühkessel – ohne Dampfkessel) */
+    fun power(context: Context, mode0: String) {
+        // „Ein“ wie in der App: mit der Einstellung „Ohne Dampf einschalten“ ohne Dampfkessel
+        val mode = if (mode0 == "on" && Prefs(context).noSteamOn) MODE_ON_NO_STEAM else mode0
+        if (Prefs(context).direct) return DirectMachine.power(context, mode)
+        val body = if (mode == MODE_ON_NO_STEAM) JSONObject().put("mode", "on").put("steam", false) else JSONObject().put("mode", mode)
+        serverOrDirect(context, { request(context, "POST", "/api/machine/power", body); Unit }) { DirectMachine.power(context, mode) }
+    }
+
+    /** Einschalten ohne Dampfkessel (Widget-Knopf „o. Dampf“) */
+    const val MODE_ON_NO_STEAM = "on_nosteam"
 
     /** Server nicht erreichbar (oder Cloudflare meldet ihn als down)? Dann die Maschine direkt im Heimnetz ansprechen. */
     private fun <T> serverOrDirect(context: Context, server: () -> T, direct: (IOException) -> T): T = try {
@@ -179,11 +205,12 @@ object Api {
     val SERVER_DOWN = setOf(502, 503, 504, 521, 522, 523, 530)
 
     /** Ein/Aus umschalten: Aus oder Eco → Ein, sonst → Aus. Gibt den gesendeten Modus zurück. */
-    fun toggle(context: Context): String {
+    /** noSteam: immer ohne Dampfkessel einschalten (Widget „Ein ohne Dampf/Aus“) */
+    fun toggle(context: Context, noSteam: Boolean = false): String {
         val s = state(context)
         if (!s.online) throw ApiException(502, "Maschine nicht erreichbar")
         if (s.shot) throw ApiException(409, "Bezug läuft – bitte an der Maschine stoppen")
-        val mode = if (s.isOn) "off" else "on"
+        val mode = if (s.isOn) "off" else if (noSteam) MODE_ON_NO_STEAM else "on"
         power(context, mode)
         return mode
     }
@@ -204,7 +231,8 @@ object Api {
         is ApiException -> e.message ?: "Fehler"
         is java.net.UnknownHostException -> "Server nicht gefunden"
         is java.net.SocketTimeoutException -> "Zeitüberschreitung"
-        is javax.net.ssl.SSLException -> "TLS-Fehler (gültiges Zertifikat nötig, z. B. Cloudflare)"
+        is javax.net.ssl.SSLException -> "TLS-Fehler: Zertifikat ungültig oder geändert (lokale Adresse neu eintragen)"
+        is java.net.ConnectException -> "Keine Verbindung (${e.message ?: "abgelehnt"})"
         else -> e.message ?: e.javaClass.simpleName
     }
 }

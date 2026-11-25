@@ -47,12 +47,23 @@ const num = (v) => (v === undefined || v === null || v === '' ? null : Number(v)
 export function normalizeLive(d) {
   return {
     ...d,
-    PU_LOADCELL_VOLUME: first(d.PU_LOADCELL_VOLUME, d.PU_SENS_SCALE_VOLUME, d.SCALE_WEIGHT),
-    PU_LOADCELL_RATE: first(d.PU_LOADCELL_RATE, d.PU_SENS_SCALE_RATE),
+    // Alte Xenia (DBL): SCALE_WEIGHT ist die Bluetooth-Waage, PU_SENS_SCALE_VOLUME die (meist fehlende) interne –
+    // die steht dann auf 0. Deshalb den Wert nehmen, der tatsächlich etwas misst.
+    PU_LOADCELL_VOLUME: measured(d.PU_LOADCELL_VOLUME, d.SCALE_WEIGHT, d.PU_SENS_SCALE_VOLUME),
+    PU_LOADCELL_RATE: measured(d.PU_LOADCELL_RATE, d.PU_SENS_SCALE_RATE),
     PU_SENS_FLOW_METER_VOLUME: first(d.PU_SENS_FLOW_METER_VOLUME, d.PU_SENS_FLOW_METER_ML),
     PU_SENS_FLOW_METER_FLOWRATE: first(d.PU_SENS_FLOW_METER_FLOWRATE),
     PU_SENS_FLOW_METER_ML: first(d.PU_SENS_FLOW_METER_ML, d.PU_SENS_FLOW_METER_VOLUME),
   };
+}
+
+// Erster Wert ungleich 0; sonst der erste vorhandene (auch 0)
+function measured(...vals) {
+  for (const v of vals) {
+    const n = num(v);
+    if (n !== null && Number.isFinite(n) && n !== 0) return n;
+  }
+  return first(...vals);
 }
 
 function first(...vals) {

@@ -1,3 +1,4 @@
+import { XENIA_ICONS } from './icons-xenia.js';
 // UI-Hilfen: Elemente bauen (ohne innerHTML für Fremddaten), Icons, Snackbar, Sheets, Dialoge, Formatierung.
 import { store } from './api.js';
 
@@ -12,7 +13,7 @@ for (const proto of [Element.prototype, DocumentFragment.prototype]) {
 }
 
 export function h(tag, attrs, ...children) {
-  const isSvg = ['svg', 'path', 'circle', 'g', 'line', 'text', 'polyline', 'rect', 'polygon', 'tspan'].includes(tag);
+  const isSvg = ['svg', 'path', 'circle', 'g', 'line', 'text', 'polyline', 'rect', 'polygon', 'tspan', 'defs', 'linearGradient', 'radialGradient', 'stop', 'ellipse'].includes(tag);
   const el = isSvg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v === undefined || v === null || v === false) continue;
@@ -77,6 +78,8 @@ const P = {
   history: 'M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z',
   warn: 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z',
   sort: 'M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z',
+  speed: 'M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44zm-9.79 6.84a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z',
+  toggle: 'M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z',
   tune: 'M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z',
   scale: 'M12 3c-1.27 0-2.4.8-2.82 2H3v2h1.95L2 14c-.47 2 1 3 3.5 3s4.06-1 3.5-3L6.05 7h3.12c.33.85.97 1.51 1.83 1.83V19H2v2h20v-2h-9V8.82c.85-.32 1.5-.98 1.83-1.82h3.12L15 14c-.47 2 1 3 3.5 3s4.06-1 3.5-3l-2.95-7H21V5h-6.17C14.4 3.8 13.27 3 12 3zM5.5 9.5 7 13H4l1.5-3.5zm13 0L20 13h-3l1.5-3.5z',
   timer: 'M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a8.994 8.994 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z',
@@ -84,7 +87,17 @@ const P = {
   palette: 'M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
 };
 
+// Schalter als Umriss (für Kachelköpfe, Linienstärke wie die übrigen Kachel-Symbole)
+P.toggleTile = 'M7 18q-2.5 0-4.25-1.75T1 12q0-2.5 1.75-4.25T7 6h10q2.5 0 4.25 1.75T23 12q0 2.5-1.75 4.25T17 18Zm0-2h10q1.65 0 2.825-1.175Q21 13.65 21 12q0-1.65-1.175-2.825Q18.65 8 17 8H7Q5.35 8 4.175 9.175 3 10.35 3 12q0 1.65 1.175 2.825Q5.35 16 7 16Zm10-1q1.25 0 2.125-.875T20 12q0-1.25-.875-2.125T17 9q-1.25 0-2.125.875T14 12q0 1.25.875 2.125T17 15Z';
+P.coffeeLine = P.coffee; P.coffeeDrip = P.coffee; P.calendarBars = P.event; // Fallback ohne Xenia-Symbole
+P.group = P.thermo; P.boiler = P.thermo; P.pid = P.tune; P.shotlog = P.list;
+
+// Symbole in beiden Designs gleich (ausgesuchte Kachel- und Leisten-Symbole); fehlt eines, das Material-Icon
 export function icon(name, cls = '') {
+  const x = XENIA_ICONS[name];
+  if (x) {
+    return h('svg', { class: `icon xi ${cls}`.trim(), viewBox: x.vb, 'aria-hidden': 'true' }, x.els.map(([tag, a]) => h(tag, a)));
+  }
   return h('svg', { class: `icon ${cls}`.trim(), viewBox: '0 0 24 24', 'aria-hidden': 'true' }, h('path', { d: P[name] || P.info }));
 }
 
@@ -132,20 +145,36 @@ export function switchEl({ checked, disabled, onChange, label }) {
 }
 
 export function sliderRow({ label, min, max, step = 1, value, unit = '', digits = 1, onInput }) {
-  const out = h('span', { class: 'value' });
-  const input = h('input', { type: 'range', min, max, step, value });
+  // Wert antippen: genaue Eingabe per Tastatur in einem Dialog (zusätzlich zum Regler). Der eingegebene Wert gilt genau
+  // (auf die angezeigten Nachkommastellen), auch zwischen den Rasterschritten des Reglers.
+  const out = h('button', { type: 'button', class: 'value value-edit', title: 'Wert eingeben', 'aria-label': `${label}: Wert eingeben` });
+  const input = h('input', { type: 'range', min, max, step, value, 'aria-label': label });
+  let cur = Number(input.value);
   const paint = () => {
-    const pct = ((Number(input.value) - min) / (max - min)) * 100;
+    const pct = ((cur - min) / (max - min)) * 100;
     input.style.setProperty('--fill', `${pct}%`);
-    out.textContent = `${fmt(Number(input.value), digits)}${unit ? ' ' + unit : ''}`;
+    input.style.setProperty('--fill-px', `${pct * 0.04}px`); // Griff (4 px) liegt bei pct % der um seine Breite gekürzten Spur
+    out.textContent = `${fmt(cur, digits)}${unit ? ' ' + unit : ''}`;
   };
   input.addEventListener('input', () => {
+    cur = Number(input.value);
     paint();
-    onInput?.(Number(input.value));
+    onInput?.(cur);
+  });
+  out.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const n = await promptNumber(label, { value: cur, min, max, step, unit, digits });
+    if (n === null) return;
+    if (!Number.isFinite(n)) { snackbar(`Erlaubt: ${fmt(min, digits)}–${fmt(max, digits)}${unit ? ' ' + unit : ''}`); return; }
+    const f = 10 ** digits;
+    cur = Math.min(max, Math.max(min, Math.round(n * f) / f));
+    input.value = String(cur);
+    paint();
+    onInput?.(cur);
   });
   paint();
   const row = h('div', { class: 'slider-row' }, h('span', { class: 'label' }, label), out, input);
-  row.setValue = (v) => { input.value = v; paint(); };
+  row.setValue = (v) => { input.value = v; cur = Number(v); paint(); };
   row.input = input;
   return row;
 }
@@ -160,10 +189,30 @@ export function snackbar(message, { action, onAction, duration = 3500 } = {}) {
   snackTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
 
+// Offene Fenster (oben = zuletzt geöffnet): die Zurück-Taste der App schließt zuerst das oberste
+const openOverlays = [];
+export function closeTopOverlay() {
+  const close = openOverlays.at(-1);
+  if (close) { close(); return true; }
+  // Rückfall: sichtbares Fenster direkt im Dokument suchen (Schließen-Knopf, sonst Hintergrund antippen)
+  const root = document.getElementById('sheet-root');
+  const top = [...(root?.children || [])].reverse().find((el) => el.classList.contains('show') && !el.classList.contains('scrim'));
+  if (!top) return false;
+  const btn = top.querySelector('.sheet-close, .detail-head .icon-btn, [aria-label="Schließen"], [aria-label="Zurück"]');
+  if (btn) btn.click();
+  else root.querySelector('.scrim.show')?.click();
+  return true;
+}
+
 function overlay(panel, { onClose } = {}) {
   const root = document.getElementById('sheet-root');
   const scrim = h('div', { class: 'scrim' });
+  let closed = false;
   const close = () => {
+    if (closed) return;
+    closed = true;
+    const i = openOverlays.indexOf(close);
+    if (i >= 0) openOverlays.splice(i, 1);
     panel.classList.remove('show');
     scrim.classList.remove('show');
     setTimeout(() => { panel.remove(); scrim.remove(); }, 220);
@@ -174,13 +223,19 @@ function overlay(panel, { onClose } = {}) {
   scrim.addEventListener('click', close);
   document.addEventListener('keydown', onKey);
   root.append(scrim, panel);
+  openOverlays.push(close);
   requestAnimationFrame(() => { scrim.classList.add('show'); panel.classList.add('show'); });
   return close;
 }
 
 export function sheet(title, content, opts) {
-  const panel = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title }, h('div', { class: 'handle' }), title ? h('h2', {}, title) : null, content);
-  return overlay(panel, opts);
+  // Kopf mit Titel und Schließen-Knopf; am Handy füllt das Fenster den Bildschirm fast ganz, ein Wisch-Griff reicht dort nicht
+  let close = () => {};
+  const closeBtn = h('button', { class: 'icon-btn sheet-close', type: 'button', 'aria-label': 'Schließen', title: 'Schließen', onclick: () => close() }, icon('close'));
+  const panel = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title },
+    h('div', { class: 'sheet-head' }, h('h2', { class: 'grow' }, title || ''), closeBtn), content);
+  close = overlay(panel, opts);
+  return close;
 }
 
 export function dialog(title, content, actions = []) {
@@ -192,14 +247,16 @@ export function dialog(title, content, actions = []) {
   });
 }
 
-export function promptNumber(title, { value, min, max, step = 0.1, unit = '' } = {}) {
-  const input = h('input', { class: 'text', type: 'number', inputmode: 'decimal', min, max, step, value: value ?? '' });
-  const p = dialog(title, h('label', { class: 'field' }, h('span', {}, `${fmt(min, 0)}–${fmt(max, 0)} ${unit}`), input), [
+export function promptNumber(title, { value, min, max, step = 0.1, unit = '', digits = 0 } = {}) {
+  // Textfeld mit Zifferntastatur: nimmt Komma und Punkt an (ein Zahlenfeld verwirft je nach Sprache das Komma)
+  const input = h('input', { class: 'text', type: 'text', inputmode: 'decimal', autocomplete: 'off', value: value == null ? '' : String(Math.round(value * 1000) / 1000).replace('.', ',') });
+  const p = dialog(title, h('label', { class: 'field' }, h('span', {}, `${fmt(min, digits)}–${fmt(max, digits)} ${unit}`), input), [
     { label: 'Abbrechen', value: null },
     { label: 'OK', value: 'ok', kind: 'filled' },
   ]).then((r) => {
     if (r !== 'ok') return null;
-    const n = Number(String(input.value).replace(',', '.'));
+    const raw = String(input.value).trim().replace(/\s/g, '').replace(',', '.');
+    const n = raw === '' ? NaN : Number(raw);
     return Number.isFinite(n) && n >= min && n <= max ? n : NaN;
   });
   setTimeout(() => { input.focus(); input.select(); }, 60);
@@ -215,10 +272,16 @@ export function fullscreen(build) {
   const panel = h('div', { class: 'fullscreen', role: 'dialog' }, inner);
   document.getElementById('sheet-root').append(panel);
   requestAnimationFrame(() => panel.classList.add('show'));
+  let closed = false;
   const close = () => {
+    if (closed) return;
+    closed = true;
+    const i = openOverlays.indexOf(close);
+    if (i >= 0) openOverlays.splice(i, 1);
     panel.classList.remove('show');
     setTimeout(() => panel.remove(), 200);
   };
+  openOverlays.push(close); // Zurück-Taste der App schließt auch Vollbild-Fenster (z. B. Bezug)
   build(inner, close);
   return close;
 }
@@ -283,4 +346,40 @@ function wheel(count, selected) {
   mark();
   requestAnimationFrame(() => go(value, false));
   return { el, get value() { return value; } };
+}
+
+// --- Auswahllisten in der Android-App --------------------------------------------------------------------------
+// Android öffnet <select> als System-Dialog (fremde Schrift, schlechte Abstände, Umbruch ohne Trennung). In der App
+// öffnet jede Auswahlliste stattdessen ein Fenster von unten in der Gestaltung der App. Im Browser bleibt es nativ.
+function openSelectSheet(select) {
+  const label = select.getAttribute('aria-label') || select.closest('label, .field')?.querySelector('span, .label')?.textContent || select.title || 'Auswählen';
+  let close = () => {};
+  const opts = [...select.options].filter((o) => !o.hidden);
+  const list = h('div', { class: 'pick-list', role: 'listbox' }, opts.map((o) => h('button', {
+    class: `pick-opt${o.selected ? ' sel' : ''}`, type: 'button', role: 'option', 'aria-selected': String(o.selected), disabled: o.disabled,
+    onclick: () => {
+      if (select.value !== o.value) {
+        select.value = o.value;
+        select.dispatchEvent(new Event('input', { bubbles: true }));
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      close();
+    },
+  }, h('span', { class: 'ck' }, o.selected ? icon('check', 's18') : null), o.textContent)));
+  close = sheet(label, list);
+  requestAnimationFrame(() => list.querySelector('.sel')?.scrollIntoView({ block: 'nearest' }));
+}
+if (/XeniaApp\//.test(navigator.userAgent)) {
+  const intercept = (e) => {
+    const select = e.target.closest?.('select');
+    if (!select || select.disabled || select.multiple) return;
+    e.preventDefault();
+    if (e.type === 'keydown' && ![' ', 'Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    select.focus({ preventScroll: true });
+    if (e.type !== 'mousedown' || e.button === 0) openSelectSheet(select);
+  };
+  document.addEventListener('mousedown', intercept, true);
+  document.addEventListener('keydown', intercept, true);
+  // der Tipp selbst darf die System-Liste nicht mehr öffnen
+  document.addEventListener('click', (e) => { if (e.target.closest?.('select')) e.preventDefault(); }, true);
 }

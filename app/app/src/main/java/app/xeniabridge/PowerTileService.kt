@@ -14,6 +14,8 @@ import kotlin.concurrent.thread
 /** Schnelleinstellungs-Kachel: zeigt den Zustand und schaltet Ein/Aus. */
 class PowerTileService : TileService() {
     private val main = Handler(Looper.getMainLooper())
+    @Volatile private var busy = false
+    @Volatile private var last: Api.State? = null
 
     override fun onStartListening() {
         super.onStartListening()
@@ -26,13 +28,24 @@ class PowerTileService : TileService() {
             openApp()
             return
         }
-        paint(null, busy = true)
+        // Doppelte Tipps abfangen, bis die Maschine den neuen Zustand meldet
+        if (busy) return
+        busy = true
+        val wasOn = last?.isOn == true
+        paint(null, busy = true, note = if (wasOn) "Schaltet aus …" else "Schaltet ein …")
         thread(name = "xenia-tile") {
             try {
                 Api.toggle(this)
-                Thread.sleep(1200)
+                // bis zu 8 s jede Sekunde nachsehen, bis der Zustand umgeschlagen ist
+                for (i in 0 until 8) {
+                    Thread.sleep(1000)
+                    val now = runCatching { Api.state(this) }.getOrNull() ?: continue
+                    if (now.online && now.isOn != wasOn) break
+                }
             } catch (e: Exception) {
                 main.post { Toast.makeText(this, Api.message(e), Toast.LENGTH_SHORT).show() }
+            } finally {
+                busy = false
             }
             val s = Widgets.renderFresh(applicationContext)
             main.post { paint(s) }
@@ -50,13 +63,16 @@ class PowerTileService : TileService() {
         }
     }
 
-    private fun paint(s: Api.State?, busy: Boolean = false) {
+    private fun paint(s: Api.State?, busy: Boolean = false, note: String? = null) {
+        if (s != null) last = s
         val tile = qsTile ?: return
         tile.icon = Icon.createWithResource(this, R.drawable.ic_power)
         tile.label = getString(R.string.tile_label)
         when {
             busy -> {
-                tile.subtitle = "…"
+                // sofort den Zielzustand zeigen
+                tile.state = if (note == "Schaltet ein …") Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+                tile.subtitle = note ?: "…"
             }
             s == null || !s.online -> {
                 tile.state = Tile.STATE_UNAVAILABLE

@@ -2,11 +2,15 @@
 
 Sicherer Web-Server, installierbare Web-App (PWA) und native Android-App mit Widgets für die **Xenia-Espressomaschine** und die **Mahlkönig E64 WS**. Mit Passwort geschützt, im Heimnetz per HTTPS und von unterwegs verschlüsselt über einen Cloudflare-Tunnel erreichbar.
 
-| Dashboard | Home | Bezüge | Skripte | Steuerung | Timer | Mühle |
+| Home | Bezüge | Skripte | Schalter | Paddle | Timer | Mühle |
 |---|---|---|---|---|---|---|
-| Anpassbare Übersicht zum Ansehen (auch fürs Tablet): Instrumente, Live-Druckkurve beim Bezug, letzter Bezug und Mahlvorgang, Verläufe | Druck- und Temperatur-Instrumente, Live-Diagramm, Ein/Aus/Eco/Dampf, Zieltemperatur | Protokoll mit Analyse: Kurve gegen frühere Bezüge, Referenz und Zielkurve des Skripts, Dosis und Verhältnis automatisch von der Mühle, Einstell-Assistent (nach jedem Bezug Geschmack und Stärke antippen → feiner/gröber, mehr/weniger Ausbeute, mit Verlauf je Bohne), Backflush-Erinnerung, CSV | Schnellstart (einfach/doppelt/Dauerbezug), Skript-Editor, Druckprofil-Baukasten mit Vorlagen nach dem Decent-Profil-Leitfaden (Blooming, Londinium, Allongé, Turbo …), Profile der visualizer.coffee-Community mit einem Klick übernehmen, Export/Import | Tastenbelegung, Bezugsgewichte, Paddle | Wochenplan, Schaltzeiten über den Server, Einschalten vor dem ersten Wecker | Rezepte, Mahlvorgänge, Grind-by-Sync, Meldungen; Drehknopf der Mühle startet auf Wunsch ein Druckprofil (Xenios vermittelt, die Mühle lernt weiter) |
+| Anpassbare Übersicht aus Kacheln (am Handy untereinander, auf dem Tablet in Breite und Höhe wählbar): Status mit laufendem Skript, Schalter (Ein/Eco/Aus, Dampf, Skript stoppen), Sollwerte, Instrumente inkl. Brühkessel, Live-Druckkurve beim Bezug, letzter Bezug und Mahlvorgang, Verlauf mit allen Sensorwerten | Protokoll mit Analyse: Kurve gegen frühere Bezüge, Referenz und Zielkurve des Skripts, Dosis und Verhältnis automatisch von der Mühle, Einstell-Assistent (nach jedem Bezug Geschmack und Stärke antippen → feiner/gröber, mehr/weniger Ausbeute, mit Verlauf je Bohne), Backflush-Erinnerung, CSV | Schnellstart (einfach/doppelt/Dauerbezug), Skript-Editor, Druckprofil-Baukasten mit Vorlagen nach dem Decent-Profil-Leitfaden (Blooming, Londinium, Allongé, Turbo …), Profile der visualizer.coffee-Community mit einem Klick übernehmen, Export/Import | Tastenbelegung mit Frontansicht (neue Xenia: vier Taster, DBL: zwei Kippschalter) | Pumpe direkt steuern, Aufnahme als Skript | Wochenplan, Schaltzeiten über den Server, Einschalten vor dem ersten Wecker | Rezepte, Mahlvorgänge, Grind-by-Sync, Meldungen; Drehknopf der Mühle startet auf Wunsch ein Druckprofil (Xenios vermittelt, die Mühle lernt weiter) |
 
-**Android-App** ([Anleitung](docs/Android-App.md)): Widgets, Schnelleinstellungs-Kachel, App-Shortcuts, Direkt-Modus ohne Server.
+**Android-App** ([Anleitung](docs/Android-App.md)): Widgets (Ein, Ein ohne Dampf, Eco, Aus), Schnelleinstellungs-Kachel, App-Shortcuts, Direkt-Modus ohne Server.
+
+**Einstellungen** als eigener Tab in drei Bereichen: Darstellung, Leiste sowie Komponenten & Funktionen direkt; **Maschinen-Einstellungen** (Waage, Maschine, Brühgruppe, Brühkessel, Dampfkessel, Pumpe inkl. Bezugszeit für Standardbezüge, PID, Timer, Schalter, Wi-Fi, Firmware) und **Server- & App-Einstellungen** (Geräte, Zugriff von unterwegs, Zeit, Benachrichtigungen, Aufzeichnung, Sicherheit, Konto) als eigene Seiten mit eingeklappten Kategorien. Die Xenia DBL mit Firmware 4.1xx wird erkannt und über die Endpunkte ihrer Original-Seiten eingestellt.
+
+**Design** (je Gerät): „Material“ (Material 3, Standard: Leiste unten mit Beschriftung, runde Formen, flache Anzeigen) oder „Xenia“ wie die Web-Oberfläche der Maschine (Schrift, Navigation links bzw. am Handy unten nur mit Symbolen, Anzeigen wie die Manometer der Maschine); die Symbole sind in beiden gleich. **Anpassen** (je Gerät): Hell/Dunkel, Anzeigen hell oder dunkel, Akzent- und Aktiv-Farbe frei wählbar, Tabs der unteren Leiste ein-/ausblenden, Komponenten wie Mühle, Waage oder Pflege komplett ausblenden, „Ohne Dampf einschalten“ als Standard für Ein. Bezüge unter einer Mindestdauer (Standard 15 s) werden aussortiert. Dashboard-Kacheln in Breite (Spalten) und Höhe (Zellen) wählbar, Kachel „Schalter“ für Ein/Eco/Aus und Dampf.
 
 ## Aufbau
 
@@ -71,6 +75,8 @@ Bei jedem Push prüfen die Workflows die Server-Tests, einen Probelauf des Docke
 cd server
 npm run mock      # simulierte Xenia (:8091) und Mühle (:8092, Owner-Passwort "mockpass")
 npm run dev       # Server auf http://127.0.0.1:8180 gegen die Simulation (Einrichtungscode im Terminal)
+npm run mock:classic   # dasselbe als Xenia DBL (Firmware 4.159, alte API mit Seiten-API)
+npm run dev:classic    # Server dazu (machine.api = classic)
 npm test          # Einheit + Ende-zu-Ende gegen die Simulation
 ```
 

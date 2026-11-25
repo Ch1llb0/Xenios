@@ -1,7 +1,8 @@
 // Server & Sicherheit: alle Einstellungen des Servers im Browser (gespeichert in config.json, sofort wirksam).
 import { h, icon, snackbar, switchEl, sheet, confirmDialog, ago } from '../ui.js';
 import { api, refreshState } from '../api.js';
-import { logout } from '../app.js';
+import { logout, inAndroidApp } from '../app.js';
+import { paintPush, shotFilterCard } from './settings.js';
 import { fillProbe, revealToggle, shake, tunnelGuide, apiChoice } from '../setup.js';
 
 const LOCK_HINT = 'per Umgebungsvariable festgelegt';
@@ -132,7 +133,19 @@ export function serverView(root) {
     sel.addEventListener('change', () => change(p, sel.value === '' ? null : sel.value));
     return h('label', { class: 'field' }, h('span', {}, label, lockNote(p)), sel);
   }
-  const card = (title, ic, ...kids) => h('section', { class: 'card setting-card' }, h('h3', { class: 'card-head' }, icon(ic, 's20'), title), ...kids);
+  // Kategorien eingeklappt; welche offen sind, merkt sich die Seite über Neuzeichnen hinweg
+  const openCards = new Set();
+  // Sprung von außen (z. B. „Bezüge unter … s ausgeblendet“): Kategorie offen anzeigen und dorthin scrollen
+  const jumpTo = location.hash === '#aufzeichnung' ? 'Aufzeichnung' : null;
+  if (jumpTo) openCards.add(jumpTo);
+  const card = (head, ic, ...kids) => {
+    const { title, badge } = typeof head === 'string' ? { title: head } : head;
+    const d = h('details', { class: 'card fold setting-card', open: openCards.has(title) },
+      h('summary', {}, icon(ic, 's20'), h('span', { class: 'grow' }, title), badge || null, icon('more', 's20 chev')),
+      h('div', { class: 'fold-body' }, ...kids.filter(Boolean)));
+    d.addEventListener('toggle', () => (d.open ? openCards.add(title) : openCards.delete(title)));
+    return d;
+  };
   const gap = () => h('div', { class: 'gap' });
   const warn = (txt) => h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, txt));
 
@@ -199,7 +212,7 @@ export function serverView(root) {
           h('code', { class: 'fp' }, s.grinderPin || 'noch keins (wird beim ersten Kontakt gemerkt)')),
         s.grinderPin ? h('button', { class: 'btn text', onclick: unpin }, 'Vergessen') : null),
       toggle('Datenbank-Download erlauben', 'Die Datenbank der Mühle enthält das WLAN-Passwort im Klartext.', 'grinder.allowDatabaseDownload'));
-    const devices = card('Geräte', 'coffee',
+    const devices = card('Geräte', 'coffeeLine',
       apiChoice(value('machine.api') === 'classic' ? 'classic' : 'bbs', (v) => { change('machine.api', v); paint(); }),
       h('div', { class: 'field-row' }, text('Adresse der Xenia', 'machine.url', { type: 'url', placeholder: 'http://192.168.178.55' }), mTest),
       mBox,
@@ -209,19 +222,22 @@ export function serverView(root) {
 
     // Von unterwegs (Cloudflare-Tunnel)
     const [tTest, tBox] = probeButton('tunnel', () => ({ url: value('publicUrl') }));
-    const remote = card('Von unterwegs (Cloudflare-Tunnel)', 'cloud',
-      h('div', { class: 'field-row' }, text('Öffentliche Adresse', 'publicUrl', { type: 'url', placeholder: 'https://xenios.deine-domain.de', parse: (v) => v.trim() || null, format: (v) => v || '' }), tTest),
-      tBox,
-      s.tunnel.httpEnabled ? null : warn('Der Tunnel-Port ist aus. Unten unter „Tunnel-Port (Cloudflare)“ einschalten, sonst erreicht cloudflared den Server nicht.'),
-      s.tunnel.docker ? tunnelPaste(s.tunnel) : null,
-      h('details', { class: 'adv', open: !data.values.publicUrl }, h('summary', {}, 'Anleitung', icon('more', 's20')), tunnelGuide(s.tunnel)));
-
-    // Funktionen
-    const features = card('Funktionen der App', 'tune',
-      toggle('Paddle', 'Pumpe direkt steuern', 'features.paddle'),
-      toggle('Skript-Editor', 'Skripte anlegen, ändern, löschen', 'features.scriptEditor'),
-      toggle('Maschinen-Einstellungen', 'Temperaturen, Druck, Tastenbelegung ändern', 'features.settings'),
-      toggle('Uhr stellen', 'Uhrzeit und Zeitzone der Maschine setzen', 'features.clockSync'));
+    // Ein Schalter für den Zugriff von unterwegs; alles Weitere nur, solange er an ist
+    const httpHost = value('http.host');
+    const tunnelOn = Boolean(value('http.enabled'));
+    const remote = card({ title: 'Von unterwegs (Cloudflare-Tunnel)', badge: h('span', { class: `badge ${tunnelOn ? 'ok' : ''}` }, tunnelOn ? 'ein' : 'aus') }, 'cloud',
+      toggle('Zugriff von unterwegs', tunnelOn ? 'Eingeschaltet: Xenios nimmt Verbindungen des Cloudflare-Tunnels an' : 'Ausgeschaltet: Xenios ist nur im Heimnetz erreichbar', 'http.enabled', { onChange: () => paint() }),
+      tunnelOn ? h('div', { class: 'collapse' },
+        h('div', { class: 'divider' }),
+        h('div', { class: 'field-row' }, text('Öffentliche Adresse', 'publicUrl', { type: 'url', placeholder: 'https://xenios.example.de', parse: (v) => v.trim() || null, format: (v) => v || '' }), tTest),
+        tBox,
+        s.tunnel.docker ? tunnelPaste(s.tunnel) : null,
+        h('details', { class: 'adv', open: !data.values.publicUrl }, h('summary', {}, 'Anleitung', icon('more', 's20')), tunnelGuide(s.tunnel)),
+        h('details', { class: 'adv' }, h('summary', {}, 'Tunnel-Port (erweitert)', icon('more', 's20')),
+          h('p', { class: 'muted small' }, 'Unverschlüsselter Port nur für cloudflared – die Verschlüsselung übernimmt Cloudflare.'),
+          h('div', { class: 'grid2' }, text('Adresse', 'http.host'), number('Port', 'http.port', 1, 65535)),
+          !['127.0.0.1', '::1', 'localhost'].includes(httpHost) && !s.docker ? warn(`Der Tunnel-Port lauscht auf ${httpHost}: unverschlüsselt im ganzen Netz erreichbar. Empfohlen: 127.0.0.1.`) : null,
+          select('Proxy-Header vertrauen von', 'trustProxy', [['loopback', 'nur diesem Rechner (cloudflared lokal)'], ['private', 'Heim-/Docker-Netz (cloudflared im Container)'], ['all', 'allen (nicht empfohlen)'], ['none', 'niemandem']]))) : null);
 
     // Zeit
     const time = card('Zeit', 'clock',
@@ -248,7 +264,6 @@ export function serverView(root) {
     loadSessions(sessionsBox);
 
     // Zugänge & Verschlüsselung
-    const httpHost = value('http.host');
     const listeners = h('div', { class: 'chips listener-chips' }, s.listeners.map((l) => h('span', { class: `chip status ${l.ok ? 'on' : l.error ? 'bad' : ''}`, title: l.error || '' },
       h('span', { class: 'dot' }), `${{ http: 'Tunnel', https: 'HTTPS', lan: 'Heimnetz-HTTP', gbs: 'Grind-by-Sync' }[l.kind]} :${l.port}`)));
     const tls = s.tls;
@@ -265,12 +280,6 @@ export function serverView(root) {
         h('code', { class: 'fp' }, tls.fingerprint),
         h('div', { class: 'small muted names' }, tls.names.join(' · ')),
         h('button', { class: 'btn text', onclick: renewCert }, icon('refresh', 's18'), 'Neu erzeugen')) : null,
-      h('div', { class: 'divider' }),
-      h('h4', {}, 'Tunnel-Port (Cloudflare)'),
-      toggle('Tunnel-Port', 'Unverschlüsselt, nur für cloudflared – TLS macht Cloudflare', 'http.enabled'),
-      h('div', { class: 'grid2' }, text('Adresse', 'http.host'), number('Port', 'http.port', 1, 65535)),
-      !['127.0.0.1', '::1', 'localhost'].includes(httpHost) && !s.docker ? warn(`Der Tunnel-Port lauscht auf ${httpHost}: unverschlüsselt im ganzen Netz erreichbar. Empfohlen: 127.0.0.1.`) : null,
-      select('Proxy-Header vertrauen von', 'trustProxy', [['loopback', 'nur diesem Rechner (cloudflared lokal)'], ['private', 'Heim-/Docker-Netz (cloudflared im Container)'], ['all', 'allen (nicht empfohlen)'], ['none', 'niemandem']]),
       h('div', { class: 'divider' }),
       h('h4', {}, 'Heimnetz-HTTP (optional)'),
       toggle('Unverschlüsseltes HTTP', 'Für die Android-App zu Hause ohne Zertifikat', 'lan.enabled'),
@@ -320,7 +329,21 @@ export function serverView(root) {
       select('Protokoll-Stufe', 'logLevel', [['error', 'nur Fehler'], ['warn', 'Warnungen'], ['info', 'Normal'], ['debug', 'Ausführlich (Fehlersuche)']]));
     if (!updateReady) { updateReady = true; startUpdatePoll(); }
 
-    body.replaceChildren(h('div', { class: 'stagger' }, devices, remote, features, time, security, network, value('grinder.enabled') && value('machine.api') !== 'classic' ? gbsCard : null, system));
+    // Benachrichtigungen, Aufzeichnung und Konto (früher auf der Einstellungsseite)
+    const pushBox = h('div', {});
+    paintPush(pushBox);
+    const notify = card('Benachrichtigungen', 'bell', pushBox);
+    const recording = card('Aufzeichnung', 'shotlog', shotFilterCard());
+    if (jumpTo && !recording.__jumped) {
+      recording.__jumped = true;
+      history.replaceState(history.state, '', location.pathname); // nur einmal springen
+      setTimeout(() => recording.scrollIntoView({ block: 'start', behavior: 'smooth' }), 450);
+    }
+    const account = card('Konto', 'logout',
+      inAndroidApp() ? h('button', { class: 'btn outlined wide', style: { 'margin-bottom': '8px' }, onclick: () => window.XeniaApp.reauth() }, icon('wifi', 's18'), 'App-Verbindung ändern') : null,
+      h('button', { class: 'btn outlined wide', onclick: logout }, icon('logout', 's18'), 'Abmelden'));
+
+    body.replaceChildren(h('div', { class: 'folds' }, devices, remote, time, notify, recording, security, network, value('grinder.enabled') && value('machine.api') !== 'classic' ? gbsCard : null, system, account));
   }
 
   async function loadSessions(box) {
@@ -337,8 +360,7 @@ export function serverView(root) {
           try {
             const r = await api(`/api/sessions/${encodeURIComponent(x.id)}`, { method: 'DELETE' });
             if (r.self) return logout();
-            row.classList.add('leaving');
-            setTimeout(() => row.remove(), 280);
+            row.remove(); // blendet wie überall aus und klappt zusammen (motion.js)
           } catch (ex) { snackbar(ex.message); }
         } }, icon('close', 's20')))));
     } catch (e) {

@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-style="xenia" data-gauge="black">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#fbf8ff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#121318" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#383c44" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#2b2d34" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
   <meta name="robots" content="noindex, nofollow">
   <title>Xenios</title>
@@ -17,11 +17,10 @@
 <body>
   <div id="app" class="app" hidden>
     <header class="topbar">
-      <button class="icon-btn" id="back-btn" type="button" aria-label="Zurück" title="Zurück" hidden></button>
-      <h1 class="topbar-title" id="title">Xenios</h1>
+      <button class="icon-btn gone" id="back-btn" type="button" aria-label="Zurück" title="Zurück" data-noanim></button>
+      <h1 class="topbar-title" id="title" data-noanim><span class="tt">Xenios</span></h1>
       <div class="topbar-actions" id="topbar-actions"></div>
       <span class="conn-dot" id="conn-dot" title="Verbindung"></span>
-      <button class="icon-btn" id="settings-btn" type="button" aria-label="Einstellungen" title="Einstellungen"></button>
     </header>
     <nav class="tabs" id="tabs" hidden></nav>
     <main class="view" id="view" tabindex="-1"></main>

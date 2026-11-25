@@ -6,6 +6,13 @@ import android.content.Context
 class Prefs(context: Context) {
     private val p = context.applicationContext.getSharedPreferences("xenia", Context.MODE_PRIVATE)
 
+    init { LocalTls.pin = p.getString("localPin", null) } // für Api.call ohne Context
+
+    /** SHA-256 des eigenen Zertifikats des Servers für https://<IP>:8443 (beim ersten Verbinden gemerkt). */
+    var localPin: String?
+        get() = p.getString("localPin", null)
+        set(v) { p.edit().putString("localPin", v).apply(); LocalTls.pin = v }
+
     var baseUrl: String?
         get() = p.getString("url", null)
         set(v) = p.edit().putString("url", v).apply()
@@ -32,6 +39,11 @@ class Prefs(context: Context) {
         set(v) = p.edit().putLong("alarmAt", v).apply()
 
     /** Widget-Updates in Folge ohne Live-Zustand der Maschine (bestimmt den Abstand der erneuten Versuche). */
+    /** Hinweis zur Erlaubnis „Wecker und Erinnerungen“ schon gezeigt */
+    var exactAlarmAsked: Boolean
+        get() = p.getBoolean("exactAlarmAsked", false)
+        set(v) = p.edit().putBoolean("exactAlarmAsked", v).apply()
+
     var widgetFails: Int
         get() = p.getInt("widgetFails", 0)
         set(v) = p.edit().putInt("widgetFails", v).apply()
@@ -69,4 +81,20 @@ class Prefs(context: Context) {
         get() = listOfNotNull(localUrl?.takeIf { it.isNotBlank() }, baseUrl?.takeIf { it.isNotBlank() })
 
     fun clearToken() = p.edit().remove("token").apply()
+
+    /** Farben und Manometer-Design der App für die Widgets (JSON von der Web-App, hell und dunkel) */
+    var widgetTheme: String?
+        get() = p.getString("widgetTheme", null)
+        set(v) = p.edit().putString("widgetTheme", v).apply()
+
+    /** Einschalten ohne Dampfkessel (gilt für App, Widgets und Shortcut „Ein“); null = noch nie gesetzt */
+    var noSteamOn: Boolean
+        get() = p.getBoolean("noSteamOn", false)
+        set(v) = p.edit().putBoolean("noSteamOn", v).putBoolean("noSteamOnSet", true).apply()
+    val noSteamOnSet: Boolean get() = p.getBoolean("noSteamOnSet", false)
+
+    /** Letzte Widget-Daten (/api/widget), um bei Farbwechseln ohne Netz neu zu zeichnen */
+    var widgetCache: String?
+        get() = p.getString("widgetCache", null)
+        set(v) = p.edit().putString("widgetCache", v).apply()
 }

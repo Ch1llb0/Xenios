@@ -2,6 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Netzwerksuche: eigenes WLAN-Netz (Adresse und Präfix) ermitteln -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Android 17+: Zugriff auf Geräte im Heimnetz (Maschine, Mühle, lokaler Server) – wird zur Laufzeit erfragt -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!-- Widgets alle 5 s aktualisieren: exakte Wecker (nur bei eingeschaltetem Bildschirm, weckt nicht). Bis Android 13
+         automatisch erteilt, ab Android 14 einmal in den Einstellungen („Wecker und Erinnerungen“) zu erlauben – die App
+         weist darauf hin. Ohne Erlaubnis aktualisieren die Widgets langsamer. (Kein USE_EXACT_ALARM: das erlaubt Google
+         Play nur Wecker- und Kalender-Apps.) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- Uhr-Apps sichtbar machen: Name der App, die den nächsten Wecker gestellt hat -->
     <queries>
@@ -11,6 +20,7 @@
     </queries>
 
     <application
+        android:name=".XeniaApplication"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -49,6 +59,7 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Xenia.Invisible" />
 
+        <!-- Reihenfolge wie in der Widget-Auswahl gewünscht: Ein/Aus, Ein ohne Dampf/Aus, Kaffeemaschine, Schalter, dann wie die Home-Kacheln -->
         <receiver
             android:name=".PowerWidget"
             android:exported="false"
@@ -60,13 +71,13 @@
         </receiver>
 
         <receiver
-            android:name=".StatusWidget"
+            android:name=".PowerNoSteamWidget"
             android:exported="false"
-            android:label="@string/widget_status">
+            android:label="@string/widget_powerns">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_status_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_powerns_info" />
         </receiver>
 
         <receiver
@@ -80,13 +91,92 @@
         </receiver>
 
         <receiver
-            android:name=".WideWidget"
+            android:name=".SwitchWidget"
             android:exported="false"
-            android:label="@string/widget_wide">
+            android:label="@string/widget_switch">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_wide_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_switch_info" />
+        </receiver>
+
+        <receiver
+            android:name=".GaugesWidget"
+            android:exported="false"
+            android:label="@string/widget_gauges">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_gauges_info" />
+        </receiver>
+
+        <receiver
+            android:name=".HistoryWidget"
+            android:exported="false"
+            android:label="@string/widget_history">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_history_info" />
+        </receiver>
+
+        <receiver
+            android:name=".LastShotWidget"
+            android:exported="false"
+            android:label="@string/widget_lastshot">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_lastshot_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ShotsWidget"
+            android:exported="false"
+            android:label="@string/widget_shots">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_shots_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ShotsLargeWidget"
+            android:exported="false"
+            android:label="@string/widget_shotslarge">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_shotslarge_info" />
+        </receiver>
+
+        <receiver
+            android:name=".TargetsWidget"
+            android:exported="false"
+            android:label="@string/widget_targets">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_targets_info" />
+        </receiver>
+
+        <receiver
+            android:name=".CareWidget"
+            android:exported="false"
+            android:label="@string/widget_care">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_care_info" />
+        </receiver>
+
+        <!-- Erlaubnis für exakte Wecker erteilt: Widgets sofort wieder im 5-Sekunden-Takt -->
+        <receiver
+            android:name=".ExactAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
         </receiver>
 
         <!-- Nächsten Wecker an den Server melden (Wecker-Automatik) -->

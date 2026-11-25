@@ -452,6 +452,9 @@ Die Dokumentation oben gilt für die **aktuelle** Firmware (Brew-by-Sync, `machi
 | Ein/Aus/Eco | `POST /api/v2/machine/control` + `POST /api/v2/toggle/sb` | dieselben `control`-Aktionen; Dampf über Aktion 3/4/5 |
 | Skriptliste | `GET /api/v2/scriptslist` | `GET /api/v2/scripts/list` |
 | Wochen-Timer, Uhr, Paddle, `/info` | vorhanden | nicht über die API; Eco/Aus-Timer über `POST /api/v2/machine` |
+| Tastenbelegung | vier Taster (oben/unten, links/rechts) | zwei Kippschalter, je nach links und rechts (kurz/lang) |
+
+Tastenbelegung der DBL: Dieselben drei belegbaren Positionen wie oben (`SWITCH_SET_LEFT_LEFT_*`, `SWITCH_SET_RIGHT_LEFT_*`, `SWITCH_SET_RIGHT_RIGHT_*`, `_0` kurz, `_1` lang; so auch in [xenia-home](https://github.com/Knoedelauflauf/xenia-home)). An der Maschine (Front unter der Tassenablage): ① linker Schalter nach links = `LEFT_LEFT`, ② linker Schalter nach rechts (am Ein/Aus-Symbol) = fest Ein/Aus (`LEFT_RIGHT`, nicht belegbar), ③ rechter Schalter nach links (am Tassen-Symbol) = `RIGHT_LEFT`, ④ rechter Schalter nach rechts = `RIGHT_RIGHT`.
 
 Maschine ein/aus/Eco und Dampf (alte API, laut [API-Beispiel](https://www.xenia-espresso.de/api-beispiel/)):
 
@@ -463,3 +466,24 @@ Maschine ein/aus/Eco und Dampf (alte API, laut [API-Beispiel](https://www.xenia-
 | 3 | Dampfkessel aus |
 | 4 | Dampfkessel an |
 | 5 | an ohne Dampfkessel |
+
+### Xenia DBL mit Firmware 4.159 / ESP 3.63 (Seiten-API)
+
+Ausgelesen am 11.11. und 14.11.2026 mit `server/tools/xenia-lesen.mjs` an einer „Xenia Dual Boiler + L“ (alle Lese-Endpunkte unten live bestätigt). Diese Firmware spricht die alte API, hat aber zusätzlich je Seite der Original-Oberfläche eigene Endpunkte. Xenios erkennt das selbst (`GET /api/v2/boilerandbrewgroup` liefert JSON) und nutzt dann diese Seiten.
+
+| Seite | Lesen | Schreiben (alle Felder als Strings) |
+|---|---|---|
+| Brühgruppe | `GET /api/v2/boilerandbrewgroup` | `POST /api/v2/brewgroup {BG_SET_TEMP, BG_SET_ECO_TEMP, BG_SET_TEMP_HYST, BG_SET_POWER}` |
+| Brühkessel | dto. | `POST /api/v2/brewboiler {BB_SET_TEMP, BB_SET_ECO_TEMP, BB_SET_TEMP_HYST, BB_MODE, BB_SET_POWER}` |
+| Dampfkessel | dto. | `POST /api/v2/steamboiler {SB_SET_PRESS, SB_SET_ECO_PRESS, SB_SET_PRESS_HYST, SB_SET_POWER}` |
+| Pumpe | `GET /api/v2/pump` | `POST /api/v2/pump {PU_SET_BREW_TIMER_1 (15–60 s), PU_SET_MAX_TIMER (30–120 s), PU_MODE}`; ohne Pumpenmodus `POST /api/v2/pump2` |
+| Maschine | `GET /api/v2/machine` | `POST /api/v2/machine {MA_HEATUP_FLUSH_DURATION (0–20 s), MA_SET_TIMER_ECO_MA, MA_SET_TIMER_POWERDOWN (1–240 min), MA_FIX_WATER_SUPPLY, MA_MAX_AMPERE, MA_BOILER_START_MODE, MA_EXTENDED_THERMAL_STABILITY}` |
+| Startseite | `GET /api/v2/overview`, `/overview/single` | `POST /api/v2/incdec {BG_SET_TEMP, BB_SET_TEMP}`, `POST /api/v2/incdecsb {SB_SET_PRESS}` (ohne Unterstrich; `inc_dec` antwortet mit 301) |
+| Schalter | `GET /api/v2/switches`, `/scriptslist` | `POST /api/v2/switches {SWITCH_SET_*}`; feste Abläufe 1 = Espresso (läuft `PU_SET_BREW_TIMER_1`), 2 = Espresso endlos, 7 = Single 25 g/ml, 8 = Double 50 g/ml. `MA_BEVERAGE_WEIGHT_*` wird gelesen, aber nirgends geschrieben. |
+| Paddle | wie neue Firmware (`/paddle`, `/paddle/press`, `/paddle/pumppower`, `/paddle/stop`) | |
+| Timer | `GET /api/v2/timer` → `TI_<Tag>_ON1/ON2` (gepackt `h<<16\|m<<8`) und `TI_<Tag>_ON<n>_BOILER` (0 aus, 1 Brühkessel, 2 Dampf, 3 beide) | `POST /api/v2/timer {TI_<Tag>_ON<n>: Sekunden seit Mitternacht, TI_<Tag>_ON<n>_STATUS: 0–3}` – beide Zeiten sind **Einschalt**zeiten; ausgeschaltet wird über `MA_SET_TIMER_POWERDOWN` (muss größer sein als `MA_SET_TIMER_ECO_MA`) |
+| Modell | `MA_TYPE` aus `GET /api/v2/machine`: 1 = 2K, 2 = DB, 3 = DB + L, 4 = 303, 5 = 2K + L (Startseite der Original-Oberfläche; bei der alten Firmware ist 3 also **nicht** die Brew-by-Sync). `GET /api/v2/machine/type` liefert dieselbe Zahl als Text; der Kommentar auf der Pumpen-Seite mit anderer Zuordnung ist falsch. | |
+
+Live geprüft am 14.11.2026 mit `server/tools/xenia-pruefen.mjs --schreibtest`: Lesen aller Werte über die Seiten-API stimmt mit den Rohantworten überein; Schreiben über `POST /api/v2/pump` (Bezugszeit 44 → 45 → 44 s) ändert nur das gesendete Feld, die übrigen Pumpen-, Kessel- und Brühgruppenwerte bleiben unverändert.
+
+Heizleistung (`*_SET_POWER`), Pumpenmodus und Stromgrenze sendet Xenios nur unverändert mit. PID, Port, Waagen-Kalibrierung und Firmware-Update bleiben der Original-Oberfläche vorbehalten.

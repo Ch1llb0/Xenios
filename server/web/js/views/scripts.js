@@ -1,7 +1,7 @@
 // Skripte: Liste, Start/Stopp, Editor, Export/Import.
 import { h, icon, fmt, snackbar, sheet, confirmDialog, fullscreen, sliderRow, switchEl, ago } from '../ui.js';
-import { api, store, subscribe, machineOn, directMode, hasGrinder, isClassic } from '../api.js';
-import { setTopActions, navigate } from '../app.js';
+import { api, store, subscribe, machineOn, scriptActive, directMode, hasGrinder, isClassic } from '../api.js';
+import { navigate } from '../app.js';
 import { shotChart } from '../gauge.js';
 import { targetCurve, profileSteps } from '../../shared/shot-analysis.js';
 import { scriptName } from '../../shared/visualizer.js';
@@ -23,16 +23,20 @@ function listTab(root) {
   const gbsBox = h('div', {});
   const listEl = h('div', { class: 'list' }, h('div', { class: 'empty' }, 'Lade Skripte …'));
   const sortBtn = h('button', { class: 'btn text', onclick: () => { sortBy = sortBy === 'name' ? 'id' : 'name'; sortBtn.lastChild.textContent = sortBy === 'name' ? 'Name' : 'ID'; paint(); } }, icon('sort', 's18'), h('span', {}, 'Name'));
-  const stopBtn = h('button', { class: 'btn danger wide big', onclick: stop }, icon('stop', 's20'), 'Skript stoppen');
+  const stopBtn = h('button', { class: 'btn danger wide big', disabled: true, onclick: stop } /* erst aktiv, wenn ein laufendes Skript erkannt ist */, icon('stop', 's20'), 'Skript stoppen');
 
   const runButtons = [];
+  // Neu anlegen, Druckprofil, Entdecken und Import als beschriftete Einträge (wie die Unterseiten der Einstellungen)
+  const entry = (ic, title, sub, onclick) => h('button', { class: 'list-item clickable as-button', type: 'button', onclick },
+    h('span', { class: 'lead' }, icon(ic)), h('div', { class: 'grow' }, h('div', { class: 'title' }, title), h('div', { class: 'sub' }, sub)), icon('right', 's20 muted'));
+  let tools = null;
   if (features.scriptEditor) {
     const fileInput = h('input', { type: 'file', accept: '.script,application/json,text/plain', hidden: true, onchange: () => importFile(fileInput) });
-    setTopActions(
-      h('button', { class: 'icon-btn', 'aria-label': 'Skript importieren (.script)', title: 'Skript importieren (.script)', onclick: () => fileInput.click() }, icon('upload'), fileInput),
-      directMode ? null : h('button', { class: 'icon-btn', 'aria-label': 'Profile entdecken (visualizer.coffee)', title: 'Profile entdecken (visualizer.coffee)', onclick: () => openCommunity(load) }, icon('explore')),
-      h('button', { class: 'icon-btn', 'aria-label': 'Druckprofil erstellen', title: 'Druckprofil erstellen', onclick: () => openProfileBuilder(load) }, icon('profile')),
-      h('button', { class: 'icon-btn', 'aria-label': 'Neues Skript', onclick: () => openEditor(null, data, load) }, icon('add')));
+    tools = h('div', { class: 'list' },
+      entry('add', 'Skript erstellen', 'Schritte selbst zusammenstellen', () => navigate('/skripte/neu')),
+      entry('profile', 'Druckprofil erstellen', 'Vorbrühen, Hauptdruck und Abfall per Regler', () => navigate('/skripte/profil')),
+      directMode ? null : entry('explore', 'Profile entdecken', 'Bewährte Profile von visualizer.coffee übernehmen', () => navigate('/skripte/entdecken')),
+      entry('upload', 'Skript importieren', '.script-Datei von der Original-Oberfläche', () => fileInput.click()), fileInput);
   }
 
   async function importFile(input) {
@@ -56,6 +60,7 @@ function listTab(root) {
     h('div', { style: { height: '12px' } }),
     stopBtn,
     gbsBox,
+    tools ? h('div', { style: { 'margin-top': '16px' } }, tools) : null,
     h('div', { class: 'section-title with-action' }, h('span', {}, 'Alle Skripte'), sortBtn),
     listEl,
   );
@@ -119,7 +124,7 @@ function listTab(root) {
   function paintEnabled() {
     const on = machineOn();
     for (const b of runButtons) b.disabled = !on;
-    stopBtn.disabled = !on;
+    stopBtn.disabled = !scriptActive(); // nur drückbar, solange ein Skript, Bezug oder Backflush läuft
   }
 
   async function run(id, title) {
@@ -142,7 +147,7 @@ function listTab(root) {
   function paint() {
     const list = [...data.scripts].sort((a, b) => (sortBy === 'name' ? a.title.localeCompare(b.title, 'de') : a.id - b.id));
     if (!list.length) {
-      listEl.replaceChildren(h('div', { class: 'empty' }, 'Keine eigenen Skripte auf der Maschine.', features.scriptEditor ? h('div', {}, h('button', { class: 'btn text', onclick: () => openEditor(null, data, load) }, icon('add', 's18'), 'Skript anlegen')) : null));
+      listEl.replaceChildren(h('div', { class: 'empty' }, 'Keine eigenen Skripte auf der Maschine.', features.scriptEditor ? h('div', {}, h('button', { class: 'btn text', onclick: () => navigate('/skripte/neu') }, icon('add', 's18'), 'Skript anlegen')) : null));
       return;
     }
     runButtons.splice(4); // die vier Schnellstart-Knöpfe bleiben
@@ -152,7 +157,7 @@ function listTab(root) {
       return h('div', { class: 'script-item' },
         h('div', { class: 'grow' }, h('div', { class: 't' }, s.title), h('div', { class: 'id' }, `ID: ${s.id} · ${s.title === gbs?.helperName ? 'von Grind-by-Sync verwaltet' : TYPE_LABEL[s.type] || s.type}`)),
         h('a', { class: 'icon-btn', href: `/api/machine/scripts/${s.id}/export`, download: '', 'aria-label': `${s.title} exportieren`, title: 'Exportieren (.script)' }, icon('download', 's20')),
-        features.scriptEditor ? h('button', { class: 'icon-btn', 'aria-label': `${s.title} bearbeiten`, onclick: () => openEditor(s, data, load) }, icon('edit', 's20')) : null,
+        features.scriptEditor ? h('button', { class: 'icon-btn', 'aria-label': `${s.title} bearbeiten`, onclick: () => navigate(`/skripte/bearbeiten?id=${s.id}`) }, icon('edit', 's20')) : null,
         play);
     }));
   }
@@ -176,7 +181,7 @@ function listTab(root) {
 }
 
 // --- Skript-Editor -----------------------------------------------------------------
-async function openEditor(script, data, onSaved) {
+async function openEditor(script, data, onSaved, host = fullscreen) {
   const ops = data.ops || {};
   let steps = [];
   let name = script?.title || '';
@@ -192,13 +197,13 @@ async function openEditor(script, data, onSaved) {
     steps = [{ op: 13, args: [] }, { op: 4, args: [9, 25] }, { op: 6, args: [] }];
   }
 
-  fullscreen((root, close) => {
+  host((root, close) => {
     const nameInput = h('input', { class: 'text', value: name, maxlength: 40, placeholder: 'Name (A–Z, 0–9, - _ #)', 'aria-label': 'Name' });
     const listEl = h('div', {});
     const expanded = new Set();
 
     const header = h('div', { class: 'row', style: { margin: '4px 0 16px' } },
-      h('div', { class: 'grow' }, h('strong', {}, script ? 'Bearbeiten' : 'Neues Skript')),
+      h('div', { class: 'grow' }, host.page ? null : h('strong', {}, script ? 'Bearbeiten' : 'Neues Skript')),
       h('button', { class: 'btn grey', onclick: close }, 'Abbrechen'),
       h('button', { class: 'btn filled', onclick: save }, 'Speichern'));
 
@@ -211,11 +216,11 @@ async function openEditor(script, data, onSaved) {
             label: `${a.name}${a.unit ? ` (${a.unit})` : ''}`, min: a.min, max: a.max, step: a.step, value: st.args?.[ai] ?? a.min,
             digits: a.step < 1 ? 1 : 0, onInput: (v) => { st.args[ai] = v; summary.textContent = argSummary(def, st); },
           })));
-        const summary = h('span', { class: 'small' }, argSummary(def, st));
+        const summary = h('span', { class: 'sum' }, argSummary(def, st));
         return h('div', { class: 'step' },
           h('div', { class: 'step-head' },
             h('span', { class: 'n' }, String(i + 1)),
-            h('span', { class: 'name', onclick: () => { open ? expanded.delete(i) : expanded.add(i); paint(); } }, def.name, ' ', summary),
+            h('span', { class: 'name', onclick: () => { open ? expanded.delete(i) : expanded.add(i); paint(); } }, h('span', { class: 'title' }, def.name), def.args?.length ? summary : null),
             h('button', { class: 'icon-btn', 'aria-label': 'Nach oben', disabled: i === 0, onclick: () => move(i, -1) }, icon('up', 's18')),
             h('button', { class: 'icon-btn', 'aria-label': 'Nach unten', disabled: i === steps.length - 1, onclick: () => move(i, 1) }, icon('down', 's18')),
             def.args?.length ? h('button', { class: 'icon-btn', 'aria-label': 'Werte', onclick: () => { open ? expanded.delete(i) : expanded.add(i); paint(); } }, icon(open ? 'less' : 'more', 's20')) : null,
@@ -270,7 +275,7 @@ async function openEditor(script, data, onSaved) {
     root.append(header,
       h('label', { class: 'field' }, h('span', {}, 'Name'), nameInput),
       h('div', { class: 'section-title' }, 'Ablauf'),
-      h('p', { class: 'muted small' }, 'Das Skript startet automatisch mit „Start“ und endet mit „Ende“. Tippe auf einen Schritt, um Werte zu ändern.'),
+      h('p', { class: 'muted small' }, 'Das Skript startet automatisch mit „Start“ und endet mit „Ende“. Ein Tipp auf einen Schritt öffnet seine Werte.'),
       listEl,
       script && script.id > 9 ? h('button', { class: 'btn text', style: { color: 'var(--danger)', 'margin-top': '24px' }, onclick: remove }, icon('del', 's18'), 'Skript löschen') : null);
     paint();
@@ -291,7 +296,8 @@ function defaultArg(a) {
 
 function argSummary(def, st) {
   if (!def.args?.length) return '';
-  return '· ' + def.args.map((a, i) => `${fmt(st.args?.[i], a.step < 1 ? 1 : 0)}${a.unit ? ' ' + a.unit : ''}`).join(' / ');
+  // eigene Zeile unter dem Namen; Zahl und Einheit bleiben zusammen (geschütztes Leerzeichen)
+  return def.args.map((a, i) => `${fmt(st.args?.[i], a.step < 1 ? 1 : 0)}${a.unit ? '\u00a0' + a.unit : ''}`).join(' · ');
 }
 
 // --- Druckprofil-Baukasten --------------------------------------------------------
@@ -312,10 +318,10 @@ const PROFILE_PRESETS = [
   { name: '80er', roast: 'Mitteldunkel bis dunkel', hint: 'Sehr tolerant, schwer zu überextrahieren. 1:2 über 40 s; Ristretto 1:1 bis etwa 60 s. Decent brüht dabei kühl (82 → 72 °C) – Brühtemperatur der Xenia dafür senken.', v: { preP: 3, preT: 8, pauseT: 0, mainP: 8, mainT: 10, endP: 6, declineT: 24 } },
 ];
 
-function openProfileBuilder(onSaved) {
+function openProfileBuilder(onSaved, host = fullscreen) {
   let preset = PROFILE_PRESETS[0];
   const p = { ...preset.v, basket: 'none', name: 'Profil Klassisch' };
-  fullscreen((root, close) => {
+  host((root, close) => {
     const preview = h('div', { class: 'chart-box' });
     const summary = h('p', { class: 'small muted' });
     const presetInfo = h('div', { class: 'preset-info' });
@@ -361,7 +367,7 @@ function openProfileBuilder(onSaved) {
     }
     root.append(
       h('div', { class: 'row', style: { margin: '4px 0 12px' } },
-        h('div', { class: 'grow' }, h('strong', {}, 'Druckprofil erstellen')),
+        h('div', { class: 'grow' }, host.page ? null : h('strong', {}, 'Druckprofil erstellen')),
         h('button', { class: 'btn grey', onclick: close }, 'Abbrechen'),
         h('button', { class: 'btn filled', onclick: save }, 'Speichern')),
       h('div', { class: 'card' }, preview, summary),
@@ -383,4 +389,33 @@ function openProfileBuilder(onSaved) {
     paintPreset();
     redraw();
   });
+}
+
+// --- Unterseiten (statt Vollbild-Fenster): Zurück-Pfeil, Zurück-Taste und Animation wie in den Einstellungen ---------
+// Abbrechen/Speichern führt zur Skriptliste zurück.
+function pageHost(root) {
+  const host = (build) => build(root, () => navigate('/skripte', { replace: true }));
+  host.page = true;
+  return host;
+}
+export function scriptNewView(root) {
+  root.append(h('div', { class: 'empty' }, 'Lade …'));
+  api('/api/machine/scripts').then((data) => { root.replaceChildren(); openEditor(null, data, null, pageHost(root)); })
+    .catch((e) => root.replaceChildren(h('div', { class: 'empty' }, e.message)));
+}
+export function scriptEditView(root) {
+  const id = Number(new URLSearchParams(location.search).get('id'));
+  root.append(h('div', { class: 'empty' }, 'Lade …'));
+  api('/api/machine/scripts').then((data) => {
+    const script = (data.scripts || []).find((x) => x.id === id);
+    if (!script) return root.replaceChildren(h('div', { class: 'empty' }, 'Skript nicht gefunden.'));
+    root.replaceChildren();
+    openEditor(script, data, null, pageHost(root));
+  }).catch((e) => root.replaceChildren(h('div', { class: 'empty' }, e.message)));
+}
+export function profileBuilderView(root) {
+  openProfileBuilder(null, pageHost(root));
+}
+export function discoverView(root) {
+  openCommunity(null, pageHost(root));
 }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Erzeugt aus den Symbolen der Web-App (icons-xenia.js: coffeeLine) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M2.5 2.5h9V8A3.5 3.5 0 0 1 8 11.5H6A3.5 3.5 0 0 1 2.5 8V2.5zm1 1V8A2.5 2.5 0 0 0 6 10.5h2A2.5 2.5 0 0 0 10.5 8V3.5h-7z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.5 4h1a2 2 0 0 1 0 4h-1V7h1a1 1 0 0 0 0-2h-1V4zM2 12.5h11a.5.5 0 0 1 0 1H2a.5.5 0 0 1 0-1z" />
+</vector>

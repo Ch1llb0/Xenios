@@ -1,25 +1,19 @@
-// Steuerung: Tastenbelegung an der Maschine (mit Frontansicht) und Paddle (Pumpe direkt).
+// Schalter: Tastenbelegung an der Maschine (mit Frontansicht). Paddle (Pumpe direkt) als eigener Tab.
 import { h, icon, fmt, snackbar, confirmDialog, switchEl } from '../ui.js';
-import { api, store, subscribe, machineOn, isClassic } from '../api.js';
-import { setTabs } from '../app.js';
-
-const TABS = [{ id: 'switches', label: 'Schalter' }, { id: 'paddle', label: 'Paddle' }];
-let lastTab = 'switches';
+import { api, store, subscribe, machineOn, isClassic, hasPaddle } from '../api.js';
 
 export function controlsView(root) {
-  let dispose = null;
-  const tabs = isClassic() ? TABS.filter((t) => t.id !== 'paddle') : TABS;
-  const show = (tab) => {
-    lastTab = tab;
-    dispose?.();
-    dispose = null;
-    root.replaceChildren();
-    setTabs(tabs.length > 1 ? tabs : null, tab, show);
-    if (tab === 'switches') dispose = switchesTab(root);
-    if (tab === 'paddle' && !isClassic()) dispose = paddleTab(root);
-  };
-  show(tabs.some((t) => t.id === lastTab) ? lastTab : 'switches');
-  return () => dispose?.();
+  return switchesTab(root);
+}
+
+// Eigener Tab „Paddle“: Pumpe direkt steuern
+export function paddleView(root) {
+  if (!hasPaddle()) {
+    root.append(h('div', { class: 'card low' }, h('h3', {}, 'Paddle'),
+      h('p', { class: 'muted' }, store.machine?.info ? 'Diese Xenia bietet die Paddle-Steuerung nicht über die API an (ältere Firmware).' : 'Maschine noch nicht erreicht – Paddle ist verfügbar, sobald die Firmware erkannt ist.')));
+    return () => {};
+  }
+  return paddleTab(root);
 }
 
 // --- Schalter ------------------------------------------------------------------------
@@ -32,6 +26,17 @@ const BUTTONS = [
   { key: 'RIGHT_LEFT', label: 'Unten rechts', cx: 268, cy: 132, glyph: 'cup2' },
 ];
 
+// Alte Xenia (DBL): zwei kleine Kippschalter, jeder lässt sich nach links und nach rechts drücken (kurz/lang).
+// Nummern wie auf dem Foto der Maschine: ① links◀, ② links▶ (am Ein/Aus-Symbol, fest Ein/Aus, gesperrt),
+// ③ rechts◀ (am Tassen-Symbol), ④ rechts▶. Die API kennt die drei belegbaren Positionen
+// SWITCH_SET_LEFT_LEFT/RIGHT_LEFT/RIGHT_RIGHT; LEFT_RIGHT fehlt dort, weil fest Ein/Aus.
+const DBL_BUTTONS = [
+  { key: 'LEFT_LEFT', no: 1, label: 'Links ◀', lever: 'left', dir: -1 },
+  { key: 'POWER', no: 2, label: 'Links ▶', lever: 'left', dir: 1, fixed: { short: 'Ein/Aus', long: 'Ein ohne Dampfkessel' } },
+  { key: 'RIGHT_LEFT', no: 3, label: 'Rechts ◀', lever: 'right', dir: -1 },
+  { key: 'RIGHT_RIGHT', no: 4, label: 'Rechts ▶', lever: 'right', dir: 1 },
+];
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 function s(tag, attrs = {}, ...children) {
   const el = document.createElementNS(SVG_NS, tag);
@@ -40,8 +45,7 @@ function s(tag, attrs = {}, ...children) {
   return el;
 }
 
-// Vereinfachte Frontansicht der Xenia nach Fotos: Taster außen, Drehknöpfe, Dampf- und Wasserlanze, Brühgruppe,
-// zwei Manometer, Display rechts, Abtropfschale. Ohne Siebträger.
+// Tasterbereich der neuen Xenia: dunkle Front mit den vier Tastern (oben/unten, links/rechts).
 function machineSvg(onPick) {
   const glyph = (kind, x, y) => {
     const g = s('g', { class: 'glyph', transform: `translate(${x} ${y})` });
@@ -61,68 +65,93 @@ function machineSvg(onPick) {
     g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(b.key); } });
     return g;
   });
-  // Drehknopf (Ventil) seitlich gesehen: Sechskant-Mutter, schwarzer Griff, Endkappe
-  const knob = (x, y, dir) => s('g', { class: 'valve' },
-    s('rect', { class: 'chrome', x: x - 9, y: y - 9, width: 18, height: 18, rx: 3 }),
-    s('rect', { class: 'grip', x: dir < 0 ? x - 34 : x + 9, y: y - 8, width: 25, height: 16, rx: 4 }),
-    s('rect', { class: 'cap-end', x: dir < 0 ? x - 40 : x + 32, y: y - 9, width: 8, height: 18, rx: 4 }));
-  const grill = (x0, x1) => {
-    const out = [];
-    for (let x = x0; x <= x1; x += 8) out.push(s('line', { x1: x, y1: 322, x2: x, y2: 344 }));
-    return out;
-  };
-  const gauge = (cx) => s('g', { class: 'gauge' },
-    s('circle', { cx, cy: 248, r: 16, class: 'bezel' }), s('circle', { cx, cy: 248, r: 12.5, class: 'face' }),
-    s('line', { x1: cx, y1: 248, x2: cx - 6, y2: 243, class: 'needle' }));
-  return s('svg', { class: 'machine-svg', viewBox: '0 0 320 370', role: 'img', 'aria-label': 'Xenia von vorn mit den vier Tastern' },
+  // Nur der Bereich der Taster (wie bei der DBL): dunkle Front, links und rechts je zwei Taster.
+  // Brühgruppe, Lanzen, Manometer und Abtropfschale bleiben weg.
+  return s('svg', { class: 'machine-svg mk', viewBox: '30 72 260 84', role: 'img', 'aria-label': 'Xenia: die vier Taster an der Front' },
     s('defs', {},
-      s('linearGradient', { id: 'mChrome', x1: 0, y1: 0, x2: 1, y2: 0 },
-        s('stop', { offset: '0', 'stop-color': '#7d8186' }), s('stop', { offset: '.45', 'stop-color': '#f4f6f8' }), s('stop', { offset: '1', 'stop-color': '#8a8e93' })),
       s('linearGradient', { id: 'mBody', x1: 0, y1: 0, x2: 0, y2: 1 },
         s('stop', { offset: '0', 'stop-color': '#2a2b2f' }), s('stop', { offset: '1', 'stop-color': '#17181b' }))),
-    // Tassenablage
-    s('path', { class: 'rail', d: 'M40 44 V26 M280 44 V26' }),
-    // Gehäuse
-    s('rect', { class: 'body', x: 36, y: 44, width: 248, height: 262, rx: 6 }),
-    // Brühgruppe (ohne Siebträger)
-    s('path', { class: 'group-top', d: 'M138 64 H182 L176 104 H144 Z' }),
-    s('rect', { class: 'light', x: 147, y: 68, width: 26, height: 30, rx: 3 }),
-    s('path', { fill: 'url(#mChrome)', d: 'M118 112 H202 Q206 112 204 120 L196 138 H124 L116 120 Q114 112 118 112 Z' }),
-    s('rect', { fill: 'url(#mChrome)', x: 140, y: 138, width: 40, height: 10, rx: 3 }),
-    // Dampf- (links) und Wasserlanze (rechts) als gerade Striche
-    knob(96, 102, 1),
-    s('line', { class: 'wand', x1: 96, y1: 111, x2: 70, y2: 290 }),
-    knob(224, 102, -1),
-    s('line', { class: 'wand', x1: 224, y1: 111, x2: 224, y2: 196 }),
-    // Display rechts
-    s('rect', { class: 'display', x: 250, y: 162, width: 12, height: 40, rx: 2 }),
-    s('rect', { class: 'display-txt', x: 252, y: 168, width: 8, height: 4 }),
-    s('rect', { class: 'display-txt', x: 252, y: 182, width: 8, height: 10 }),
-    // Manometer
-    gauge(118), gauge(202),
-    s('path', { class: 'warn-tri', d: 'M262 282 L270 268 L278 282 Z' }),
-    // Abtropfschale
-    s('rect', { class: 'tray', x: 28, y: 306, width: 264, height: 52, rx: 6 }),
-    s('rect', { class: 'grill-bg', x: 44, y: 316, width: 98, height: 34, rx: 3 }),
-    s('rect', { class: 'grill-bg', x: 178, y: 316, width: 98, height: 34, rx: 3 }),
-    s('g', { class: 'grill' }, grill(50, 136), grill(184, 270)),
+    s('rect', { class: 'body', x: 30.5, y: 72.5, width: 259, height: 83, rx: 6 }),
     ...buttons);
+}
+
+// Schema der Xenia DBL von vorn: zwei Kippschalter (Paddel) unter der Brühgruppe, jede Seite antippbar.
+// Frontansicht der Xenia DBL nach Foto: weiße Front unter der Tassenablage, zwei kleine Kippschalter von vorn
+// (Sechskantmutter, Hebelkopf zeigt zum Betrachter), rechts vom linken Schalter das Ein/Aus-Symbol, links vom rechten
+// das Tassen-Symbol; darunter die Brühgruppe und die beiden Holzknöpfe. Die Positionen ①–④ sind antippbar; die
+// gewählte Seite kippt den Hebel sichtbar. ② (links nach rechts) ist fest Ein/Aus und gesperrt.
+function dblSvg(onPick) {
+  const tips = {};
+  const toggle = (cx, cy, side) => {
+    const tip = s('g', { class: 'tg-tip' },
+      s('line', { class: 'tg-stem', x1: cx, y1: cy, x2: cx, y2: cy }),
+      s('circle', { class: 'tg-head', cx, cy, r: 5.2 }));
+    tips[side] = { tip, cx, cy };
+    const halves = DBL_BUTTONS.filter((b) => b.lever === side).map((b) => {
+      const x = b.dir < 0 ? cx - 34 : cx;
+      const nx = cx + b.dir * 17; // Nummer schräg über dem Schalter, wie auf dem Foto
+      const g = s('g', { class: `mbtn lever-side${b.fixed ? ' fixed' : ''}`, 'data-key': b.key, role: 'button', tabindex: 0, 'aria-label': `Schalter ${b.no} ${b.label}` },
+        s('rect', { class: 'halo', x: b.dir < 0 ? cx - 21 : cx + 1, y: cy - 15, width: 20, height: 30, rx: 9 }),
+        s('circle', { class: 'pos-ring', cx: nx, cy: cy - 28, r: 9 }),
+        s('text', { class: 'pos-no', x: nx, y: cy - 24.5, 'text-anchor': 'middle' }, String(b.no)),
+        s('rect', { class: 'hit', x: b.dir < 0 ? cx - 40 : cx, y: cy - 40, width: 40, height: 58 }));
+      g.addEventListener('click', () => onPick(b.key));
+      g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(b.key); } });
+      return g;
+    });
+    return s('g', { class: 'toggle' },
+      s('polygon', { class: 'tg-nut', points: hexPoints(cx, cy, 12) }),
+      s('circle', { class: 'tg-ring', cx, cy, r: 8.5 }),
+      s('circle', { class: 'tg-hole', cx, cy, r: 6 }),
+      tip,
+      ...halves);
+  };
+  // Nur der Schalterstreifen der Front (ohne Brühgruppe und Drehknöpfe)
+  const svg = s('svg', { class: 'machine-svg dbl', viewBox: '30 32 260 82', role: 'img', 'aria-label': 'Xenia DBL: die zwei Kippschalter an der Front' },
+    s('defs', {},
+      s('linearGradient', { id: 'mFront', x1: 0, y1: 0, x2: 0, y2: 1 },
+        s('stop', { offset: '0', 'stop-color': '#f7f7f6' }), s('stop', { offset: '1', 'stop-color': '#e3e3e1' }))),
+    s('rect', { class: 'front', x: 30.5, y: 32.5, width: 259, height: 81, rx: 6 }),
+    // Symbole wie an der Maschine
+    s('path', { class: 'sym', d: 'M121.5 77 A8 8 0 1 0 130.5 77 M126 72 V81' }),
+    s('path', { class: 'sym', d: 'M188 75 H200 V83 A4 4 0 0 1 196 87 H192 A4 4 0 0 1 188 83 Z M200 77.5 H202.5 A2.5 2.5 0 0 1 202.5 82.5 H200' }),
+    toggle(100, 80, 'left'), toggle(220, 80, 'right'));
+  // Hebelkopf zur gewählten Seite kippen (wie beim Drücken an der Maschine)
+  svg.tilt = (key) => {
+    const b = DBL_BUTTONS.find((x) => x.key === key);
+    for (const [side, t] of Object.entries(tips)) {
+      const dx = b && b.lever === side ? b.dir * 9 : 0;
+      t.tip.querySelector('.tg-head').setAttribute('cx', String(t.cx + dx));
+      t.tip.querySelector('.tg-stem').setAttribute('x2', String(t.cx + dx));
+      t.tip.classList.toggle('tilted', Boolean(dx));
+    }
+  };
+  return svg;
+}
+
+function hexPoints(cx, cy, r) {
+  return Array.from({ length: 6 }, (_, i) => {
+    const a = (Math.PI / 3) * i + Math.PI / 6;
+    return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+  }).join(' ');
 }
 
 function switchesTab(root) {
   const features = store.server?.features || {};
+  const classic = isClassic();
+  const BTNS = classic ? DBL_BUTTONS : BUTTONS;
   const box = h('div', {}, h('div', { class: 'empty' }, 'Lade Belegung …'));
   root.append(box);
   (async () => {
     try {
       const [sw, sc] = await Promise.all([api('/api/machine/switches'), api('/api/machine/scripts')]);
       const options = [
-        ...Object.entries(sc.builtin).map(([id, title]) => ({ id: Number(id), title })),
+        ...Object.entries(sc.builtin).map(([id, title]) => ({ id: Number(id), title: classic && id === '7' && sw.singleDoseG ? `${title} ${sw.singleDoseG} g/ml` : classic && id === '8' && sw.doubleDoseG ? `${title} ${sw.doubleDoseG} g/ml` : title })),
         ...sc.scripts.filter((x) => x.id > 9).map((x) => ({ id: x.id, title: x.title })),
       ];
       const nm = (id) => options.find((o) => o.id === id)?.title || (id ? `Skript ${id}` : 'Keine');
       const assign = {};
-      for (const b of BUTTONS) if (!b.fixed) assign[b.key] = { short: sw.buttons[b.key]?.short ?? 0, long: sw.buttons[b.key]?.long ?? 0 };
+      for (const b of BTNS) if (!b.fixed) assign[b.key] = { short: sw.buttons[b.key]?.short ?? 0, long: sw.buttons[b.key]?.long ?? 0 };
       const changed = {};
       const editable = Boolean(features.settings);
 
@@ -140,10 +169,11 @@ function switchesTab(root) {
 
       const cards = {};
       let selected = null;
-      const svg = machineSvg((key) => pick(key));
+      const svg = classic ? dblSvg((key) => pick(key)) : machineSvg((key) => pick(key));
       function pick(key) {
         selected = selected === key ? null : key;
         for (const g of svg.querySelectorAll('.mbtn')) g.classList.toggle('sel', g.dataset.key === selected);
+        svg.tilt?.(selected);
         for (const [k, c] of Object.entries(cards)) c.classList.toggle('sel', k === selected);
         if (selected) cards[selected].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
@@ -159,9 +189,9 @@ function switchesTab(root) {
         el.addEventListener('focus', () => { if (selected !== b.key) pick(b.key); });
         return el;
       };
-      const grid = h('div', { class: 'btn-assign' }, BUTTONS.map((b) => {
+      const grid = h('div', { class: 'btn-assign' }, BTNS.map((b) => {
         const c = h('div', { class: 'assign-card', onclick: (e) => { if (e.target.tagName !== 'SELECT') pick(b.key); } },
-          h('div', { class: 'ttl' }, b.label, b.fixed ? h('span', { class: 'badge' }, 'fest') : null),
+          h('div', { class: 'ttl' }, classic ? `${'①②③④'[b.no - 1]} Schalter ${b.label}` : b.label, b.fixed ? h('span', { class: 'badge' }, 'gesperrt') : null),
           b.fixed
             ? [h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Kurz'), h('span', { class: 'v' }, b.fixed.short)),
               h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Lang'), h('span', { class: 'v' }, b.fixed.long))]
@@ -171,27 +201,15 @@ function switchesTab(root) {
         return c;
       }));
 
-      const single = h('input', { class: 'text', type: 'number', min: 1, max: 199, step: 0.5, value: sw.singleDoseG ?? '' });
-      const double = h('input', { class: 'text', type: 'number', min: 1, max: 199, step: 0.5, value: sw.doubleDoseG ?? '' });
       box.replaceChildren(
         h('div', { class: 'card' },
           h('h3', {}, 'Tastenbelegung'),
-          h('p', { class: 'muted small' }, 'Tippe auf einen Taster und wähle, was kurzes bzw. langes Drücken startet. Eigene Abläufe legst du unter „Skripte“ an.'),
+          h('p', { class: 'muted small' }, classic
+            ? 'Alte Xenia (DBL): Eine Position ①–④ antippen und auswählen, was kurzes bzw. langes Drücken startet. ② (linker Schalter nach rechts, am Ein/Aus-Symbol) ist fest Ein/Aus und lässt sich nicht ändern.'
+            : 'Einen Taster antippen und auswählen, was kurzes bzw. langes Drücken startet. Eigene Abläufe entstehen unter „Skripte“.'),
           h('div', { class: 'machine-wrap' }, svg),
           grid,
-          editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')),
-        h('div', { class: 'card' },
-          h('h3', {}, 'Bezugsgewicht (interne Waage)'),
-          h('div', { class: 'row' },
-            h('label', { class: 'field grow' }, h('span', {}, 'Einfache Dosis (g)'), single),
-            h('label', { class: 'field grow' }, h('span', {}, 'Doppelte Dosis (g)'), double)),
-          h('div', { style: { height: '12px' } }),
-          h('button', { class: 'btn filled wide', disabled: !editable, onclick: async () => {
-            try {
-              await api('/api/machine/switches', { method: 'PUT', body: { singleDoseG: Number(single.value), doubleDoseG: Number(double.value) } });
-              snackbar('Gewichte gespeichert');
-            } catch (e) { snackbar(e.message); }
-          } }, 'Speichern')));
+          editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')));
     } catch (e) {
       box.replaceChildren(h('div', { class: 'empty' }, e.message));
     }
