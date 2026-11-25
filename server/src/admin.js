@@ -63,17 +63,23 @@ export function publicUrl(v) {
   return u.origin;
 }
 
+function hexColor(label) {
+  return (v) => {
+    const s = String(v ?? '').trim().toLowerCase();
+    if (!/^#[0-9a-f]{6}$/.test(s)) throw bad(`${label}: #rrggbb`);
+    return s;
+  };
+}
+
 export const FIELDS = {
   publicUrl: (v) => (v === null || v === '' ? null : publicUrl(v)),
   'machine.url': (v) => deviceUrl(v, 'Adresse der Xenia'),
   'machine.api': oneOf('Xenia-Modell', ['bbs', 'classic']),
-  'machine.look.color': (v) => {
-    const s = String(v ?? '').trim().toLowerCase();
-    if (!/^#[0-9a-f]{6}$/.test(s)) throw bad('Farbe der Xenia: #rrggbb');
-    return s;
-  },
+  'machine.look.color': hexColor('Farbe der Xenia'),
+  'machine.look.grip': hexColor('Farbe der Griffe'),
   'machine.look.style': oneOf('Ansicht', ['render', 'simple']),
   'machine.look.steamSide': oneOf('Dampflanze', ['left', 'right']),
+  'machine.look.valves': oneOf('Ventile', ['lever', 'rotary']),
   'machine.look.editButton': bool('Knopf „Ansicht ändern“'),
   'grinder.enabled': bool('Mühle'),
   'grinder.url': (v) => deviceUrl(v, 'Adresse der Mühle'),

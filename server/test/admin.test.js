@@ -128,11 +128,11 @@ test('Server-Einstellungen: lesen, ändern, sofort wirksam; Prüfungen', async (
   r = await call('GET', '/api/machine/paddle');
   assert.equal(r.status, 403);
   // Aussehen der Xenia (Frontansicht unter „Schalter“): kommt mit dem Server-Zustand zur App
-  r = await call('PUT', '/api/admin/config', { changes: { 'machine.look.style': 'simple', 'machine.look.color': '#9E1F24', 'machine.look.steamSide': 'right', 'machine.look.editButton': false } });
+  r = await call('PUT', '/api/admin/config', { changes: { 'machine.look.style': 'simple', 'machine.look.color': '#9E1F24', 'machine.look.steamSide': 'right', 'machine.look.valves': 'rotary', 'machine.look.grip': '#1D1E21', 'machine.look.editButton': false } });
   assert.equal(r.status, 200);
-  assert.deepEqual((await call('GET', '/api/state')).json.server.machine.look, { style: 'simple', color: '#9e1f24', steamSide: 'right', editButton: false });
+  assert.deepEqual((await call('GET', '/api/state')).json.server.machine.look, { style: 'simple', color: '#9e1f24', steamSide: 'right', valves: 'rotary', grip: '#1d1e21', editButton: false });
   for (const changes of [{ 'nope.key': 1 }, { 'machine.url': 'ftp://1.2.3.4' }, { 'http.port': 70000 }, { 'http.enabled': false, 'https.enabled': false }, { 'https.port': 8080 }, { timezone: 'Mars/Olympus' },
-    { 'machine.look.color': 'red' }, { 'machine.look.steamSide': 'oben' }, { 'machine.look.style': 'foto' }]) {
+    { 'machine.look.color': 'red' }, { 'machine.look.steamSide': 'oben' }, { 'machine.look.style': 'foto' }, { 'machine.look.valves': 'kugel' }, { 'machine.look.grip': 'holz' }]) {
     r = await call('PUT', '/api/admin/config', { changes });
     assert.equal(r.status, 400, JSON.stringify(changes));
   }
