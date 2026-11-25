@@ -20,12 +20,12 @@ export function paddleView(root) {
 // --- Schalter ------------------------------------------------------------------------
 // Taster an der Front (vgl. Original-UI „Button Assignments“). Oben links ist fest Ein/Aus;
 // die übrigen drei Taster tragen je ein Skript für kurz/lang drücken (SWITCH_SET_<Taster>_<0|1>).
-// Lage der Taster je Ansicht: im Render über der Brühgruppe, in der vereinfachten Ansicht an den Rändern
+// Lage der Taster je Ansicht: im Render auf den Seitenleisten über den Ventilen, in der vereinfachten Ansicht an den Rändern
 const BUTTONS = [
-  { key: 'POWER', label: 'Oben links', render: [110, 52], simple: [52, 96], glyph: 'power', fixed: { short: 'Ein/Aus', long: 'Ein ohne Dampfkessel' } },
-  { key: 'RIGHT_RIGHT', label: 'Oben rechts', render: [210, 52], simple: [268, 96], glyph: 'cup1' },
-  { key: 'LEFT_LEFT', label: 'Unten links', render: [110, 78], simple: [52, 132], glyph: 'crown' },
-  { key: 'RIGHT_LEFT', label: 'Unten rechts', render: [210, 78], simple: [268, 132], glyph: 'cup2' },
+  { key: 'POWER', label: 'Oben links', render: [56, 54], simple: [52, 96], glyph: 'power', fixed: { short: 'Ein/Aus', long: 'Ein ohne Dampfkessel' } },
+  { key: 'RIGHT_RIGHT', label: 'Oben rechts', render: [264, 54], simple: [268, 96], glyph: 'cup1' },
+  { key: 'LEFT_LEFT', label: 'Unten links', render: [56, 94], simple: [52, 132], glyph: 'crown' },
+  { key: 'RIGHT_LEFT', label: 'Unten rechts', render: [264, 94], simple: [268, 132], glyph: 'cup2' },
 ];
 
 // Alte Xenia (DBL): zwei kleine Kippschalter, jeder lässt sich nach links und nach rechts drücken (kurz/lang).
@@ -53,15 +53,18 @@ function s(tag, attrs = {}, ...children) {
 // vier Taster und Display; alte Xenia (DBL, nach Foto): zwei Kippschalter oben, vier Leuchten rechts der Brühgruppe.
 // Nur die Taster bzw. die Schalterseiten sind antippbar. Ansicht, Farbe, Dampflanze und Ventile: Einstellungen →
 // Modell & Aussehen.
-export const LOOK_DEFAULTS = { color: '#26272b', steamSide: 'left', grip: '#c98a4f' };
+export const LOOK_DEFAULTS = { color: '#26272b', steamSide: 'left', grip: '#c98a4f', gauge: '#141518' };
+const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || '') ? v.toLowerCase() : null);
 export function machineLook() {
   const l = store.server?.machine?.look || {};
   return {
     style: l.style === 'simple' ? 'simple' : 'render',
-    color: /^#[0-9a-f]{6}$/i.test(l.color || '') ? l.color.toLowerCase() : LOOK_DEFAULTS.color,
+    color: hex(l.color) || LOOK_DEFAULTS.color,
     steamSide: l.steamSide === 'right' ? 'right' : 'left',
     valves: l.valves === 'rotary' ? 'rotary' : 'lever',
-    grip: /^#[0-9a-f]{6}$/i.test(l.grip || '') ? l.grip.toLowerCase() : LOOK_DEFAULTS.grip,
+    grip: l.grip === 'chrome' ? 'chrome' : hex(l.grip), // null: Standard des Modells (DBL Holz, neue Xenia Chrom)
+    tray: hex(l.tray) || hex(l.color) || LOOK_DEFAULTS.color, // ohne eigene Farbe wie das Gehäuse
+    gauge: hex(l.gauge) || LOOK_DEFAULTS.gauge,
     editButton: l.editButton !== false,
   };
 }
@@ -96,9 +99,12 @@ function pickable(g, key, onPick) {
 
 function xeniaSvg({ classic, look, onPick }) {
   const body = look.color;
-  const grip = look.grip;
-  // Maserung nur bei Holztönen; schwarze, weiße oder graue Griffe bleiben glatt
-  const grain = saturation(grip) > 0.2 ? shade(grip, -0.5) : 'transparent';
+  // Griffe: Farbe (Holzarten, Schwarz, Weiß, eigene) oder Chrom; ohne eigene Wahl DBL Holz, neue Xenia Chrom
+  const grip = look.grip || (classic ? LOOK_DEFAULTS.grip : 'chrome');
+  const chromeGrip = grip === 'chrome';
+  const tone = chromeGrip ? '#b9bdc2' : grip;
+  // Maserung nur bei Holztönen; Chrom, schwarze, weiße oder graue Griffe bleiben glatt
+  const grain = !chromeGrip && saturation(tone) > 0.2 ? shade(tone, -0.5) : 'transparent';
   const light = contrastOn(body) !== '#ffffff'; // helles Gehäuse → dunkle Schrift und Symbole
   const ink = light ? '#45474c' : '#d3d5d9';
   const grad = (id, stops, horizontal = false) => s('linearGradient', { id, x1: 0, y1: 0, x2: horizontal ? 1 : 0, y2: horizontal ? 0 : 1 },
@@ -107,11 +113,15 @@ function xeniaSvg({ classic, look, onPick }) {
     grad('mChrome', [['0', '#7d8186'], ['.45', '#f4f6f8'], ['1', '#8a8e93']], true),
     grad('mChromeV', [['0', '#f4f6f8'], ['.55', '#b9bdc2'], ['1', '#7d8186']]),
     grad('mBody', [['0', shade(body, 0.1)], ['1', shade(body, -0.2)]]),
+    grad('mTray', [['0', shade(look.tray, 0.1)], ['1', shade(look.tray, -0.2)]]),
     grad('mSide', [['0', '#000', 0.22], ['.12', '#000', 0], ['.88', '#000', 0], ['1', '#000', 0.22]], true),
-    grad('mWood', [['0', shade(grip, -0.4)], ['.45', grip], ['1', shade(grip, -0.4)]], true),
-    // Drehknöpfe: Licht von oben links
+    chromeGrip ? grad('mWood', [['0', '#7d8186'], ['.45', '#f4f6f8'], ['1', '#8a8e93']], true)
+      : grad('mWood', [['0', shade(tone, -0.4)], ['.45', tone], ['1', shade(tone, -0.4)]], true),
+    // Runde Griffe von vorn: Licht von oben links
     s('radialGradient', { id: 'mKnobWood', cx: 0.42, cy: 0.38, r: 0.7 },
-      s('stop', { offset: '0', 'stop-color': shade(grip, 0.25) }), s('stop', { offset: '.6', 'stop-color': grip }), s('stop', { offset: '1', 'stop-color': shade(grip, -0.25) })));
+      s('stop', { offset: '0', 'stop-color': chromeGrip ? '#f4f6f8' : shade(tone, 0.25) }),
+      s('stop', { offset: '.6', 'stop-color': tone }),
+      s('stop', { offset: '1', 'stop-color': chromeGrip ? '#7d8186' : shade(tone, -0.25) })));
 
   // Tassenablage und Gehäuse
   const rail = [s('rect', { x: 44, y: 21, width: 232, height: 10, rx: 2, fill: 'url(#mChrome)' })];
@@ -120,6 +130,12 @@ function xeniaSvg({ classic, look, onPick }) {
     s('rect', { class: 'body', x: 40, y: 30, width: 240, height: 232, rx: 7 }),
     s('rect', { x: 40, y: 30, width: 240, height: 232, rx: 7, fill: 'url(#mSide)' }),
     s('rect', { x: 44, y: 31, width: 232, height: 2, fill: '#fff', opacity: light ? 0.5 : 0.08 }),
+    ...(classic ? [] : [
+      s('rect', { x: 40, y: 30, width: 30, height: 232, rx: 7, fill: '#fff', opacity: light ? 0.12 : 0.035 }),
+      s('rect', { x: 250, y: 30, width: 30, height: 232, rx: 7, fill: '#fff', opacity: light ? 0.12 : 0.035 }),
+      s('line', { x1: 70, y1: 34, x2: 70, y2: 262, stroke: '#000', opacity: 0.25 }),
+      s('line', { x1: 250, y1: 34, x2: 250, y2: 262, stroke: '#000', opacity: 0.25 }),
+    ]),
   ];
 
   // Abtropfschale mit versetzten Schlitzen
@@ -128,8 +144,8 @@ function xeniaSvg({ classic, look, onPick }) {
     for (let x = 48 + (r % 2) * 9; x + 13 <= 274; x += 18) slots.push(s('rect', { x, y: 271 + r * 10, width: 13, height: 6, rx: 3, fill: '#0c0d0f' }));
   }
   const tray = [
-    s('rect', { class: 'body', x: 28, y: 262, width: 264, height: 74, rx: 6 }),
-    s('rect', { x: 40, y: 267, width: 240, height: 33, rx: 4, fill: shade(body, -0.45) }),
+    s('rect', { x: 28, y: 262, width: 264, height: 74, rx: 6, fill: 'url(#mTray)', stroke: 'rgba(0,0,0,.45)', 'stroke-width': 0.8 }),
+    s('rect', { x: 40, y: 267, width: 240, height: 33, rx: 4, fill: shade(look.tray, -0.45) }),
     ...slots,
     s('line', { x1: 34, y1: 306, x2: 286, y2: 306, stroke: '#000', opacity: 0.25 }),
   ];
@@ -150,12 +166,17 @@ function xeniaSvg({ classic, look, onPick }) {
 
   // Ventile mit Holzgriff, je nach Ausstattung als Hebel (schräg nach außen) oder als Drehknopf (von vorn rund);
   // darunter Heißwasser und Dampflanze (Grundzeichnung: Dampf rechts)
-  const lever = (vx, dir) => [
-    s('line', { x1: vx, y1: 104, x2: vx + dir * 20, y2: 96, stroke: '#c3c7cc', 'stroke-width': 7, 'stroke-linecap': 'round' }),
-    s('ellipse', { class: 'kn-wood', cx: vx + dir * 30, cy: 92, rx: 17, ry: 11, transform: `rotate(${dir * -18} ${vx + dir * 30} 92)` }),
-    s('path', { class: 'kn-grain', d: `M${vx + dir * 20} 90 Q${vx + dir * 30} 86 ${vx + dir * 42} 90`, transform: `rotate(${dir * -18} ${vx + dir * 30} 92)` }),
-    s('rect', { x: vx - 7, y: 96, width: 14, height: 24, rx: 4, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.6 }),
-  ];
+  // Hebel wie an der DBL: Holzgriff schräg nach unten außen
+  const lever = (vx, dir) => {
+    const hx = vx + dir * 22;
+    const turn = `rotate(${dir * 40} ${hx} 116)`;
+    return [
+      s('rect', { x: vx - 7, y: 96, width: 14, height: 24, rx: 4, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.6 }),
+      s('line', { x1: vx, y1: 102, x2: vx + dir * 12, y2: 108, stroke: '#c3c7cc', 'stroke-width': 6, 'stroke-linecap': 'round' }),
+      s('ellipse', { class: 'kn-wood', cx: hx, cy: 116, rx: 16, ry: 8, transform: turn }),
+      s('path', { class: 'kn-grain', d: `M${hx - 12} 115 Q${hx} 112 ${hx + 12} 115 M${hx - 9} 119 Q${hx} 121 ${hx + 10} 118`, transform: turn }),
+    ];
+  };
   // Drehknopf wie an der Maschine: fünfblättriger Holzstern, schwarze Plakette mit Chromring, Chrom in der Mitte
   const rotary = (vx, id) => {
     const cy = 92;
@@ -176,7 +197,7 @@ function xeniaSvg({ classic, look, onPick }) {
       s('rect', { x: vx - 7, y: 104, width: 14, height: 16, rx: 4, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.6 }),
       s('clipPath', { id: `${id}Clip` }, s('path', { d: star })),
       s('path', { d: star, fill: '#000', opacity: 0.25, transform: 'translate(0 1.4)' }),
-      s('path', { d: star, fill: 'url(#mKnobWood)', stroke: shade(grip, -0.35), 'stroke-width': 0.5, 'stroke-opacity': 0.5 }),
+      s('path', { d: star, fill: 'url(#mKnobWood)', stroke: shade(tone, -0.35), 'stroke-width': 0.5, 'stroke-opacity': 0.5 }),
       s('path', { d: lines.join(' '), fill: 'none', stroke: grain, 'stroke-width': 0.8, opacity: 0.35, 'clip-path': `url(#${id}Clip)` }),
       s('circle', { cx: vx, cy, r: 9.2, fill: '#18191b', stroke: '#d9dce0', 'stroke-width': 0.9 }),
       s('circle', { cx: vx, cy, r: 3, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.4 }),
@@ -199,22 +220,79 @@ function xeniaSvg({ classic, look, onPick }) {
     s('line', { x1: 241, y1: 188, x2: 254, y2: 228, stroke: '#1b1c1f', 'stroke-width': 10, 'stroke-linecap': 'round' }),
     s('rect', { x: 259, y: 252, width: 7, height: 10, rx: 2, fill: '#8a8e93' }),
   ];
-  const wands = s('g', look.steamSide === 'left' ? { transform: 'translate(320 0) scale(-1 1)' } : {}, ...water, ...steam);
+
+  // Neue Xenia nach Foto der Maschine: kantige Nische mit Chromkeil, runder Chromkragen, Siebträgergriff zum
+  // Betrachter nach unten, runde Ventilknöpfe (Chrom oder Holz), Heißwasser kurz mit bauchigem Auslauf, Dampflanze gerade mit Gummigriff
+  // bis knapp über die Abtropfschale (Grundzeichnung wie oben: Heißwasser links, Dampf rechts)
+  const newXenia = () => {
+    const nut = (vx, y) => [
+      s('path', { d: `M${vx - 6.5} ${y} H${vx + 6.5} L${vx + 8} ${y + 3} V${y + 7} L${vx + 6.5} ${y + 10} H${vx - 6.5} L${vx - 8} ${y + 7} V${y + 3} Z`, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.6 }),
+      s('line', { x1: vx - 7.5, y1: y + 5, x2: vx + 7.5, y2: y + 5, stroke: '#7d8186', 'stroke-width': 0.4, opacity: 0.6 }),
+    ];
+    const cone = (vx, y) => s('path', { d: `M${vx - 6} ${y} H${vx + 6} L${vx + 3} ${y + 12} H${vx - 3} Z`, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.5 });
+    // Runder Ventilknopf von vorn: Chrom oder Holz (bzw. eigene Farbe) mit Maserung
+    const knob = (vx) => [
+      s('rect', { x: vx - 5, y: 76, width: 10, height: 24, rx: 3, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.5 }),
+      s('circle', { cx: vx, cy: 70, r: 11.5, fill: chromeGrip ? 'url(#mChromeV)' : 'url(#mKnobWood)', stroke: chromeGrip ? '#6f7378' : shade(tone, -0.35), 'stroke-width': 0.7 }),
+      chromeGrip ? s('circle', { cx: vx, cy: 70, r: 8, fill: 'url(#mChrome)', opacity: 0.9 })
+        : s('path', { class: 'kn-grain', d: `M${vx - 9} 67 Q${vx} 64 ${vx + 9} 67 M${vx - 10} 72 Q${vx} 75 ${vx + 10} 72` }),
+    ];
+    const ribs = [];
+    for (let i = 0; i < 5; i++) ribs.push(s('line', { x1: 230.5, y1: 180 + i * 4.6, x2: 241.5, y2: 180 + i * 4.6, stroke: '#4a4d53', 'stroke-width': 1.4 }));
+    return {
+      group: [
+        s('rect', { x: 132, y: 54, width: 56, height: 58, rx: 3, fill: '#111214' }),
+        s('path', { d: 'M140 60 H180 L170 112 H150 Z', fill: 'url(#mChrome)' }),
+        s('path', { d: 'M148 64 H172 L160 98 Z', fill: '#000', opacity: 0.22 }),
+        s('rect', { x: 111, y: 110, width: 98, height: 24, rx: 12, fill: 'url(#mChrome)', stroke: '#6f7378', 'stroke-width': 0.8 }),
+        s('line', { x1: 116, y1: 122, x2: 204, y2: 122, stroke: '#6f7378', 'stroke-width': 0.6, opacity: 0.7 }),
+        s('path', { d: 'M132 134 H188 L180 150 H140 Z', fill: 'url(#mChromeV)' }),
+        // Auslauf und Siebträgergriff, der wie bei der DBL zum Betrachter nach unten zeigt (etwas kürzer)
+        s('path', { d: 'M148 150 H172 L167 160 H153 Z', fill: 'url(#mChrome)' }),
+        s('path', { class: 'kn-wood', d: 'M150 166 Q160 161 170 166 L174 258 Q160 271 146 258 Z' }),
+        s('path', { class: 'kn-grain', d: 'M155 172 Q151 212 156 256 M163 170 Q168 216 162 262 M158 188 Q162 200 158 212' }),
+        s('rect', { x: 149, y: 158, width: 22, height: 9, rx: 3, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.6 }),
+      ],
+      valves: [...knob(84), ...knob(236)],
+      water: [
+        ...nut(84, 98), cone(84, 108),
+        s('rect', { x: 81.5, y: 120, width: 5, height: 46, rx: 2, fill: 'url(#mChrome)' }),
+        s('path', { d: 'M80.5 164 H87.5 Q91 170 90.5 179 Q90 192 84 193 Q78 192 77.5 179 Q77 170 80.5 164 Z', fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.6 }),
+      ],
+      steam: [
+        ...nut(236, 98), cone(236, 108),
+        s('rect', { x: 234, y: 120, width: 4, height: 58, rx: 2, fill: 'url(#mChrome)' }),
+        s('rect', { x: 230.5, y: 176, width: 11, height: 26, rx: 4, fill: '#2b2d31' }),
+        ...ribs,
+        s('rect', { x: 234.4, y: 202, width: 3.2, height: 52, rx: 1.5, fill: 'url(#mChrome)' }),
+        s('ellipse', { cx: 236, cy: 256, rx: 3.2, ry: 4.5, fill: 'url(#mChrome)', stroke: '#7d8186', 'stroke-width': 0.5 }),
+      ],
+    };
+  };
+  const parts = classic ? { group, valves: [...valve(84, -1), ...valve(236, 1)], water, steam } : newXenia();
+  const wands = s('g', look.steamSide === 'left' ? { transform: 'translate(320 0) scale(-1 1)' } : {}, ...parts.water, ...parts.steam);
 
   // Manometer und Schriftzug
+  // Zifferblatt in der eingestellten Farbe; Skala und Zeiger hell auf dunklem, dunkel auf hellem Grund
+  const dial = contrastOn(look.gauge) === '#ffffff' ? '#e8e8e8' : '#2a2b2f';
+  // Neue Xenia: größere Manometer (k skaliert Ring, Skala und Zeiger)
+  const gk = classic ? 1 : 1.3;
   const gauge = (cx) => {
-    const g = s('g', {}, s('circle', { cx, cy: 228, r: 14.5, fill: 'url(#mChrome)' }), s('circle', { cx, cy: 228, r: 11.8, fill: '#141518' }));
+    const cy = classic ? 228 : 220;
+    const g = s('g', {}, s('circle', { cx, cy, r: 14.5 * gk, fill: 'url(#mChrome)' }), s('circle', { cx, cy, r: 11.8 * gk, fill: look.gauge }));
     for (let i = 0; i <= 8; i++) {
       const a = (Math.PI * (225 - i * 33.75)) / 180;
-      g.append(s('line', { x1: cx + Math.cos(a) * 8.8, y1: 228 - Math.sin(a) * 8.8, x2: cx + Math.cos(a) * 11, y2: 228 - Math.sin(a) * 11, stroke: '#e8e8e8', 'stroke-width': 0.9 }));
+      g.append(s('line', { x1: cx + Math.cos(a) * 8.8 * gk, y1: cy - Math.sin(a) * 8.8 * gk, x2: cx + Math.cos(a) * 11 * gk, y2: cy - Math.sin(a) * 11 * gk, stroke: dial, 'stroke-width': 0.9 }));
     }
-    g.append(s('line', { x1: cx, y1: 228, x2: cx - 5, y2: 222, stroke: '#e8e8e8', 'stroke-width': 1.3, 'stroke-linecap': 'round' }),
-      s('circle', { cx, cy: 228, r: 1.6, fill: '#d0342c' }));
+    g.append(s('line', { x1: cx, y1: cy, x2: cx - 5 * gk, y2: cy - 6 * gk, stroke: dial, 'stroke-width': 1.3, 'stroke-linecap': 'round' }),
+      s('circle', { cx, cy, r: 1.6 * gk, fill: '#d0342c' }));
     return g;
   };
-  // Schriftzug wie an der Maschine halb hinter dem Siebträgergriff („NIA“ rechts davon sichtbar)
-  const front = [gauge(106), gauge(214),
-    s('text', { x: 175, y: 232, 'text-anchor': 'middle', fill: ink, 'font-size': 10, 'letter-spacing': 3.5, 'font-weight': 300 }, 'XENIA')];
+  // DBL: Schriftzug wie an der Maschine halb hinter dem Siebträgergriff („NIA“ rechts davon sichtbar).
+  // Neue Xenia: ohne Schriftzug, rotes Dreieck rechts unten.
+  const front = [gauge(106), gauge(214), classic
+    ? s('text', { x: 175, y: 232, 'text-anchor': 'middle', fill: ink, 'font-size': 10, 'letter-spacing': 3.5, 'font-weight': 300 }, 'XENIA')
+    : s('path', { d: 'M272 243 L277 252 H267 Z', fill: '#d0342c' })];
 
   // Bedienelemente je Modell
   const controls = [];
@@ -224,13 +302,16 @@ function xeniaSvg({ classic, look, onPick }) {
     controls.push(s('path', { d: 'M119.5 63 A6 6 0 1 0 126.5 63 M123 59 V66', fill: 'none', stroke: ink, 'stroke-width': 1.6, 'stroke-linecap': 'round' }),
       s('path', { d: 'M192 61 H202 V67 A3.5 3.5 0 0 1 198.5 70.5 H195.5 A3.5 3.5 0 0 1 192 67 Z M202 63 H204 A2 2 0 0 1 204 67 H202', fill: 'none', stroke: ink, 'stroke-width': 1.4, 'stroke-linejoin': 'round' }));
   } else {
-    controls.push(s('rect', { x: 200, y: 128, width: 12, height: 40, rx: 2, fill: '#0b1020', stroke: '#2c3a66' }),
-      s('rect', { x: 202, y: 134, width: 8, height: 4, fill: '#9fd3ff', opacity: 0.9 }), s('rect', { x: 202, y: 148, width: 8, height: 10, fill: '#9fd3ff', opacity: 0.9 }));
+    // Display schmal auf der rechten Seitenleiste: Symbole oben, Gewicht und Zeit darunter
+    controls.push(s('rect', { x: 259, y: 128, width: 12, height: 44, rx: 2, fill: '#0b0c0e', stroke: '#2a2c31' }));
+    for (const y of [133, 140, 147]) controls.push(s('circle', { cx: 265, cy: y, r: 1.6, fill: 'none', stroke: '#d9dce0', 'stroke-width': 0.6 }));
+    controls.push(s('rect', { x: 261.5, y: 154, width: 7, height: 5, rx: 0.8, fill: '#d9dce0', opacity: 0.85 }),
+      s('rect', { x: 261.5, y: 163, width: 7, height: 5, rx: 0.8, fill: '#d9dce0', opacity: 0.85 }));
   }
 
   const svg = s('svg', { class: `machine-svg render${classic ? ' dbl' : ''}`, viewBox: '20 14 280 326', role: 'img',
     'aria-label': classic ? 'Xenia DBL von vorn mit den zwei Kippschaltern' : 'Xenia von vorn mit den vier Tastern' },
-  defs, ...rail, ...shell, ...tray, ...front, ...controls, ...valve(84, -1), ...valve(236, 1), wands, ...group);
+  defs, ...rail, ...shell, ...tray, ...front, ...controls, ...parts.valves, wands, ...parts.group);
   // Maserung von Siebträger und Hebelgriffen in der Griff-Farbe (per CSSOM, ein style-Attribut verbietet die CSP)
   svg.style.setProperty('--grip-grain', grain);
 
