@@ -88,6 +88,7 @@ function widgetAlarmButton(unsubs) {
 }
 
 // Android-App: neue APK aus dem GitHub-Release laden und installieren. Ältere Apps ohne diese Brückenfunktion: kein Eintrag.
+// Die Variante „ohne Updater“ (selfInstall false) installiert nicht selbst, sondern öffnet den Download im Browser.
 function appUpdateItem(unsubs) {
   if (!inAndroidApp() || typeof window.XeniaApp?.appUpdate !== 'function') return null;
   const sub = h('div', { class: 'sub' });
@@ -99,17 +100,19 @@ function appUpdateItem(unsubs) {
   const paint = () => {
     let s;
     try { s = JSON.parse(window.XeniaApp.appUpdate()); } catch { item.hidden = true; return; }
+    const self = s.selfInstall !== false; // Apps vor den zwei Varianten kennen das Feld nicht und installieren selbst
     const lines = s.phase === 'checking' ? ['Sucht nach einer neuen Version …']
       : s.phase === 'downloading' ? [`Lädt ${s.latest} … ${s.progress} %`]
       : s.phase === 'installing' ? ['Wird installiert. Xenios schließt sich dabei und ist danach aktualisiert.']
       : [
         `Installiert: ${s.installed}` + (s.available ? ` · neu: ${s.latest}` : s.checkedAt ? ' · aktuell' : ''),
-        s.error || (s.available && !s.allowed ? 'Einmal „Unbekannte Apps installieren“ für Xenios erlauben' : null),
+        s.error || (s.available && !self ? 'Variante ohne Updater: lädt die APK im Browser, dann von Hand installieren'
+          : s.available && !s.allowed ? 'Einmal „Unbekannte Apps installieren“ für Xenios erlauben' : null),
         !s.error && !s.available && s.checkedAt ? `Geprüft ${ago(new Date(s.checkedAt).toISOString())}` : null,
       ];
     sub.replaceChildren(...lines.filter(Boolean).flatMap((t, i) => (i ? [h('br'), t] : [t])));
     btn.disabled = Boolean(s.phase);
-    btn.textContent = s.available ? 'Installieren' : 'Prüfen';
+    btn.textContent = !s.available ? 'Prüfen' : self ? 'Installieren' : 'Herunterladen';
     btn.onclick = () => {
       try { if (s.available) window.XeniaApp.installAppUpdate(); else window.XeniaApp.checkAppUpdate(); } catch { /* ältere App */ }
     };

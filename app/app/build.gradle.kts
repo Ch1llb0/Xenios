@@ -42,6 +42,21 @@ android {
         }
     }
 
+    // Zwei Varianten je Release, gleiche App (gleiche ID, Build-Nummer und Signatur), gegenseitig drüberinstallierbar:
+    //  - updater: App-Update per Knopf (darf APKs installieren; Play Protect kann davor warnen) → Xenios-<Build>.apk
+    //  - manuell: ohne dieses Recht, meldet neue Versionen und öffnet den Download → Xenios-<Build>-ohne-Updater.apk
+    // Der Unterschied steckt in src/<Variante>/ (Installer.kt, beim Updater dazu das Manifest).
+    flavorDimensions += "update"
+    productFlavors {
+        create("updater") {
+            dimension = "update"
+            isDefault = true
+        }
+        create("manuell") {
+            dimension = "update"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

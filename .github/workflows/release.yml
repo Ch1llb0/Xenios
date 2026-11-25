@@ -69,10 +69,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/xenios"
+          UPD=$(ls Xenios-*.apk | grep -v -- -ohne-Updater)
+          MAN=$(ls Xenios-*-ohne-Updater.apk)
           cat > notes.md <<EOF
-          ## Android-App
-          \`Xenios-*.apk\` unten herunterladen und auf dem Handy installieren (ab Android 11).
-          Ist Xenios schon installiert: in der App *Einstellungen → App-Update* (ab der ersten Version mit App-Update).
+          ## Android-App (ab Android 11)
+          Zwei Varianten derselben App. Eine unten herunterladen und auf dem Handy installieren:
+
+          | Datei | Updates |
+          |---|---|
+          | \`$UPD\` | **Mit Updater:** *Einstellungen → App-Update* lädt neue Versionen und installiert sie selbst. Weil die App dafür andere APKs installieren darf, kann Google Play Protect beim Installieren warnen („App may be harmful“ / „Möglicherweise schädliche App“). Über die Details der Warnung lässt sie sich trotzdem installieren. |
+          | \`$MAN\` | **Ohne Updater:** ohne dieses Recht, deshalb ohne diese Warnung. Die App meldet neue Versionen und öffnet den Download, installiert wird von Hand. |
+
+          Wechseln geht jederzeit: die andere Variante einfach drüber installieren, Anmeldung und Einstellungen bleiben.
 
           ## Server (Docker)
           \`\`\`

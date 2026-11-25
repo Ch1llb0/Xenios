@@ -61,15 +61,26 @@ Ohne Server entfallen Push-Benachrichtigungen, die weiteren Schaltzeiten, das Ei
 
 ## App-Update
 
-*Einstellungen → App auf diesem Gerät → App-Update* zeigt die installierte Version (z. B. `2.4.0 (380)`) und, falls es eine gibt, die neue. Der Knopf heißt dann **Installieren**, sonst **Prüfen**. Apps ohne diese Funktion zeigen den Eintrag nicht; die erste Version mit App-Update einmal von Hand installieren (siehe [Installieren](#installieren)).
+*Einstellungen → App auf diesem Gerät → App-Update* zeigt die installierte Version (z. B. `2.4.0 (380)`) und, falls es eine gibt, die neue. Der Knopf heißt dann **Installieren** (bzw. **Herunterladen**, siehe Varianten), sonst **Prüfen**. Apps ohne diese Funktion zeigen den Eintrag nicht; die erste Version mit App-Update einmal von Hand installieren (siehe [Installieren](#installieren)). Im Server-Modus braucht auch der Server mindestens Version 2.5.1, denn die Einstellungsseite kommt von ihm.
+
+**Zwei Varianten.** Jedes Release enthält die App zweimal, mit gleicher Build-Nummer und gleichem Schlüssel:
+
+| Datei | Updates |
+|---|---|
+| `Xenios-<Build>.apk` | **Mit Updater:** lädt und installiert neue Versionen selbst (Ablauf unten). Dafür braucht die App das Recht, APKs zu installieren (`REQUEST_INSTALL_PACKAGES`). Deshalb kann Google Play Protect beim Installieren warnen („App may be harmful“ / „Möglicherweise schädliche App“); über die Details der Warnung lässt sie sich trotzdem installieren. |
+| `Xenios-<Build>-ohne-Updater.apk` | **Ohne Updater:** ohne dieses Recht und ohne Installations-Code, deshalb ohne diese Warnung. Die App prüft und meldet neue Versionen genauso; „Herunterladen“ öffnet die passende APK im Browser, installiert wird von Hand. |
+
+Wechseln geht jederzeit: die andere Variante drüber installieren, Anmeldung und Einstellungen bleiben. Jede Variante sucht im Release nur ihre eigene Datei. Der Unterschied steckt in den Gradle-Flavors `updater` und `manuell` (`app/app/src/updater/`, `app/app/src/manuell/`).
 
 **Im Server-Modus** kommt die Oberfläche vom Server und ist mit jedem Server-Update aktuell, auch ohne neue APK. Ein App-Update braucht es nur für die nativen Teile: Widgets, Schnelleinstellungs-Kachel, Wecker-Meldung, Shortcuts, Notbetrieb und den Direkt-Modus (dort steckt die ganze Oberfläche in der APK).
 
-**Ablauf**
-1. **Prüfen:** Beim Öffnen der App höchstens einmal am Tag, dazu jederzeit über „Prüfen“. Die App fragt `https://api.github.com/repos/TimS1998/Xenios/releases/latest` ab, sucht das Asset `Xenios-<Build>.apk` und vergleicht `<Build>` mit der eigenen Build-Nummer (`versionCode`, die Zahl der Commits). Mitgeschickt wird nur die Build-Nummer im User-Agent. Offline oder bei gebremstem Zugriff (GitHub erlaubt ohne Anmeldung 60 Anfragen pro Stunde) passiert beim automatischen Prüfen nichts, der nächste Versuch kommt frühestens nach einer Stunde. Auf Knopfdruck steht der Grund im Eintrag.
+**Ablauf (mit Updater)**
+1. **Prüfen:** Beim Öffnen der App höchstens einmal am Tag, dazu jederzeit über „Prüfen“. Die App fragt `https://api.github.com/repos/TimS1998/Xenios/releases/latest` ab, sucht das Asset ihrer Variante (`Xenios-<Build>.apk` bzw. `Xenios-<Build>-ohne-Updater.apk`) und vergleicht `<Build>` mit der eigenen Build-Nummer (`versionCode`, die Zahl der Commits). Mitgeschickt wird nur die Build-Nummer im User-Agent. Offline oder bei gebremstem Zugriff (GitHub erlaubt ohne Anmeldung 60 Anfragen pro Stunde) passiert beim automatischen Prüfen nichts, der nächste Versuch kommt frühestens nach einer Stunde. Auf Knopfdruck steht der Grund im Eintrag.
 2. **Hinweis:** Gibt es eine neue Version, erscheint einmal ein Hinweis unten in der App („App-Update … verfügbar“, „Ansehen“ öffnet die Einstellungen). Eine Android-Benachrichtigung gibt es nicht.
 3. **Laden:** „Installieren“ lädt die APK in den Cache der App. Geladen wird nur ein Asset aus einem Release dieses Repos (`https://github.com/TimS1998/Xenios/releases/download/…`). Größe und SHA-256 müssen zu den Angaben von GitHub passen. Danach prüft die App Paketname, Build-Nummer und Signaturschlüssel der APK.
-4. **Installieren:** über den `PackageInstaller` von Android (Session). Android beendet die App dabei und ersetzt sie. Danach die App wieder öffnen; Anmeldung, Einstellungen und Widgets bleiben.
+4. **Installieren:** über den `PackageInstaller` von Android (Session). Android beendet die App dabei und ersetzt sie. Danach die App wieder öffnen; Anmeldung, Einstellungen und Widgets bleiben. Ob Play Protect auch hier warnt, ist auf echter Hardware noch nicht geprüft.
+
+Ohne Updater enden Schritt 3 und 4 im Browser: Er lädt `Xenios-<Build>-ohne-Updater.apk`, installiert wird wie beim ersten Mal.
 
 Die Adresse des Repos steht fest in [`AppUpdate.kt`](../app/app/src/main/java/app/xeniabridge/AppUpdate.kt). Ein Fork mit eigenen Releases muss sie dort ändern.
 
@@ -95,9 +106,9 @@ Ist die App beim Dialog nicht im Vordergrund, erscheint er beim nächsten Öffne
 ## APK bauen
 
 ### Per GitHub Actions (empfohlen)
-Der Workflow [`.github/workflows/app.yml`](../.github/workflows/app.yml) baut bei jeder Änderung in `app/` oder `server/web/` (oder manuell über *Actions → Android-App bauen → Run workflow*) eine signierte APK. Sie liegt danach als Artefakt **Xenios-APK** am Lauf.
+Der Workflow [`.github/workflows/app.yml`](../.github/workflows/app.yml) baut bei jeder Änderung in `app/` oder `server/web/` (oder manuell über *Actions → Android-App bauen → Run workflow*) die signierte APK in beiden Varianten (`Xenios-<Build>.apk` mit Updater, `Xenios-<Build>-ohne-Updater.apk` ohne). Sie liegen danach im Artefakt **Xenios-APK** am Lauf.
 
-**Releases:** Ein Tag `v*` (z. B. `git tag v2.0.0 && git push origin v2.0.0`) startet [`release.yml`](../.github/workflows/release.yml). Das erzeugt ein GitHub-Release mit der APK zum Herunterladen und veröffentlicht das Docker-Image in GitHub Packages.
+**Releases:** Ein Tag `v*` (z. B. `git tag v2.0.0 && git push origin v2.0.0`) startet [`release.yml`](../.github/workflows/release.yml). Das erzeugt ein GitHub-Release mit beiden APKs zum Herunterladen (die Release-Notizen erklären den Unterschied) und veröffentlicht das Docker-Image in GitHub Packages.
 
 Damit Updates sich über die installierte App installieren lassen, muss jede APK mit **demselben Schlüssel** signiert sein. Dafür im Repository unter *Settings → Secrets and variables → Actions* vier Secrets anlegen:
 
@@ -118,17 +129,17 @@ for s in XENIOS_KEYSTORE_BASE64 XENIOS_KEYSTORE_PASSWORD XENIOS_KEY_ALIAS XENIOS
 Ohne Secrets baut der Workflow trotzdem, signiert aber mit einem wechselnden Debug-Schlüssel.
 
 ### Lokal (Android Studio)
-Ordner `app/` in Android Studio öffnen und *Run* drücken. Für eine Release-APK die Umgebungsvariablen `XENIOS_KEYSTORE`, `XENIOS_KEYSTORE_PASSWORD`, `XENIOS_KEY_ALIAS` und `XENIOS_KEY_PASSWORD` setzen und `gradle assembleRelease` ausführen.
+Ordner `app/` in Android Studio öffnen und *Run* drücken (Variante mit Updater; die andere unter *Build Variants* → `manuellDebug`). Für Release-APKs die Umgebungsvariablen `XENIOS_KEYSTORE`, `XENIOS_KEYSTORE_PASSWORD`, `XENIOS_KEY_ALIAS` und `XENIOS_KEY_PASSWORD` setzen und `gradle assembleRelease` ausführen (baut beide Varianten).
 
 ## Installieren
-1. APK auf das Handy laden (Artefakt-ZIP entpacken bzw. aus dem Release).
+1. APK auf das Handy laden (Artefakt-ZIP entpacken bzw. aus dem Release). Welche der beiden Varianten, steht unter [App-Update](#app-update).
 2. Öffnen und „Aus unbekannten Quellen installieren“ für den Browser bzw. Dateimanager erlauben. Neuere Android-Versionen geben das erst in den Entwickleroptionen frei, oft mit einem Fenster von 24 Stunden. Der Weg unterscheidet sich je nach Handy.
 3. App starten und eine der beiden Arten wählen.
    - **Mit Server:** Adresse und App-Passwort. Die Oberfläche kommt vom Server. Nach einem Server-Update reicht die vorhandene App, siehe [Linux, Aktualisieren](Installation-Linux-Docker.md#8-aktualisieren-und-sichern).
    - **Direkt im Heimnetz:** **Neue Xenia** oder **Alte Xenia**, dazu die IP der Maschine und optional die Mühle. Diese Wahl und die Oberfläche dafür liegen in der APK. Ab Release 2.2.0 ist die alte Xenia im Direkt-Modus enthalten.
 4. Widgets: Startbildschirm lange drücken → *Widgets* → *Xenios*. Kachel: Schnelleinstellungen bearbeiten → *Xenios* hineinziehen.
 
-Spätere Versionen kommen über *Einstellungen → App-Update*, ohne Herunterladen von Hand (siehe [App-Update](#app-update)).
+Spätere Versionen meldet *Einstellungen → App-Update*. Mit Updater installiert die App sie selbst, ohne Updater öffnet sie den Download (siehe [App-Update](#app-update)).
 
 ## Test mit der Simulation
 ```bash
