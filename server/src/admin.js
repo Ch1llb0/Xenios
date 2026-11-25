@@ -8,7 +8,7 @@ import { XeniaClient, MA_TYPE, CLASSIC_TYPE, machineApiId, httpError } from './m
 import { GrinderHttp } from './grinder.js';
 import { ensureCert, certInfo } from './tls.js';
 import { setLogLevel, logger } from './log.js';
-import { updateInfo, requestUpdate, helperAlive, readUpdate } from './update.js';
+import { updateInfo, requestUpdate, cancelUpdate, helperAlive, readUpdate } from './update.js';
 import { tunnelTokenFromPaste, requestTunnelToken, waitForTunnelApplied } from './tunnel-token.js';
 
 const log = logger('admin');
@@ -470,10 +470,19 @@ export function authRoutes(route, app) {
   route('GET', '/api/admin/update', async () => updateInfo({ dataDir: cfg.dataDir, version: app.version, fetchImpl: app.fetchImpl }));
   route('POST', '/api/admin/tunnel-token', async (ctx) => storeTunnelToken(ctx.body.token, ctx.ip));
   route('POST', '/api/admin/update', async ({ ip }) => {
+    // Ohne Update-Dienst auf dem Rechner holt niemand die Anforderung ab – nicht endlos warten lassen
+    if (!readUpdate(cfg.dataDir).helperAlive) {
+      throw httpError(409, 'Auf dem Server läuft kein Update-Dienst. Einmal auf dem Server ausführen: sh ~/xenios/install.sh --update (aktualisiert und richtet den Dienst ein).');
+    }
     const info = await updateInfo({ dataDir: cfg.dataDir, version: app.version, fetchImpl: app.fetchImpl });
     requestUpdate(cfg.dataDir);
     log.info(`Aktualisierung angefordert (von ${ip})`);
     return { ...info, requested: true, job: { state: 'queued', at: Date.now(), version: null, error: null } };
+  });
+  route('DELETE', '/api/admin/update', async ({ ip }) => {
+    cancelUpdate(cfg.dataDir);
+    log.info(`Aktualisierung abgebrochen (von ${ip})`);
+    return updateInfo({ dataDir: cfg.dataDir, version: app.version, fetchImpl: app.fetchImpl });
   });
   route('GET', '/api/admin/backup', async () => app.takeBackup());
   route('POST', '/api/admin/backup', async ({ body, session, ip }) => {

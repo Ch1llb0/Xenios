@@ -151,6 +151,12 @@ test('Aktualisierung: Stand prüfen und anfordern', async () => {
   assert.equal(r.json.latest, '9.9.9');
   assert.equal(r.json.newer, true);
   assert.equal(r.json.requested, false);
+  // Ohne Update-Dienst auf dem Rechner wird nichts angefordert (sonst wartet die App endlos)
+  r = await call('POST', '/api/admin/update');
+  assert.equal(r.status, 409);
+  assert.match(r.json.error, /kein Update-Dienst/);
+  assert.ok(!fs.existsSync(path.join(dir, 'update.request')));
+  fs.writeFileSync(path.join(dir, 'update-helper.json'), JSON.stringify({ at: Date.now(), host: 'test' }));
   r = await call('POST', '/api/admin/update');
   assert.equal(r.status, 200);
   assert.equal(r.json.requested, true);
@@ -158,6 +164,12 @@ test('Aktualisierung: Stand prüfen und anfordern', async () => {
   assert.ok(fs.existsSync(path.join(dir, 'update.request')));
   const job = JSON.parse(fs.readFileSync(path.join(dir, 'update.json'), 'utf8'));
   assert.equal(job.state, 'queued');
+  // Zurückziehen: Anforderung und Wartestatus sind weg
+  r = await call('DELETE', '/api/admin/update');
+  assert.equal(r.status, 200);
+  assert.equal(r.json.requested, false);
+  assert.equal(r.json.job, null);
+  assert.ok(!fs.existsSync(path.join(dir, 'update.request')));
 });
 
 test('Sicherung: ZIP herunterladen und wieder einspielen', async () => {

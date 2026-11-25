@@ -23,32 +23,37 @@ export function serverView(root) {
   let updateReady = false;
   function paintUpdate(u) {
     const job = u.job || {};
-    const pending = job.state === 'queued' || job.state === 'running';
+    // Angefordert, aber kein Update-Dienst holt die Anforderung ab: nicht endlos „holt die neue Version …“ zeigen
+    const stuck = job.state === 'queued' && !u.helper;
+    const pending = !stuck && (job.state === 'queued' || job.state === 'running');
     const line = h('div', { class: 'small' },
       `Installiert: Xenios ${u.current || data?.status?.version || '–'}`,
       u.latest ? (u.newer ? ` · neu: ${u.latest}` : ' · aktuell') : null,
       u.latestError ? h('span', { class: 'muted' }, ` · ${u.latestError}`) : null);
-    const progress = pending
+    const cancel = h('button', { type: 'button', class: 'btn text', onclick: cancelUpdate }, 'Anforderung zurückziehen');
+    const progress = stuck
+      ? h('div', {}, h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, 'Auf dem Server läuft kein Update-Dienst, die Anforderung wird nicht abgeholt. Auf dem Server einmal das Update von Hand starten (siehe unten).')), cancel)
+      : pending
       ? h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), job.state === 'queued'
         ? ' Der Update-Dienst holt die neue Version …'
         : ' Aktualisierung läuft, der Server startet gleich neu …')
       : job.state === 'error' ? h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, job.error || 'Aktualisierung fehlgeschlagen'))
       : job.state === 'ok' && job.version ? h('p', { class: 'small' }, `Zuletzt aktualisiert auf ${job.version}.`) : null;
-    const btn = h('button', { type: 'button', class: 'btn tonal', disabled: pending, onclick: requestUpdate },
+    const btn = h('button', { type: 'button', class: 'btn tonal', disabled: pending || stuck || !u.helper, onclick: requestUpdate },
       icon('refresh', 's18'), u.newer && u.latest ? `Auf ${u.latest} aktualisieren` : 'Aktualisieren');
     const hint = u.helper
       ? h('p', { class: 'small muted' }, 'Holt das neueste Image und startet Xenios neu. Konfiguration, Sitzungen und Bezüge bleiben.')
       : h('div', { class: 'small muted' },
-        h('p', {}, 'Damit der Knopf selbst aktualisiert, einmal auf dem Linux-Server:'),
-        h('pre', { class: 'hint-code' }, 'curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/install.sh | sh'),
-        h('p', {}, 'Ohne den Dienst: ', h('code', {}, 'sh ~/xenios/install.sh --update')));
+        h('p', {}, 'Auf diesem Server läuft kein Update-Dienst, deshalb ist der Knopf aus. Einmal auf dem Linux-Server ausführen – aktualisiert und richtet den Dienst ein, danach geht der Knopf:'),
+        h('pre', { class: 'hint-code' }, 'sh ~/xenios/install.sh --update'),
+        h('p', {}, 'Ohne Installation über install.sh: ', h('code', {}, 'curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/install.sh | sh')));
     updateBox.replaceChildren(h('div', { class: 'divider' }), h('div', {}, 'Aktualisierung'), line, progress, h('div', { class: 'row', style: { 'margin-top': '8px' } }, btn), hint);
   }
   async function refreshUpdate() {
     try {
       const u = await api('/api/admin/update');
       paintUpdate(u);
-      return u.job?.state === 'queued' || u.job?.state === 'running';
+      return u.job?.state === 'running' || (u.job?.state === 'queued' && u.helper);
     } catch {
       updateBox.replaceChildren(h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Verbindung unterbrochen – warte auf den Neustart …'));
       return true;
@@ -62,6 +67,12 @@ export function serverView(root) {
     if (updatePoll) return;
     if (immediate) tick();
     else updatePoll = setTimeout(tick, 2500);
+  }
+  async function cancelUpdate() {
+    try {
+      paintUpdate(await api('/api/admin/update', { method: 'DELETE' }));
+      snackbar('Anforderung zurückgezogen');
+    } catch (e) { snackbar(e.message); }
   }
   async function requestUpdate() {
     if (!(await confirmDialog(
