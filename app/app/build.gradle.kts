@@ -7,6 +7,8 @@ plugins {
 // Signatur für Release-Builds kommt aus Umgebungsvariablen (GitHub-Secrets), nie aus dem Repo.
 val keystorePath: String? = System.getenv("XENIOS_KEYSTORE")
 val buildNumber = (System.getenv("XENIOS_BUILD_NUMBER") ?: "1").toInt()
+// Anzeige-Version wie der Server (server/package.json), dazu die Build-Nummer
+val appVersion = (groovy.json.JsonSlurper().parse(rootProject.file("../server/package.json")) as Map<*, *>)["version"]?.toString() ?: "0"
 
 // Web-App (../server/web) in die APK packen: im Direkt-Modus läuft sie ohne Server aus den Assets.
 val webAssetsDir = layout.buildDirectory.dir("generated/webassets").get().asFile
@@ -26,7 +28,7 @@ android {
         minSdk = 30
         targetSdk = 36
         versionCode = buildNumber
-        versionName = "1.0.$buildNumber"
+        versionName = "$appVersion ($buildNumber)"
     }
 
     signingConfigs {
