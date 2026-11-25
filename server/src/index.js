@@ -41,6 +41,20 @@ export function prepare(cfg) {
   applyTimezone(cfg.timezone);
 }
 
+// Aussehen der Frontansicht unter „Schalter“ für die App (Standardwerte in config.js, Prüfung in admin.js)
+function lookState(l = {}) {
+  return {
+    style: l.style === 'simple' ? 'simple' : 'render',
+    color: l.color,
+    steamSide: l.steamSide,
+    valves: l.valves === 'rotary' ? 'rotary' : 'lever',
+    grip: l.grip,
+    tray: l.tray || null,
+    gauge: l.gauge,
+    editButton: l.editButton !== false,
+  };
+}
+
 // hooks (vom Start-Code gesetzt): onListeners(), onTls(), listenerStatus()
 export function createApp(cfg, hooks = {}) {
   // Auch mit einer von Hand gebauten Konfiguration (Tests) lauffähig
@@ -161,7 +175,7 @@ export function createApp(cfg, hooks = {}) {
     version: VERSION,
     features: cfg.features,
     push: { enabled: push.enabled, publicKey: cfg.push.publicKey, topics: PUSH_TOPICS },
-    machine: { api: cfg.machine.api === 'classic' ? 'classic' : 'bbs', look: { style: cfg.machine.look?.style === 'simple' ? 'simple' : 'render', color: cfg.machine.look?.color, steamSide: cfg.machine.look?.steamSide, valves: cfg.machine.look?.valves === 'rotary' ? 'rotary' : 'lever', grip: cfg.machine.look?.grip, editButton: cfg.machine.look?.editButton !== false } },
+    machine: { api: cfg.machine.api === 'classic' ? 'classic' : 'bbs', look: lookState(cfg.machine.look) },
     grinder: { enabled: cfg.grinder.enabled, databaseDownload: Boolean(cfg.grinder.allowDatabaseDownload) },
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });

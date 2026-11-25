@@ -53,15 +53,18 @@ function s(tag, attrs = {}, ...children) {
 // vier Taster und Display; alte Xenia (DBL, nach Foto): zwei Kippschalter oben, vier Leuchten rechts der Brühgruppe.
 // Nur die Taster bzw. die Schalterseiten sind antippbar. Ansicht, Farbe, Dampflanze und Ventile: Einstellungen →
 // Modell & Aussehen.
-export const LOOK_DEFAULTS = { color: '#26272b', steamSide: 'left', grip: '#c98a4f' };
+export const LOOK_DEFAULTS = { color: '#26272b', steamSide: 'left', grip: '#c98a4f', gauge: '#141518' };
+const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || '') ? v.toLowerCase() : null);
 export function machineLook() {
   const l = store.server?.machine?.look || {};
   return {
     style: l.style === 'simple' ? 'simple' : 'render',
-    color: /^#[0-9a-f]{6}$/i.test(l.color || '') ? l.color.toLowerCase() : LOOK_DEFAULTS.color,
+    color: hex(l.color) || LOOK_DEFAULTS.color,
     steamSide: l.steamSide === 'right' ? 'right' : 'left',
     valves: l.valves === 'rotary' ? 'rotary' : 'lever',
-    grip: /^#[0-9a-f]{6}$/i.test(l.grip || '') ? l.grip.toLowerCase() : LOOK_DEFAULTS.grip,
+    grip: hex(l.grip) || LOOK_DEFAULTS.grip,
+    tray: hex(l.tray) || hex(l.color) || LOOK_DEFAULTS.color, // ohne eigene Farbe wie das Gehäuse
+    gauge: hex(l.gauge) || LOOK_DEFAULTS.gauge,
     editButton: l.editButton !== false,
   };
 }
@@ -107,6 +110,7 @@ function xeniaSvg({ classic, look, onPick }) {
     grad('mChrome', [['0', '#7d8186'], ['.45', '#f4f6f8'], ['1', '#8a8e93']], true),
     grad('mChromeV', [['0', '#f4f6f8'], ['.55', '#b9bdc2'], ['1', '#7d8186']]),
     grad('mBody', [['0', shade(body, 0.1)], ['1', shade(body, -0.2)]]),
+    grad('mTray', [['0', shade(look.tray, 0.1)], ['1', shade(look.tray, -0.2)]]),
     grad('mSide', [['0', '#000', 0.22], ['.12', '#000', 0], ['.88', '#000', 0], ['1', '#000', 0.22]], true),
     grad('mWood', [['0', shade(grip, -0.4)], ['.45', grip], ['1', shade(grip, -0.4)]], true),
     // Drehknöpfe: Licht von oben links
@@ -128,8 +132,8 @@ function xeniaSvg({ classic, look, onPick }) {
     for (let x = 48 + (r % 2) * 9; x + 13 <= 274; x += 18) slots.push(s('rect', { x, y: 271 + r * 10, width: 13, height: 6, rx: 3, fill: '#0c0d0f' }));
   }
   const tray = [
-    s('rect', { class: 'body', x: 28, y: 262, width: 264, height: 74, rx: 6 }),
-    s('rect', { x: 40, y: 267, width: 240, height: 33, rx: 4, fill: shade(body, -0.45) }),
+    s('rect', { x: 28, y: 262, width: 264, height: 74, rx: 6, fill: 'url(#mTray)', stroke: 'rgba(0,0,0,.45)', 'stroke-width': 0.8 }),
+    s('rect', { x: 40, y: 267, width: 240, height: 33, rx: 4, fill: shade(look.tray, -0.45) }),
     ...slots,
     s('line', { x1: 34, y1: 306, x2: 286, y2: 306, stroke: '#000', opacity: 0.25 }),
   ];
@@ -202,19 +206,26 @@ function xeniaSvg({ classic, look, onPick }) {
   const wands = s('g', look.steamSide === 'left' ? { transform: 'translate(320 0) scale(-1 1)' } : {}, ...water, ...steam);
 
   // Manometer und Schriftzug
+  // Zifferblatt in der eingestellten Farbe; Skala und Zeiger hell auf dunklem, dunkel auf hellem Grund
+  const dial = contrastOn(look.gauge) === '#ffffff' ? '#e8e8e8' : '#2a2b2f';
+  // Neue Xenia: größere Manometer (k skaliert Ring, Skala und Zeiger)
+  const gk = classic ? 1 : 1.3;
   const gauge = (cx) => {
-    const g = s('g', {}, s('circle', { cx, cy: 228, r: 14.5, fill: 'url(#mChrome)' }), s('circle', { cx, cy: 228, r: 11.8, fill: '#141518' }));
+    const cy = 228;
+    const g = s('g', {}, s('circle', { cx, cy, r: 14.5 * gk, fill: 'url(#mChrome)' }), s('circle', { cx, cy, r: 11.8 * gk, fill: look.gauge }));
     for (let i = 0; i <= 8; i++) {
       const a = (Math.PI * (225 - i * 33.75)) / 180;
-      g.append(s('line', { x1: cx + Math.cos(a) * 8.8, y1: 228 - Math.sin(a) * 8.8, x2: cx + Math.cos(a) * 11, y2: 228 - Math.sin(a) * 11, stroke: '#e8e8e8', 'stroke-width': 0.9 }));
+      g.append(s('line', { x1: cx + Math.cos(a) * 8.8 * gk, y1: cy - Math.sin(a) * 8.8 * gk, x2: cx + Math.cos(a) * 11 * gk, y2: cy - Math.sin(a) * 11 * gk, stroke: dial, 'stroke-width': 0.9 }));
     }
-    g.append(s('line', { x1: cx, y1: 228, x2: cx - 5, y2: 222, stroke: '#e8e8e8', 'stroke-width': 1.3, 'stroke-linecap': 'round' }),
-      s('circle', { cx, cy: 228, r: 1.6, fill: '#d0342c' }));
+    g.append(s('line', { x1: cx, y1: cy, x2: cx - 5 * gk, y2: cy - 6 * gk, stroke: dial, 'stroke-width': 1.3, 'stroke-linecap': 'round' }),
+      s('circle', { cx, cy, r: 1.6 * gk, fill: '#d0342c' }));
     return g;
   };
-  // Schriftzug wie an der Maschine halb hinter dem Siebträgergriff („NIA“ rechts davon sichtbar)
-  const front = [gauge(106), gauge(214),
-    s('text', { x: 175, y: 232, 'text-anchor': 'middle', fill: ink, 'font-size': 10, 'letter-spacing': 3.5, 'font-weight': 300 }, 'XENIA')];
+  // DBL: Schriftzug wie an der Maschine halb hinter dem Siebträgergriff („NIA“ rechts davon sichtbar).
+  // Neue Xenia: ohne Schriftzug, rotes Dreieck rechts unten.
+  const front = [gauge(106), gauge(214), classic
+    ? s('text', { x: 175, y: 232, 'text-anchor': 'middle', fill: ink, 'font-size': 10, 'letter-spacing': 3.5, 'font-weight': 300 }, 'XENIA')
+    : s('path', { d: 'M272 243 L277 252 H267 Z', fill: '#d0342c' })];
 
   // Bedienelemente je Modell
   const controls = [];

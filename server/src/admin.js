@@ -77,6 +77,8 @@ export const FIELDS = {
   'machine.api': oneOf('Xenia-Modell', ['bbs', 'classic']),
   'machine.look.color': hexColor('Farbe der Xenia'),
   'machine.look.grip': hexColor('Farbe der Griffe'),
+  'machine.look.tray': (v) => (v === null || v === '' ? null : hexColor('Farbe des Abtropfgitters')(v)),
+  'machine.look.gauge': hexColor('Farbe der Manometer'),
   'machine.look.style': oneOf('Ansicht', ['render', 'simple']),
   'machine.look.steamSide': oneOf('Dampflanze', ['left', 'right']),
   'machine.look.valves': oneOf('Ventile', ['lever', 'rotary']),

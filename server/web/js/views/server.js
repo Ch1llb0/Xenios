@@ -233,38 +233,38 @@ export const serverPage = (part) => (root) => {
       apiChoice(value('machine.api') === 'classic' ? 'classic' : 'bbs', (v) => { change('machine.api', v); paint(); }),
       h('div', { class: 'field-row' }, text('Adresse der Xenia', 'machine.url', { type: 'url', placeholder: 'http://192.168.178.55' }), mTest),
       mBox);
-    // Aussehen der Xenia für die Frontansicht unter „Schalter“: Gehäusefarbe (Vorlagen oder eigene) und Dampflanze
-    const LOOK_COLORS = [['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß'], ['#c4c7cb', 'Edelstahl'], ['#9e1f24', 'Rot'], ['#2f4a6d', 'Blau']];
-    const lookColor = value('machine.look.color') || LOOK_COLORS[0][0];
-    const steamSide = value('machine.look.steamSide') === 'right' ? 'right' : 'left';
-    const valves = value('machine.look.valves') === 'rotary' ? 'rotary' : 'lever';
-    const GRIP_COLORS = [['#c98a4f', 'Holz'], ['#e0aa6a', 'Olive'], ['#6e4127', 'Nuss'], ['#1d1e21', 'Schwarz'], ['#eceae4', 'Weiß']];
-    const gripColor = value('machine.look.grip') || GRIP_COLORS[0][0];
-    const gripInput = h('input', { type: 'color', value: gripColor, 'aria-label': 'Eigene Farbe der Griffe' });
-    gripInput.addEventListener('change', () => { change('machine.look.grip', gripInput.value); paint(); });
-    const ownGrip = !GRIP_COLORS.some(([c]) => c === gripColor);
-    const colorInput = h('input', { type: 'color', value: lookColor, 'aria-label': 'Eigene Farbe der Xenia' });
-    colorInput.addEventListener('change', () => { change('machine.look.color', colorInput.value); paint(); });
-    const own = !LOOK_COLORS.some(([c]) => c === lookColor);
+    // Aussehen der Xenia für die Frontansicht unter „Schalter“: Ansicht, Farben (Vorlagen oder eigene) und Ausstattung
+    // Reihe mit Beschriftung; Farbreihe: Vorlagen, optional „Wie Gehäuse“ (Wert null) und „Eigene“ mit Farbwähler
+    const row = (label, ...kids) => h('div', { class: 'look-row' }, h('div', { class: 'small muted' }, label), ...kids);
+    const pick = (label, key, options, current) => h('div', { class: 'chips', role: 'radiogroup', 'aria-label': label },
+      options.map(([v, text]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(current === v), onclick: () => { change(key, v); paint(); } }, text)));
+    const colorRow = (label, key, presets, { fallback, same } = {}) => {
+      const cur = value(key) || null;
+      const shown = cur || fallback;
+      const input = h('input', { type: 'color', value: shown, 'aria-label': `${label}: eigene Farbe` });
+      input.addEventListener('change', () => { change(key, input.value); paint(); });
+      const own = Boolean(cur) && !presets.some(([c]) => c === cur);
+      return row(label, h('div', { class: 'chips', role: 'radiogroup', 'aria-label': label },
+        same ? h('button', { type: 'button', class: 'chip', 'aria-pressed': String(!cur), onclick: () => { change(key, null); paint(); } }, same) : null,
+        presets.map(([c, text]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String((same ? cur : shown) === c), onclick: () => { change(key, c); paint(); } },
+          h('span', { class: 'swatch', style: { background: c } }), text)),
+        h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, input, 'Eigene')));
+    };
+    const BODY = [['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß'], ['#c4c7cb', 'Edelstahl'], ['#9e1f24', 'Rot'], ['#2f4a6d', 'Blau']];
+    const TRAY = [['#c4c7cb', 'Edelstahl'], ['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß']];
+    const GRIP = [['#c98a4f', 'Holz'], ['#e0aa6a', 'Olive'], ['#6e4127', 'Nuss'], ['#1d1e21', 'Schwarz'], ['#eceae4', 'Weiß']];
+    const GAUGE = [['#141518', 'Schwarz'], ['#f4f4f1', 'Weiß']];
     const simple = value('machine.look.style') === 'simple';
     const look = card({ title: 'Aussehen', anchor: 'aussehen' }, 'palette',
-      h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine (Farbe des Gehäuses, Dampflanze, Ventile und Griffe einstellbar) oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
-      h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Ansicht' },
-        [['render', 'Render'], ['simple', 'Vereinfacht']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String((simple ? 'simple' : 'render') === v), onclick: () => { change('machine.look.style', v); paint(); } }, label))),
-      simple ? null : h('div', { class: 'look-pick', style: { 'margin-top': '12px' } },
-        h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Farbe der Xenia' },
-          LOOK_COLORS.map(([c, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(lookColor === c), onclick: () => { change('machine.look.color', c); paint(); } },
-            h('span', { class: 'swatch', style: { background: c } }), label)),
-          h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, colorInput, 'Eigene')),
-        h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Dampflanze', style: { 'margin-top': '8px' } },
-          [['left', 'Dampflanze links'], ['right', 'Dampflanze rechts']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(steamSide === v), onclick: () => { change('machine.look.steamSide', v); paint(); } }, label))),
-        h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Ventile', style: { 'margin-top': '8px' } },
-          [['lever', 'Hebelventile'], ['rotary', 'Drehventile']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(valves === v), onclick: () => { change('machine.look.valves', v); paint(); } }, label))),
-        h('div', { class: 'small muted', style: { margin: '12px 0 6px' } }, 'Griffe (Ventile und Siebträger)'),
-        h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Farbe der Griffe' },
-          GRIP_COLORS.map(([c, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(gripColor === c), onclick: () => { change('machine.look.grip', c); paint(); } },
-            h('span', { class: 'swatch', style: { background: c } }), label)),
-          h('label', { class: 'chip color-chip', 'aria-pressed': String(ownGrip) }, gripInput, 'Eigene'))),
+      h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine mit eigenen Farben und Ausstattung oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
+      pick('Ansicht', 'machine.look.style', [['render', 'Render'], ['simple', 'Vereinfacht']], simple ? 'simple' : 'render'),
+      simple ? null : h('div', { class: 'look-pick' },
+        colorRow('Gehäuse', 'machine.look.color', BODY, { fallback: BODY[0][0] }),
+        colorRow('Abtropfgitter', 'machine.look.tray', TRAY, { fallback: value('machine.look.color') || BODY[0][0], same: 'Wie Gehäuse' }),
+        colorRow('Griffe (Ventile und Siebträger)', 'machine.look.grip', GRIP, { fallback: GRIP[0][0] }),
+        colorRow('Manometer', 'machine.look.gauge', GAUGE, { fallback: GAUGE[0][0] }),
+        row('Dampflanze', pick('Dampflanze', 'machine.look.steamSide', [['left', 'Links'], ['right', 'Rechts']], value('machine.look.steamSide') === 'right' ? 'right' : 'left')),
+        row('Ventile', pick('Ventile', 'machine.look.valves', [['lever', 'Hebel'], ['rotary', 'Drehknopf']], value('machine.look.valves') === 'rotary' ? 'rotary' : 'lever'))),
       toggle('Knopf unter der Ansicht', 'Zeigt unter „Schalter“ den Knopf „Ansicht ändern“', 'machine.look.editButton'));
     return [connection, look];
   }
