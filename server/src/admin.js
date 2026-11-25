@@ -72,8 +72,9 @@ export const FIELDS = {
     if (!/^#[0-9a-f]{6}$/.test(s)) throw bad('Farbe der Xenia: #rrggbb');
     return s;
   },
+  'machine.look.style': oneOf('Ansicht', ['render', 'simple']),
   'machine.look.steamSide': oneOf('Dampflanze', ['left', 'right']),
-  'machine.look.editButton': bool('Knopf „Farbe und Dampflanze ändern“'),
+  'machine.look.editButton': bool('Knopf „Ansicht ändern“'),
   'grinder.enabled': bool('Mühle'),
   'grinder.url': (v) => deviceUrl(v, 'Adresse der Mühle'),
   'grinder.password': (v) => {

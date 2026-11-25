@@ -228,16 +228,19 @@ export const serverPage = (part) => (root) => {
     const colorInput = h('input', { type: 'color', value: lookColor, 'aria-label': 'Eigene Farbe der Xenia' });
     colorInput.addEventListener('change', () => { change('machine.look.color', colorInput.value); paint(); });
     const own = !LOOK_COLORS.some(([c]) => c === lookColor);
+    const simple = value('machine.look.style') === 'simple';
     const look = card('Aussehen', 'palette',
-      h('p', { class: 'small muted' }, 'Für die Frontansicht unter „Schalter“: Farbe des Gehäuses und Seite der Dampflanze (Heißwasser auf der anderen Seite).'),
-      h('div', { class: 'look-pick' },
+      h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine (Farbe des Gehäuses und Seite der Dampflanze einstellbar) oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
+      h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Ansicht' },
+        [['render', 'Render'], ['simple', 'Vereinfacht']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String((simple ? 'simple' : 'render') === v), onclick: () => { change('machine.look.style', v); paint(); } }, label))),
+      simple ? null : h('div', { class: 'look-pick', style: { 'margin-top': '12px' } },
         h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Farbe der Xenia' },
           LOOK_COLORS.map(([c, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(lookColor === c), onclick: () => { change('machine.look.color', c); paint(); } },
             h('span', { class: 'swatch', style: { background: c } }), label)),
           h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, colorInput, 'Eigene')),
         h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Dampflanze', style: { 'margin-top': '8px' } },
           [['left', 'Dampflanze links'], ['right', 'Dampflanze rechts']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(steamSide === v), onclick: () => { change('machine.look.steamSide', v); paint(); } }, label)))),
-      toggle('Knopf unter der Ansicht', 'Zeigt unter „Schalter“ den Knopf „Farbe und Dampflanze ändern“', 'machine.look.editButton'));
+      toggle('Knopf unter der Ansicht', 'Zeigt unter „Schalter“ den Knopf „Ansicht ändern“', 'machine.look.editButton'));
     return [connection, look];
   }
 

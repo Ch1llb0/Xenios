@@ -32,7 +32,7 @@ export function settingsView(root) {
       direct && android ? listButton('wifi', 'App-Verbindung', 'Server-Adresse und Anmeldung der Android-App', () => window.XeniaApp.reauth()) : null),
     ...group('Kaffeemaschine',
       listButton('settings', 'Maschine', 'Temperaturen, Dampf, Pumpe, Waage, Wi-Fi, Firmware', go('/einstellungen/maschine')),
-      direct ? null : listButton('coffeeLine', 'Modell & Aussehen', 'Neue oder alte Xenia, Adresse, Farbe, Dampflanze', go('/einstellungen/modell')),
+      direct ? null : listButton('coffeeLine', 'Modell & Aussehen', 'Neue oder alte Xenia, Adresse, Ansicht unter „Schalter“', go('/einstellungen/modell')),
       listButton('shotlog', 'Bezüge', 'Kurze Bezüge aussortieren, Standard-Dosis', go('/einstellungen/bezuege')),
       direct ? null : listButton('grinder', 'Mühle & Grind-by-Sync', store.server?.grinder?.enabled ? 'Mahlkönig E64 WS, Drehknopf startet Profile' : 'Mahlkönig E64 WS einbinden', go('/einstellungen/muehle'))),
     ...(direct ? [] : group('Server',
