@@ -636,9 +636,10 @@ body { transition: background-color .3s, color .3s; }
 .wheel-sep { position: relative; font-size: 26px; font-weight: 600; color: var(--on-secondary-container); }
 button.time-field { height: 48px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--outline); background: transparent; text-align: left; font-size: 16px; font-variant-numeric: tabular-nums; width: 100%; }
 
-/* Server-Einstellungen */
+/* Unterseiten der Einstellungen (Karten mit Kopfzeile) */
 .setting-card { padding: 16px 16px 14px; }
-.card-head { display: flex; align-items: center; gap: 8px; }
+.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.card-head h3 { margin: 0; }
 .card-head svg { color: var(--primary); }
 .setting-card h4 { margin: 12px 0 4px; font-size: 12px; font-weight: 600; color: var(--on-surface-variant); text-transform: uppercase; letter-spacing: .6px; }
 .toggle-row { padding: 8px 0; }

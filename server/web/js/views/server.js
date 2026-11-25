@@ -1,16 +1,26 @@
-// Server & Sicherheit: alle Einstellungen des Servers im Browser (gespeichert in config.json, sofort wirksam).
+// Einstellungen, die auf dem Server liegen (config.json, sofort wirksam). Jede Unterseite der Einstellungen zeigt
+// einen Teil davon: Modell & Aussehen, Mühle & Grind-by-Sync, Von unterwegs, Benachrichtigungen, Sicherheit, System.
 import { h, icon, snackbar, switchEl, sheet, confirmDialog, ago } from '../ui.js';
 import { api, refreshState } from '../api.js';
-import { logout, inAndroidApp } from '../app.js';
-import { paintPush, shotFilterCard } from './settings.js';
+import { logout } from '../app.js';
+import { paintPush } from './settings.js';
 import { fillProbe, revealToggle, shake, tunnelGuide, apiChoice } from '../setup.js';
 
 const LOCK_HINT = 'per Umgebungsvariable festgelegt';
 
-export function serverView(root) {
+// Funktionen ein-/ausschalten: gilt auf dem Server für alle Geräte
+const FEATURES = [
+  ['features.paddle', 'Paddle', 'Pumpe direkt steuern (auch für den Backflush nötig); aus: Tab „Paddle“ verschwindet'],
+  ['features.scriptEditor', 'Skript-Editor', 'Skripte anlegen, ändern, löschen'],
+  ['features.settings', 'Maschinen-Einstellungen ändern', 'Temperaturen, Druck, Timer, Tastenbelegung; aus: Tab „Schalter“ und Kachel „Sollwerte“ verschwinden'],
+  ['features.clockSync', 'Uhr stellen', 'Uhrzeit und Zeitzone der Maschine setzen'],
+];
+
+// part: 'modell' | 'muehle' | 'unterwegs' | 'benachrichtigungen' | 'sicherheit' | 'system'
+export const serverPage = (part) => (root) => {
   let data = null;
   const dirty = {};
-  const body = h('div', {}, h('div', { class: 'empty' }, h('span', { class: 'spinner' }), ' Lade Server-Einstellungen …'));
+  const body = h('div', {}, h('div', { class: 'empty' }, h('span', { class: 'spinner' }), ' Lade Einstellungen …'));
   const saveBtn = h('button', { class: 'btn filled', onclick: save }, icon('check', 's18'), 'Speichern');
   const savebar = h('div', { class: 'savebar', hidden: true, role: 'region', 'aria-label': 'Ungespeicherte Änderungen' },
     h('span', { class: 'savebar-text' }, 'Ungespeicherte Änderungen'),
@@ -112,7 +122,11 @@ export function serverView(root) {
       data = await api('/api/admin/config', { method: 'PUT', body: { changes: dirty } });
       for (const k of keys) delete dirty[k];
       paint();
-      refreshState().catch(() => {});
+      const features = keys.some((k) => k.startsWith('features.'));
+      refreshState().catch(() => {}).then(() => {
+        // Leiste und Tabs neu: ausgeschaltete Funktionen blenden ihre Seiten aus
+        if (features) window.dispatchEvent(new CustomEvent('xenios-prefs', { detail: 'features' }));
+      });
       snackbar(listener ? 'Gespeichert – Zugänge werden neu gestartet' : 'Gespeichert und übernommen');
     } catch (e) {
       snackbar(e.message);
@@ -144,18 +158,12 @@ export function serverView(root) {
     sel.addEventListener('change', () => change(p, sel.value === '' ? null : sel.value));
     return h('label', { class: 'field' }, h('span', {}, label, lockNote(p)), sel);
   }
-  // Kategorien eingeklappt; welche offen sind, merkt sich die Seite über Neuzeichnen hinweg
-  const openCards = new Set();
-  // Sprung von außen (z. B. „Bezüge unter … s ausgeblendet“): Kategorie offen anzeigen und dorthin scrollen
-  const jumpTo = location.hash === '#aufzeichnung' ? 'Aufzeichnung' : null;
-  if (jumpTo) openCards.add(jumpTo);
+  // Karte mit Kopfzeile; jede Unterseite hat nur wenige, deshalb offen statt eingeklappt
   const card = (head, ic, ...kids) => {
     const { title, badge } = typeof head === 'string' ? { title: head } : head;
-    const d = h('details', { class: 'card fold setting-card', open: openCards.has(title) },
-      h('summary', {}, icon(ic, 's20'), h('span', { class: 'grow' }, title), badge || null, icon('more', 's20 chev')),
-      h('div', { class: 'fold-body' }, ...kids.filter(Boolean)));
-    d.addEventListener('toggle', () => (d.open ? openCards.add(title) : openCards.delete(title)));
-    return d;
+    return h('section', { class: 'card setting-card' },
+      h('div', { class: 'card-head' }, icon(ic, 's20'), h('h3', { class: 'grow' }, title), badge || null),
+      ...kids.filter(Boolean));
   };
   const gap = () => h('div', { class: 'gap' });
   const warn = (txt) => h('div', { class: 'note warn' }, icon('warn', 's18'), h('span', {}, txt));
@@ -205,24 +213,14 @@ export function serverView(root) {
     return [btn, box];
   }
 
-  // --- Seite ---
-  function paint() {
-    const s = data.status;
-    savebar.hidden = Object.keys(dirty).length === 0;
-
-    // Geräte
+  // --- Seiten ---
+  // Modell, Adresse und Aussehen der Xenia
+  function modelCards() {
     const [mTest, mBox] = probeButton('machine', () => ({ url: value('machine.url') }));
-    const [gTest, gBox] = probeButton('grinder', () => ({ url: value('grinder.url'), password: dirty['grinder.password'] || '' }));
-    const grinderFields = h('div', { class: 'collapse', hidden: !value('grinder.enabled') },
-      h('div', { class: 'field-row' }, text('Adresse der Mühle', 'grinder.url', { type: 'url', placeholder: 'https://192.168.178.54' }), gTest),
-      gBox,
-      gap(),
-      text('Owner-Passwort der Mühle', 'grinder.password', { type: 'password', placeholder: data.secrets['grinder.password'] ? '•••••••• (gespeichert, leer = unverändert)' : 'nicht gesetzt', parse: (v) => v, autocomplete: 'new-password' }),
-      h('div', { class: 'cert-row' },
-        h('div', { class: 'grow' }, h('div', { class: 'small muted' }, 'Gemerktes Zertifikat der Mühle'),
-          h('code', { class: 'fp' }, s.grinderPin || 'noch keins (wird beim ersten Kontakt gemerkt)')),
-        s.grinderPin ? h('button', { class: 'btn text', onclick: unpin }, 'Vergessen') : null),
-      toggle('Datenbank-Download erlauben', 'Die Datenbank der Mühle enthält das WLAN-Passwort im Klartext.', 'grinder.allowDatabaseDownload'));
+    const connection = card('Verbindung', 'coffeeLine',
+      apiChoice(value('machine.api') === 'classic' ? 'classic' : 'bbs', (v) => { change('machine.api', v); paint(); }),
+      h('div', { class: 'field-row' }, text('Adresse der Xenia', 'machine.url', { type: 'url', placeholder: 'http://192.168.178.55' }), mTest),
+      mBox);
     // Aussehen der Xenia für die Frontansicht unter „Schalter“: Gehäusefarbe (Vorlagen oder eigene) und Dampflanze
     const LOOK_COLORS = [['#26272b', 'Schwarz'], ['#f2f1ee', 'Weiß'], ['#c4c7cb', 'Edelstahl'], ['#9e1f24', 'Rot'], ['#2f4a6d', 'Blau']];
     const lookColor = value('machine.look.color') || LOOK_COLORS[0][0];
@@ -230,31 +228,71 @@ export function serverView(root) {
     const colorInput = h('input', { type: 'color', value: lookColor, 'aria-label': 'Eigene Farbe der Xenia' });
     colorInput.addEventListener('change', () => { change('machine.look.color', colorInput.value); paint(); });
     const own = !LOOK_COLORS.some(([c]) => c === lookColor);
-    const look = h('div', { class: 'look-pick' },
-      h('div', {}, 'Aussehen der Xenia'),
-      h('div', { class: 'small muted', style: { margin: '2px 0 8px' } }, 'Für die Frontansicht unter „Schalter“: Farbe des Gehäuses und Seite der Dampflanze (Heißwasser auf der anderen Seite).'),
-      h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Farbe der Xenia' },
-        LOOK_COLORS.map(([c, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(lookColor === c), onclick: () => { change('machine.look.color', c); paint(); } },
-          h('span', { class: 'swatch', style: { background: c } }), label)),
-        h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, colorInput, 'Eigene')),
-      h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Dampflanze', style: { 'margin-top': '8px' } },
-        [['left', 'Dampflanze links'], ['right', 'Dampflanze rechts']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(steamSide === v), onclick: () => { change('machine.look.steamSide', v); paint(); } }, label))),
+    const look = card('Aussehen', 'palette',
+      h('p', { class: 'small muted' }, 'Für die Frontansicht unter „Schalter“: Farbe des Gehäuses und Seite der Dampflanze (Heißwasser auf der anderen Seite).'),
+      h('div', { class: 'look-pick' },
+        h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Farbe der Xenia' },
+          LOOK_COLORS.map(([c, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(lookColor === c), onclick: () => { change('machine.look.color', c); paint(); } },
+            h('span', { class: 'swatch', style: { background: c } }), label)),
+          h('label', { class: 'chip color-chip', 'aria-pressed': String(own) }, colorInput, 'Eigene')),
+        h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Dampflanze', style: { 'margin-top': '8px' } },
+          [['left', 'Dampflanze links'], ['right', 'Dampflanze rechts']].map(([v, label]) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(steamSide === v), onclick: () => { change('machine.look.steamSide', v); paint(); } }, label)))),
       toggle('Knopf unter der Ansicht', 'Zeigt unter „Schalter“ den Knopf „Farbe und Dampflanze ändern“', 'machine.look.editButton'));
-    const devices = card('Geräte', 'coffeeLine',
-      apiChoice(value('machine.api') === 'classic' ? 'classic' : 'bbs', (v) => { change('machine.api', v); paint(); }),
-      look,
-      h('div', { class: 'field-row' }, text('Adresse der Xenia', 'machine.url', { type: 'url', placeholder: 'http://192.168.178.55' }), mTest),
-      mBox,
-      h('div', { class: 'divider' }),
-      toggle('Mahlkönig-Mühle', 'E64 WS: Rezepte, Mahlvorgänge, Meldungen', 'grinder.enabled', { onChange: () => paint() }),
-      grinderFields);
+    return [connection, look];
+  }
 
-    // Von unterwegs (Cloudflare-Tunnel)
+  // Mühle und Grind-by-Sync-Vermittler
+  function grinderCards() {
+    const s = data.status;
+    const [gTest, gBox] = probeButton('grinder', () => ({ url: value('grinder.url'), password: dirty['grinder.password'] || '' }));
+    const grinder = card('Mahlkönig-Mühle', 'grinder',
+      toggle('Mühle einbinden', 'E64 WS: Rezepte, Mahlvorgänge, Meldungen', 'grinder.enabled', { onChange: () => paint() }),
+      value('grinder.enabled') ? h('div', { class: 'collapse' },
+        h('div', { class: 'divider' }),
+        h('div', { class: 'field-row' }, text('Adresse der Mühle', 'grinder.url', { type: 'url', placeholder: 'https://192.168.178.54' }), gTest),
+        gBox,
+        gap(),
+        text('Owner-Passwort der Mühle', 'grinder.password', { type: 'password', placeholder: data.secrets['grinder.password'] ? '•••••••• (gespeichert, leer = unverändert)' : 'nicht gesetzt', parse: (v) => v, autocomplete: 'new-password' }),
+        h('div', { class: 'cert-row' },
+          h('div', { class: 'grow' }, h('div', { class: 'small muted' }, 'Gemerktes Zertifikat der Mühle'),
+            h('code', { class: 'fp' }, s.grinderPin || 'noch keins (wird beim ersten Kontakt gemerkt)')),
+          s.grinderPin ? h('button', { class: 'btn text', onclick: unpin }, 'Vergessen') : null),
+        toggle('Datenbank-Download erlauben', 'Die Datenbank der Mühle enthält das WLAN-Passwort im Klartext.', 'grinder.allowDatabaseDownload')) : null);
+    if (!value('grinder.enabled')) return [grinder];
+
+    const urlIp = (() => {
+      try {
+        const host = new URL(value('grinder.url')).hostname.replace(/^\[|\]$/g, '');
+        return /^[\d.]+$|:/.test(host) ? host : null;
+      } catch { return null; }
+    })();
+    const gbs = card('Grind-by-Sync mit Druckprofilen', 'speed',
+      h('p', { class: 'small muted' }, value('machine.api') === 'classic'
+        ? 'Alte Xenia: Xenios gibt sich der Mühle gegenüber als neue Xenia aus. Der Drehknopf startet den Bezug an der DBL, und Xenios stoppt ihn am Zielgewicht des Mühlenrezepts – gemessen von der Bluetooth-Waage an der Xenia. Ohne verbundene Waage startet der Drehknopf nichts.'
+        : 'Xenios gibt sich der Mühle gegenüber als Xenia aus und reicht alles an die echte Xenia weiter. Nur der Start per Drehknopf wird gegen das unter Skripte gewählte Profil getauscht; es stoppt wie das Original beim Zielgewicht des Mühlenrezepts.'),
+      toggle('Vermittler', 'Unverschlüsselt und ohne Anmeldung, aber nur für die IP der Mühle', 'gbs.enabled'),
+      h('div', { class: 'grid2' }, text('Adresse', 'gbs.host'), number('Port', 'gbs.port', 1, 65535)),
+      gap(),
+      text('IP der Mühle', 'gbs.grinderIp', { placeholder: urlIp ? `aus der Adresse der Mühle: ${urlIp}` : 'z. B. 192.168.178.54', parse: (v) => v.trim() || null, format: (v) => v || '' }),
+      s.docker ? h('p', { class: 'small muted' }, `Im Container lauscht der Vermittler auf Port ${value('gbs.port')}. In compose.yaml die Zeile „80:${value('gbs.port')}“ aktivieren – die Mühle fragt immer Port 80 ab.`) : null,
+      !s.docker && Number(value('gbs.port')) !== 80 ? warn('Die Mühle fragt immer Port 80 ab. Ein anderer Port geht nur mit einer Weiterleitung von 80 auf diesen Port.') : null,
+      h('details', { class: 'adv' }, h('summary', {}, 'Mühle umstellen', icon('more', 's20')),
+        h('ol', { class: 'small' },
+          h('li', {}, 'Vermittler einschalten und speichern.'),
+          h('li', {}, 'Am Display der Mühle (nicht in der Web-Oberfläche): unten links Settings → Connectivity → Machine To Machine → Xenia → Configuration.'),
+          h('li', {}, 'Die Suche findet Xenios nicht: als Host die IP dieses Servers von Hand eintragen statt der IP der Xenia.'),
+          h('li', {}, 'Unter Skripte das Profil für den Drehknopf wählen.')),
+        h('p', { class: 'small muted' }, 'Läuft Xenios nicht, findet die Mühle keine Xenia. Zurück: in der Mühle wieder die IP der Xenia eintragen.')));
+    return [grinder, gbs];
+  }
+
+  // Von unterwegs (Cloudflare-Tunnel): ein Schalter, alles Weitere nur, solange er an ist
+  function remoteCards() {
+    const s = data.status;
     const [tTest, tBox] = probeButton('tunnel', () => ({ url: value('publicUrl') }));
-    // Ein Schalter für den Zugriff von unterwegs; alles Weitere nur, solange er an ist
     const httpHost = value('http.host');
     const tunnelOn = Boolean(value('http.enabled'));
-    const remote = card({ title: 'Von unterwegs (Cloudflare-Tunnel)', badge: h('span', { class: `badge ${tunnelOn ? 'ok' : ''}` }, tunnelOn ? 'ein' : 'aus') }, 'cloud',
+    return [card({ title: 'Cloudflare-Tunnel', badge: h('span', { class: `badge ${tunnelOn ? 'ok' : ''}` }, tunnelOn ? 'ein' : 'aus') }, 'cloud',
       toggle('Zugriff von unterwegs', tunnelOn ? 'Eingeschaltet: Xenios nimmt Verbindungen des Cloudflare-Tunnels an' : 'Ausgeschaltet: Xenios ist nur im Heimnetz erreichbar', 'http.enabled', { onChange: () => paint() }),
       tunnelOn ? h('div', { class: 'collapse' },
         h('div', { class: 'divider' }),
@@ -266,33 +304,31 @@ export function serverView(root) {
           h('p', { class: 'muted small' }, 'Unverschlüsselter Port nur für cloudflared – die Verschlüsselung übernimmt Cloudflare.'),
           h('div', { class: 'grid2' }, text('Adresse', 'http.host'), number('Port', 'http.port', 1, 65535)),
           !['127.0.0.1', '::1', 'localhost'].includes(httpHost) && !s.docker ? warn(`Der Tunnel-Port lauscht auf ${httpHost}: unverschlüsselt im ganzen Netz erreichbar. Empfohlen: 127.0.0.1.`) : null,
-          select('Proxy-Header vertrauen von', 'trustProxy', [['loopback', 'nur diesem Rechner (cloudflared lokal)'], ['private', 'Heim-/Docker-Netz (cloudflared im Container)'], ['all', 'allen (nicht empfohlen)'], ['none', 'niemandem']]))) : null);
+          select('Proxy-Header vertrauen von', 'trustProxy', [['loopback', 'nur diesem Rechner (cloudflared lokal)'], ['private', 'Heim-/Docker-Netz (cloudflared im Container)'], ['all', 'allen (nicht empfohlen)'], ['none', 'niemandem']]))) : null)];
+  }
 
-    // Zeit
-    const time = card('Zeit', 'clock',
-      select('Zeitzone für Zeitplan und Wecker', 'timezone', [[null, `System (${s.timezone})`], ...data.timezones.map((t) => [t, t.replace(/_/g, ' ')])]),
-      h('div', { class: 'small muted', style: { 'margin-top': '6px' } }, `Serverzeit: ${new Date(s.serverTime).toLocaleString('de-DE', { timeZone: s.timezone })}`));
+  // Push-Benachrichtigungen dieses Geräts (der Server verschickt sie)
+  function notifyCards() {
+    const pushBox = h('div', {});
+    paintPush(pushBox);
+    return [card('Push-Benachrichtigungen', 'bell', pushBox)];
+  }
 
-    // Sicherheit
+  // Anmeldung, angemeldete Geräte, Zugänge & Verschlüsselung, Funktionen sperren
+  function securityCards() {
+    const s = data.status;
     const sessionsBox = h('div', { class: 'sessions' }, h('div', { class: 'muted small' }, 'Lade …'));
-    const security = card('Anmeldung', 'shield',
+    const login = card('Anmeldung', 'shield',
       h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', {}, 'App-Passwort'), h('div', { class: 'small muted' }, 'scrypt-Hash; ändern meldet alle anderen Geräte ab')),
         h('button', { class: 'btn tonal', onclick: changePassword }, 'Ändern')),
       gap(),
       number('Angemeldet bleiben (Tage)', 'auth.sessionDays', 1, 365),
       h('div', { class: 'divider' }),
-      h('h4', {}, 'Sicherung'),
-      h('p', { class: 'small muted' }, 'ZIP mit Konfiguration, Bezügen, Zeitplänen und Schlüsseln. Enthält secret.key – wie ein Passwort aufbewahren.'),
-      h('div', { class: 'row', style: { 'margin-top': '8px', 'flex-wrap': 'wrap' } },
-        h('button', { type: 'button', class: 'btn tonal', onclick: downloadBackup }, icon('download', 's18'), 'Sichern'),
-        h('button', { type: 'button', class: 'btn tonal', onclick: restoreBackup }, icon('upload', 's18'), 'Einspielen')),
-      h('div', { class: 'divider' }),
-      h('div', { class: 'row' }, h('h3', { class: 'grow', style: { margin: 0 } }, 'Angemeldete Geräte'),
+      h('div', { class: 'row' }, h('h4', { class: 'grow', style: { margin: 0 } }, 'Angemeldete Geräte'),
         h('button', { class: 'btn text danger-text', onclick: revokeAll }, 'Alle abmelden')),
       sessionsBox);
     loadSessions(sessionsBox);
 
-    // Zugänge & Verschlüsselung
     const listeners = h('div', { class: 'chips listener-chips' }, s.listeners.map((l) => h('span', { class: `chip status ${l.ok ? 'on' : l.error ? 'bad' : ''}`, title: l.error || '' },
       h('span', { class: 'dot' }), `${{ http: 'Tunnel', https: 'HTTPS', lan: 'Heimnetz-HTTP', gbs: 'Grind-by-Sync' }[l.kind]} :${l.port}`)));
     const tls = s.tls;
@@ -315,37 +351,19 @@ export function serverView(root) {
       h('div', { class: 'grid2' }, text('Adresse', 'lan.host'), number('Port', 'lan.port', 1, 65535)),
       value('lan.enabled') ? warn('Passwort und Sitzung gehen hier im Klartext durchs WLAN. Nur in einem vertrauenswürdigen Heimnetz nutzen.') : null);
 
-    // Grind-by-Sync-Vermittler
-    const urlIp = (() => {
-      try {
-        const host = new URL(value('grinder.url')).hostname.replace(/^\[|\]$/g, '');
-        return /^[\d.]+$|:/.test(host) ? host : null;
-      } catch { return null; }
-    })();
-    const gbsCard = card('Grind-by-Sync mit Druckprofilen', 'grinder',
-      h('p', { class: 'small muted' }, value('machine.api') === 'classic'
-        ? 'Alte Xenia: Xenios gibt sich der Mühle gegenüber als neue Xenia aus. Der Drehknopf startet den Bezug an der DBL, und Xenios stoppt ihn am Zielgewicht des Mühlenrezepts – gemessen von der Bluetooth-Waage an der Xenia. Ohne verbundene Waage startet der Drehknopf nichts.'
-        : 'Xenios gibt sich der Mühle gegenüber als Xenia aus und reicht alles an die echte Xenia weiter. Nur der Start per Drehknopf wird gegen das unter Skripte gewählte Profil getauscht; es stoppt wie das Original beim Zielgewicht des Mühlenrezepts.'),
-      toggle('Vermittler', 'Unverschlüsselt und ohne Anmeldung, aber nur für die IP der Mühle', 'gbs.enabled'),
-      h('div', { class: 'grid2' }, text('Adresse', 'gbs.host'), number('Port', 'gbs.port', 1, 65535)),
-      gap(),
-      text('IP der Mühle', 'gbs.grinderIp', { placeholder: urlIp ? `aus der Adresse der Mühle: ${urlIp}` : 'z. B. 192.168.178.54', parse: (v) => v.trim() || null, format: (v) => v || '' }),
-      s.docker ? h('p', { class: 'small muted' }, `Im Container lauscht der Vermittler auf Port ${value('gbs.port')}. In compose.yaml die Zeile „80:${value('gbs.port')}“ aktivieren – die Mühle fragt immer Port 80 ab.`) : null,
-      !s.docker && Number(value('gbs.port')) !== 80 ? warn('Die Mühle fragt immer Port 80 ab. Ein anderer Port geht nur mit einer Weiterleitung von 80 auf diesen Port.') : null,
-      h('details', { class: 'adv' }, h('summary', {}, 'Mühle umstellen', icon('more', 's20')),
-        h('ol', { class: 'small' },
-          h('li', {}, 'Vermittler einschalten und speichern.'),
-          h('li', {}, 'Am Display der Mühle (nicht in der Web-Oberfläche): unten links Settings → Connectivity → Machine To Machine → Xenia → Configuration.'),
-          h('li', {}, 'Die Suche findet Xenios nicht: als Host die IP dieses Servers von Hand eintragen statt der IP der Xenia.'),
-          h('li', {}, 'Unter Skripte das Profil für den Drehknopf wählen.')),
-        h('p', { class: 'small muted' }, 'Läuft Xenios nicht, findet die Mühle keine Xenia. Zurück: in der Mühle wieder die IP der Xenia eintragen.')));
+    const features = card('Funktionen', 'tune',
+      h('p', { class: 'small muted' }, 'Gilt für alle Geräte. Ausgeschaltete Funktionen lassen sich in der App nicht mehr nutzen.'),
+      ...FEATURES.map(([key, title, sub]) => toggle(title, sub, key)));
+    return [login, network, features];
+  }
 
-
-    // System
+  // Version, Aktualisierung, Protokoll, Zeit, Sicherung
+  function systemCards() {
+    const s = data.status;
     const up = s.uptimeS;
     const uptime = up < 3600 ? `${Math.round(up / 60)} min` : up < 86400 ? `${Math.round(up / 3600)} h` : `${Math.round(up / 86400)} Tage`;
     const kv = (k, v) => [h('dt', {}, k), h('dd', {}, v)];
-    const system = card('System', 'info',
+    const system = card('Server', 'info',
       h('dl', { class: 'kv' },
         kv('Version', `Xenios ${s.version}`),
         kv('Node.js', s.node),
@@ -359,22 +377,21 @@ export function serverView(root) {
       gap(),
       select('Protokoll-Stufe', 'logLevel', [['error', 'nur Fehler'], ['warn', 'Warnungen'], ['info', 'Normal'], ['debug', 'Ausführlich (Fehlersuche)']]));
     if (!updateReady) { updateReady = true; startUpdatePoll(); }
+    const time = card('Zeit', 'clock',
+      select('Zeitzone für Zeitplan und Wecker', 'timezone', [[null, `System (${s.timezone})`], ...data.timezones.map((t) => [t, t.replace(/_/g, ' ')])]),
+      h('div', { class: 'small muted', style: { 'margin-top': '6px' } }, `Serverzeit: ${new Date(s.serverTime).toLocaleString('de-DE', { timeZone: s.timezone })}`));
+    const backup = card('Sicherung', 'download',
+      h('p', { class: 'small muted' }, 'ZIP mit Konfiguration, Bezügen, Zeitplänen und Schlüsseln. Enthält secret.key – wie ein Passwort aufbewahren.'),
+      h('div', { class: 'row', style: { 'margin-top': '8px', 'flex-wrap': 'wrap' } },
+        h('button', { type: 'button', class: 'btn tonal', onclick: downloadBackup }, icon('download', 's18'), 'Sichern'),
+        h('button', { type: 'button', class: 'btn tonal', onclick: restoreBackup }, icon('upload', 's18'), 'Einspielen')));
+    return [system, time, backup];
+  }
 
-    // Benachrichtigungen, Aufzeichnung und Konto (früher auf der Einstellungsseite)
-    const pushBox = h('div', {});
-    paintPush(pushBox);
-    const notify = card('Benachrichtigungen', 'bell', pushBox);
-    const recording = card('Aufzeichnung', 'shotlog', shotFilterCard());
-    if (jumpTo && !recording.__jumped) {
-      recording.__jumped = true;
-      history.replaceState(history.state, '', location.pathname); // nur einmal springen
-      setTimeout(() => recording.scrollIntoView({ block: 'start', behavior: 'smooth' }), 450);
-    }
-    const account = card('Konto', 'logout',
-      inAndroidApp() ? h('button', { class: 'btn outlined wide', style: { 'margin-bottom': '8px' }, onclick: () => window.XeniaApp.reauth() }, icon('wifi', 's18'), 'App-Verbindung ändern') : null,
-      h('button', { class: 'btn outlined wide', onclick: logout }, icon('logout', 's18'), 'Abmelden'));
-
-    body.replaceChildren(h('div', { class: 'folds' }, devices, remote, time, notify, recording, security, network, value('grinder.enabled') ? gbsCard : null, system, account));
+  const PARTS = { modell: modelCards, muehle: grinderCards, unterwegs: remoteCards, benachrichtigungen: notifyCards, sicherheit: securityCards, system: systemCards };
+  function paint() {
+    savebar.hidden = Object.keys(dirty).length === 0;
+    body.replaceChildren(h('div', { class: 'folds' }, ...PARTS[part]()));
   }
 
   async function loadSessions(box) {
@@ -496,7 +513,7 @@ export function serverView(root) {
 
   load();
   return () => { clearTimeout(updatePoll); savebar.remove(); };
-}
+};
 
 function uaShort(ua = '') {
   if (/Android-App/.test(ua)) return 'Android-App';

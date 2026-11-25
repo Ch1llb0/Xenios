@@ -240,7 +240,7 @@ export class XeniaClient {
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('text/html')) {
       // Unbekannte Pfade liefern die HTML-Startseite mit HTTP 200.
-      const err = new Error(`Unbekannter Endpunkt ${apiPath} – passt das Modell (neue/alte Xenia) unter Einstellungen → Geräte?`);
+      const err = new Error(`Unbekannter Endpunkt ${apiPath} – passt das Modell (neue/alte Xenia) unter Einstellungen → Modell & Aussehen?`);
       err.status = 404;
       throw err;
     }
@@ -661,7 +661,7 @@ export class Machine extends Emitter {
     if (key(mismatch) === key(this.state.apiMismatch)) return;
     this.state.apiMismatch = mismatch;
     const name = { bbs: 'neue Xenia', classic: 'alte Xenia (DBL)' };
-    if (mismatch) log.warn(`Eingestellt ist ${name[mismatch.configured]}, die Maschine antwortet aber wie die ${name[mismatch.detected]} – unter Einstellungen → Geräte umstellen`);
+    if (mismatch) log.warn(`Eingestellt ist ${name[mismatch.configured]}, die Maschine antwortet aber wie die ${name[mismatch.detected]} – unter Einstellungen → Modell & Aussehen umstellen`);
     this.emit('state');
   }
 

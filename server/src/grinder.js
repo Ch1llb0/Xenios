@@ -36,7 +36,7 @@ export class GrinderHttp {
       return null;
     }
     if (this.pinned === fp) return null;
-    return Object.assign(new Error('Zertifikat der Mühle hat sich geändert – möglicher Angriff. In den Server-Einstellungen prüfen und ggf. „Zertifikat vergessen“.'), { status: 502, expose: true });
+    return Object.assign(new Error('Zertifikat der Mühle hat sich geändert – möglicher Angriff. Unter Einstellungen → Mühle & Grind-by-Sync prüfen und ggf. „Zertifikat vergessen“.'), { status: 502, expose: true });
   }
 
   request(method, path, { body, form, headers = {}, binary = false } = {}) {

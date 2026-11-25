@@ -150,7 +150,7 @@ cp .env.example .env              # Einstellungen, siehe unten
 docker compose up -d
 docker compose logs xenios        # zeigt den Einrichtungscode
 ```
-Dann `https://<IP-des-Servers>:8443` öffnen, die Zertifikatswarnung einmal bestätigen, den Code eingeben und der Einrichtung folgen. Danach in der App unter *Server & Sicherheit → Weitere Namen/IPs fürs Zertifikat* die IP des Servers eintragen, damit das Zertifikat zu ihr passt.
+Dann `https://<IP-des-Servers>:8443` öffnen, die Zertifikatswarnung einmal bestätigen, den Code eingeben und der Einrichtung folgen. Danach in der App unter *Einstellungen → Sicherheit → Weitere Namen/IPs fürs Zertifikat* die IP des Servers eintragen, damit das Zertifikat zu ihr passt.
 
 Wichtige Werte in `docker/.env`:
 
@@ -174,7 +174,7 @@ Für Grind-by-Sync mit Druckprofilen zusätzlich in `compose.yaml` die Zeile `- 
 | **Alles löschen, auch die Daten** | `docker compose down -v` (Vorsicht) |
 
 ### 3.4 Aktualisieren
-In der App unter *Einstellungen → Server & Sicherheit* prüft **Aktualisieren**, ob GitHub ein neueres Release hat. Nach `install.sh` holt der Knopf Image und Git und startet neu (Dienst `xenios-update.timer`). Konfiguration, Sitzungen und Bezüge bleiben. Fehlt der Dienst, zeigt die Seite den Einrichtungsbefehl; `sh ~/xenios/install.sh` richtet ihn nach, ohne eine vorhandene `.env` zu überschreiben.
+In der App unter *Einstellungen → System* prüft **Aktualisieren**, ob GitHub ein neueres Release hat. Nach `install.sh` holt der Knopf Image und Git und startet neu (Dienst `xenios-update.timer`). Konfiguration, Sitzungen und Bezüge bleiben. Fehlt der Dienst, zeigt die Seite den Einrichtungsbefehl; `sh ~/xenios/install.sh` richtet ihn nach, ohne eine vorhandene `.env` zu überschreiben.
 
 ```bash
 sh ~/xenios/install.sh --update
@@ -189,7 +189,7 @@ docker image prune -f             # alte Images aufräumen
 Eine bestimmte Version festhalten: `XENIOS_IMAGE=ghcr.io/tims1998/xenios:2.1.0`. Unter Windows ohne das Skript bleibt das Holen bei `git pull` und einem Neustart; der Knopf zeigt trotzdem, ob eine neue Version da ist.
 
 ### 3.5 Sichern und wiederherstellen
-In der App unter *Server & Sicherheit* gibt es **Sichern** / **Einspielen** (ZIP). Zusätzlich das Volume (enthält `secret.key` und damit den Schlüssel zum Mühlen-Passwort, also sicher aufbewahren):
+In der App unter *Einstellungen → System* gibt es **Sichern** / **Einspielen** (ZIP). Zusätzlich das Volume (enthält `secret.key` und damit den Schlüssel zum Mühlen-Passwort, also sicher aufbewahren):
 ```bash
 docker run --rm -v xenios_xenios-data:/d -v "$PWD":/b alpine tar czf /b/xenios-backup.tgz -C /d .
 ```

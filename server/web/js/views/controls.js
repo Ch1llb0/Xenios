@@ -50,7 +50,7 @@ function s(tag, attrs = {}, ...children) {
 // Ganze Maschine von vorn: Tassenablage, Gehäuse in der eingestellten Farbe, Brühgruppe mit Siebträger, Drehknöpfe aus
 // Holz, Heißwasser- und Dampflanze (Seite einstellbar), Manometer, Abtropfschale. Neue Xenia: vier Taster und Display;
 // alte Xenia (DBL, nach Foto): zwei Kippschalter oben, vier Leuchten rechts der Brühgruppe. Nur die Taster bzw. die
-// Schalterseiten sind antippbar. Farbe und Seite der Dampflanze: Server-Einstellungen → Geräte.
+// Schalterseiten sind antippbar. Farbe und Seite der Dampflanze: Einstellungen → Modell & Aussehen.
 export const LOOK_DEFAULTS = { color: '#26272b', steamSide: 'left' };
 export function machineLook() {
   const l = store.server?.machine?.look || {};
@@ -307,7 +307,7 @@ function switchesTab(root) {
             ? 'Alte Xenia (DBL): Eine Position ①–④ antippen und auswählen, was kurzes bzw. langes Drücken startet. ② (linker Schalter nach rechts, am Ein/Aus-Symbol) ist fest Ein/Aus und lässt sich nicht ändern.'
             : 'Einen Taster antippen und auswählen, was kurzes bzw. langes Drücken startet. Eigene Abläufe entstehen unter „Skripte“.'),
           h('div', { class: 'machine-wrap' }, svg,
-            directMode || !look.editButton ? null : h('button', { class: 'btn text', type: 'button', onclick: () => navigate('/server') }, icon('settings', 's18'), 'Farbe und Dampflanze ändern')),
+            directMode || !look.editButton ? null : h('button', { class: 'btn text', type: 'button', onclick: () => navigate('/einstellungen/modell') }, icon('settings', 's18'), 'Farbe und Dampflanze ändern')),
           grid,
           editable ? saveBtn : h('p', { class: 'muted small' }, 'Ändern ist in der Server-Konfiguration deaktiviert.')));
     } catch (e) {

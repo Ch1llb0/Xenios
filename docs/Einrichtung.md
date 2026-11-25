@@ -32,7 +32,7 @@
    ```
    Das legt die Aufgabe „Xenios“ an. Sie startet beim Hochfahren und bei Abstürzen neu. Das Log liegt in `server\data\server.log`.
 
-   Unter *Einstellungen → Server & Sicherheit* prüft **Aktualisieren**, ob auf GitHub eine neuere Version liegt. Ohne `install.sh` holt der Knopf sie nicht. Auf dem Windows-PC bleibt es bei `git pull` im Projektordner und einem Neustart des Servers (die Aufgabe „Xenios“ startet ihn wieder). Konfiguration, Sitzungen und Bezüge bleiben.
+   Unter *Einstellungen → System* prüft **Aktualisieren**, ob auf GitHub eine neuere Version liegt. Ohne `install.sh` holt der Knopf sie nicht. Auf dem Windows-PC bleibt es bei `git pull` im Projektordner und einem Neustart des Servers (die Aufgabe „Xenios“ startet ihn wieder). Konfiguration, Sitzungen und Bezüge bleiben.
 
 > Tipp: Der PC darf nicht in den Ruhezustand gehen (Energieoptionen). Alternativ läuft der Server auch auf einem Raspberry Pi oder NAS, siehe unten.
 
@@ -40,7 +40,7 @@
 
 Voraussetzung: eine eigene Domain bei Cloudflare (kostenloser Tarif reicht).
 
-Der Einrichtungs-Assistent (Schritt „Unterwegs“) und *Einstellungen → Server & Sicherheit → Von unterwegs* zeigen die Schritte passend zur Installation, mit der richtigen **Service URL** zum Kopieren: in Docker `http://xenios:8080`, sonst `http://127.0.0.1:8080`. Dort die öffentliche Adresse eintragen und **Testen**: Der Server ruft sich selbst über die Adresse auf und prüft, dass wirklich er antwortet. Mit gesetzter Adresse wird sie auch Kontakt für die Push-Dienste, solange dort noch der Platzhalter steht.
+Der Einrichtungs-Assistent (Schritt „Unterwegs“) und *Einstellungen → Von unterwegs* zeigen die Schritte passend zur Installation, mit der richtigen **Service URL** zum Kopieren: in Docker `http://xenios:8080`, sonst `http://127.0.0.1:8080`. Dort die öffentliche Adresse eintragen und **Testen**: Der Server ruft sich selbst über die Adresse auf und prüft, dass wirklich er antwortet. Mit gesetzter Adresse wird sie auch Kontakt für die Push-Dienste, solange dort noch der Platzhalter steht.
 
 Mit Docker: siehe [Abschnitt 4](#4-alternativ-linux-server-raspberry-pi-oder-nas-mit-docker) (Token in `docker/.env`). Ohne Docker:
 
@@ -88,18 +88,18 @@ docker compose logs xenios           # Einrichtungscode ablesen
 Dann `https://<IP-des-Servers>:8443` öffnen und der Einrichtung folgen (wie oben).
 
 - **Fertiges Image statt selbst bauen:** Jedes Release veröffentlicht das Image in GitHub Packages (amd64 und arm64). In `docker/.env`: `XENIOS_IMAGE=ghcr.io/tims1998/xenios:latest` und `XENIOS_PULL=always`.
-- **Daten** (Konfiguration, Schlüssel, Zertifikat, Sitzungen, Bezüge) liegen im Volume `xenios_xenios-data`. In der App unter *Server & Sicherheit → Sicherung* als ZIP herunterladen oder einspielen. Zusätzlich das ganze Volume: `docker run --rm -v xenios_xenios-data:/d -v "$PWD":/b alpine tar czf /b/xenios-backup.tgz -C /d .` (beides enthält `secret.key`, also sicher aufbewahren).
-- **Zertifikat:** Im Container kennt der Server die LAN-IP des Rechners nicht. In der App unter *Server & Sicherheit → Weitere Namen/IPs fürs Zertifikat* die IP bzw. den Hostnamen eintragen; das Zertifikat wird sofort neu erzeugt.
+- **Daten** (Konfiguration, Schlüssel, Zertifikat, Sitzungen, Bezüge) liegen im Volume `xenios_xenios-data`. In der App unter *Einstellungen → System → Sicherung* als ZIP herunterladen oder einspielen. Zusätzlich das ganze Volume: `docker run --rm -v xenios_xenios-data:/d -v "$PWD":/b alpine tar czf /b/xenios-backup.tgz -C /d .` (beides enthält `secret.key`, also sicher aufbewahren).
+- **Zertifikat:** Im Container kennt der Server die LAN-IP des Rechners nicht. In der App unter *Einstellungen → Sicherheit → Weitere Namen/IPs fürs Zertifikat* die IP bzw. den Hostnamen eintragen; das Zertifikat wird sofort neu erzeugt.
 - **Ports und Pfade** sind im Container fest (Umgebungsvariablen im `Dockerfile`) und in der App als gesperrt markiert. Den HTTPS-Port auf dem Rechner ändert `XENIOS_HTTPS_PORT` in `.env`. Unter Linux umgehen Docker-Ports `ufw`; mit `XENIOS_HTTPS_PORT=<LAN-IP>:8443` lauscht der Port nur im Heimnetz.
-- **Cloudflare-Tunnel** im selben Compose: im Einrichten oder unter *Server & Sicherheit* die Zeile `sudo cloudflared service install …` einfügen. Den Befehl nicht ausführen. `install.sh` schreibt `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` und startet `cloudflared`. Im Tunnel **Add route → Published Application** auf **`http://xenios:8080`** setzen (Container-Name statt localhost). Port 8080 ist bewusst nicht nach außen veröffentlicht.
-- **Aktualisieren:** in der App unter *Einstellungen → Server & Sicherheit → Aktualisieren*. `install.sh` richtet dafür den Dienst `xenios-update.timer` ein (Debian, Ubuntu, Raspberry Pi OS 64-Bit). Der Knopf holt Git und das Image und startet neu; Konfiguration, Sitzungen und Bezüge bleiben. Fehlt der Dienst, zeigt die Seite den `curl`-Befehl. Einmal `sh ~/xenios/install.sh` richtet ihn nach, eine vorhandene `.env` bleibt. Nur holen: `sh ~/xenios/install.sh --update`. Ohne das Skript: `git pull && docker compose up -d`.
+- **Cloudflare-Tunnel** im selben Compose: im Einrichten oder unter *Einstellungen → Von unterwegs* die Zeile `sudo cloudflared service install …` einfügen. Den Befehl nicht ausführen. `install.sh` schreibt `TUNNEL_TOKEN` und `COMPOSE_PROFILES=tunnel` und startet `cloudflared`. Im Tunnel **Add route → Published Application** auf **`http://xenios:8080`** setzen (Container-Name statt localhost). Port 8080 ist bewusst nicht nach außen veröffentlicht.
+- **Aktualisieren:** in der App unter *Einstellungen → System → Aktualisieren*. `install.sh` richtet dafür den Dienst `xenios-update.timer` ein (Debian, Ubuntu, Raspberry Pi OS 64-Bit). Der Knopf holt Git und das Image und startet neu; Konfiguration, Sitzungen und Bezüge bleiben. Fehlt der Dienst, zeigt die Seite den `curl`-Befehl. Einmal `sh ~/xenios/install.sh` richtet ihn nach, eine vorhandene `.env` bleibt. Nur holen: `sh ~/xenios/install.sh --update`. Ohne das Skript: `git pull && docker compose up -d`.
 - Härtung: schreibgeschütztes Dateisystem, eigener Benutzer statt root, keine Linux-Capabilities, Speicher- und Prozessgrenzen (siehe `compose.yaml`).
 
 Oder ohne Docker mit systemd: [`server/deploy/linux/xenios.service`](../server/deploy/linux/xenios.service).
 
 ## 5. Einstellungen
 
-Alles lässt sich in der App unter **Einstellungen → Server & Sicherheit** ändern. Die Werte landen in `config.json` und wirken sofort, auch Ports und Zertifikat (die Zugänge werden ohne Neustart neu gebunden).
+Alles lässt sich in der App unter **Einstellungen** ändern (Gruppen Kaffeemaschine und Server). Die Werte landen in `config.json` und wirken sofort, auch Ports und Zertifikat (die Zugänge werden ohne Neustart neu gebunden).
 
 | In der App | Schlüssel in `config.json` | Standard |
 |---|---|---|
@@ -136,7 +136,7 @@ Normal startet der Drehknopf der E64 WS nach einem GbS-Mahlvorgang das fest eing
 **So funktioniert es:** Die Mühle fragt Xenios statt der Xenia ab. Xenios reicht alle Abfragen unverändert an die Xenia weiter. Nur `scripts/execute {"ID":9}` (der Druck auf den Drehknopf) wird getauscht: Xenios schreibt das gewählte Profil als Skript **„Xenios GbS“** auf die Maschine. Nach der Pumpe steht der Stopp beim Zielgewicht des Mühlenrezepts (Befehl 27, Wert aus `brewratio`, auf ganze Gramm gerundet; vorn würde die Firmware auf Gewicht warten, ohne dass Wasser fließt), und die letzte Druckstufe wird um bis zu 30 s verlängert. So endet der Bezug wie beim Original am Gewicht, und die Mühle lernt aus der Bezugszeit. Das Skript wird nur neu geschrieben, wenn sich Profil oder Zielgewicht ändern. Geht etwas schief (Profil gelöscht, Maschine antwortet nicht), startet Xenios das Original-Skript 9.
 
 **Einrichten:**
-1. *Server & Sicherheit → Grind-by-Sync mit Druckprofilen*: Vermittler einschalten. Die IP der Mühle wird aus der Adresse der Mühle übernommen; steht dort ein Name, die IP eintragen (am besten im Router fest vergeben).
+1. *Einstellungen → Mühle & Grind-by-Sync*: Vermittler einschalten. Die IP der Mühle wird aus der Adresse der Mühle übernommen; steht dort ein Name, die IP eintragen (am besten im Router fest vergeben).
 2. Am Display der Mühle (nicht in der Web-Oberfläche): unten links **Settings** → *Connectivity → Machine To Machine → Xenia* (eingeschaltet lassen) → *Configuration*. Die Suche findet Xenios nicht, also die IP des Xenios-Servers von Hand als Host eintragen.
 3. Unter **Skripte → Grind-by-Sync** das Profil wählen. Dort steht auch, wann sich die Mühle zuletzt gemeldet hat und was beim letzten Drehknopf gestartet wurde.
 
@@ -158,7 +158,7 @@ Die DBL kennt die Grind-by-Sync-Schnittstelle nicht (kein `/api/v2/mako`, kein S
 Voraussetzungen und Grenzen:
 - Die Waage muss an der DBL verbunden sein (Anzeige „Waage verbunden“). Ist sie getrennt, startet der Drehknopf nichts; der Grund steht unter **Skripte → Grind-by-Sync**.
 - Tasse vor dem Drehknopf auf die Waage stellen. Ob die Waage tariert, ist egal: Xenios zählt ab dem niedrigsten Wert.
-- Sicherheitsgrenzen: kommt nach 15 s kein Gewicht, stoppt Xenios und meldet der Mühle einen Abbruch; nach 75 s ebenso. Fällt der Server mitten im Bezug aus, beendet ihn die DBL nach ihrer **Max. Bezugszeit** (Maschinen-Einstellungen → Pumpe).
+- Sicherheitsgrenzen: kommt nach 15 s kein Gewicht, stoppt Xenios und meldet der Mühle einen Abbruch; nach 75 s ebenso. Fällt der Server mitten im Bezug aus, beendet ihn die DBL nach ihrer **Max. Bezugszeit** (Einstellungen → Maschine → Pumpe).
 - Ungetestet an echter Hardware (Stand der Umsetzung): ob die Mühle die DBL-Seriennummer annimmt, ob die DBL Skript 2 über `scripts/execute` startet und ob sie den Wassertank meldet. Meldet die Mühle „tank is empty“ oder startet nichts, steht der Grund im Server-Log (`gbs`).
 
 **Zurück:** In der Mühle wieder die IP der Xenia eintragen. Läuft Xenios nicht, findet die Mühle keine Xenia und Grind-by-Sync geht nicht.

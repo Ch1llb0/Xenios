@@ -8,7 +8,7 @@ Sicherer Web-Server, installierbare Web-App (PWA) und native Android-App mit Wid
 
 **Android-App** ([Anleitung](docs/Android-App.md)): Widgets (Ein, Ein ohne Dampf, Eco, Aus), Schnelleinstellungs-Kachel, App-Shortcuts, Direkt-Modus ohne Server.
 
-**Einstellungen** als eigener Tab in drei Bereichen: Darstellung, Leiste sowie Komponenten & Funktionen direkt; **Maschinen-Einstellungen** (Waage, Maschine, Brühgruppe, Brühkessel, Dampfkessel, Pumpe inkl. Bezugszeit für Standardbezüge, PID, Timer, Schalter, Wi-Fi, Firmware) und **Server- & App-Einstellungen** (Geräte, Zugriff von unterwegs, Zeit, Benachrichtigungen, Aufzeichnung, Sicherheit, Konto) als eigene Seiten mit eingeklappten Kategorien. Die Xenia DBL mit Firmware 4.1xx wird erkannt und über die Endpunkte ihrer Original-Seiten eingestellt.
+**Einstellungen** als eigener Tab: eine Übersicht in drei Gruppen, jeder Eintrag eine eigene Seite. **App** (Darstellung, Leiste & Ansicht, Widgets), **Kaffeemaschine** (Maschine mit Waage, Brühgruppe, Kesseln, Pumpe inkl. Bezugszeit für Standardbezüge, Wi-Fi und Firmware; Modell & Aussehen; Bezüge; Mühle & Grind-by-Sync) und **Server** (Von unterwegs, Benachrichtigungen, Sicherheit, System). Die Xenia DBL mit Firmware 4.1xx wird erkannt und über die Endpunkte ihrer Original-Seiten eingestellt.
 
 **Design** (je Gerät): „Material“ (Material 3, Standard: Leiste unten mit Beschriftung, runde Formen, flache Anzeigen) oder „Xenia“ wie die Web-Oberfläche der Maschine (Schrift, Navigation links bzw. am Handy unten nur mit Symbolen, Anzeigen wie die Manometer der Maschine); die Symbole sind in beiden gleich. **Anpassen** (je Gerät): Hell/Dunkel, Anzeigen hell oder dunkel, Akzent- und Aktiv-Farbe frei wählbar, Tabs der unteren Leiste ein-/ausblenden, Komponenten wie Mühle, Waage oder Pflege komplett ausblenden, „Ohne Dampf einschalten“ als Standard für Ein. Bezüge unter einer Mindestdauer (Standard 15 s) werden aussortiert. Dashboard-Kacheln in Breite (Spalten) und Höhe (Zellen) wählbar, Kachel „Schalter“ für Ein/Eco/Aus und Dampf.
 
@@ -27,7 +27,7 @@ Sicherer Web-Server, installierbare Web-App (PWA) und native Android-App mit Wid
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TimS1998/Xenios/main/install.sh | sh
 ```
-Danach `https://<IP>:8443` öffnen. Das Skript gilt für Debian, Ubuntu und Raspberry Pi OS 64-Bit. Updates: in der App unter **Einstellungen → Server & Sicherheit → Aktualisieren**, oder `sh ~/xenios/install.sh --update`.
+Danach `https://<IP>:8443` öffnen. Das Skript gilt für Debian, Ubuntu und Raspberry Pi OS 64-Bit. Updates: in der App unter **Einstellungen → System → Aktualisieren**, oder `sh ~/xenios/install.sh --update`.
 
 **Docker** von Hand:
 ```bash
@@ -40,7 +40,7 @@ docker compose logs xenios       # zeigt den Einrichtungscode
 cd server
 npm start                        # zeigt den Einrichtungscode
 ```
-Dann `https://<IP-des-Rechners>:8443` öffnen (Zertifikatswarnung einmal bestätigen), den Code eingeben und der [Einrichtung](docs/Einrichtung.md) folgen: App-Passwort, neue oder alte Xenia, optional die Mühle, jeweils mit Verbindungstest. Ohne Mühle bleiben die Mühlenseiten aus; Dosis und Mahlgrad trägt man bei einem Bezug von Hand ein. Alles Weitere unter **Einstellungen → Server & Sicherheit**, ohne Neustart.
+Dann `https://<IP-des-Rechners>:8443` öffnen (Zertifikatswarnung einmal bestätigen), den Code eingeben und der [Einrichtung](docs/Einrichtung.md) folgen: App-Passwort, neue oder alte Xenia, optional die Mühle, jeweils mit Verbindungstest. Ohne Mühle bleiben die Mühlenseiten aus; Dosis und Mahlgrad trägt man bei einem Bezug von Hand ein. Alles Weitere unter **Einstellungen**, ohne Neustart.
 
 Von einem frischen System an: [welcher Rechner](docs/Hardware.md), [Raspberry Pi](docs/Installation-Raspberry-Pi.md), [Linux mit Docker](docs/Installation-Linux-Docker.md).
 
