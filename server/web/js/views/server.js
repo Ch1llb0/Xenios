@@ -255,16 +255,18 @@ export const serverPage = (part) => (root) => {
     const GRIP = [['#c98a4f', 'Holz'], ['#e0aa6a', 'Olive'], ['#6e4127', 'Nuss'], ['#1d1e21', 'Schwarz'], ['#eceae4', 'Weiß']];
     const GAUGE = [['#141518', 'Schwarz'], ['#f4f4f1', 'Weiß']];
     const simple = value('machine.look.style') === 'simple';
+    // Griffe und Ventile wählbar nur bei der DBL; die neue Xenia hat Chromventile und den Siebträger von vorn
+    const dbl = value('machine.api') === 'classic';
     const look = card({ title: 'Aussehen', anchor: 'aussehen' }, 'palette',
       h('p', { class: 'small muted' }, 'Frontansicht unter „Schalter“: als Render der ganzen Maschine mit eigenen Farben und Ausstattung oder vereinfacht, nur die Taster bzw. Kippschalter als Linien.'),
       pick('Ansicht', 'machine.look.style', [['render', 'Render'], ['simple', 'Vereinfacht']], simple ? 'simple' : 'render'),
       simple ? null : h('div', { class: 'look-pick' },
         colorRow('Gehäuse', 'machine.look.color', BODY, { fallback: BODY[0][0] }),
         colorRow('Abtropfgitter', 'machine.look.tray', TRAY, { fallback: value('machine.look.color') || BODY[0][0], same: 'Wie Gehäuse' }),
-        colorRow('Griffe (Ventile und Siebträger)', 'machine.look.grip', GRIP, { fallback: GRIP[0][0] }),
+        dbl ? colorRow('Griffe (Ventile und Siebträger)', 'machine.look.grip', GRIP, { fallback: GRIP[0][0] }) : null,
         colorRow('Manometer', 'machine.look.gauge', GAUGE, { fallback: GAUGE[0][0] }),
         row('Dampflanze', pick('Dampflanze', 'machine.look.steamSide', [['left', 'Links'], ['right', 'Rechts']], value('machine.look.steamSide') === 'right' ? 'right' : 'left')),
-        row('Ventile', pick('Ventile', 'machine.look.valves', [['lever', 'Hebel'], ['rotary', 'Drehknopf']], value('machine.look.valves') === 'rotary' ? 'rotary' : 'lever'))),
+        dbl ? row('Ventile', pick('Ventile', 'machine.look.valves', [['lever', 'Hebel'], ['rotary', 'Drehknopf']], value('machine.look.valves') === 'rotary' ? 'rotary' : 'lever')) : null),
       toggle('Knopf unter der Ansicht', 'Zeigt unter „Schalter“ den Knopf „Ansicht ändern“', 'machine.look.editButton'));
     return [connection, look];
   }
