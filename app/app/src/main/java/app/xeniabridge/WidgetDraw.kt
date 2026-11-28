@@ -40,6 +40,8 @@ class WidgetTheme(
     val badgeR get() = if (xenia) 2f else 9f
     private fun col(k: String, light: Int, darkC: Int) = c[k] ?: if (dark) darkC else light
     val bg get() = col("bg", 0xFFFFFFFF.toInt(), 0xFF1F1F25.toInt())
+    /** Seitenhintergrund (--surface), z. B. für den Einrichtungs-Bildschirm */
+    val surface get() = col("surface", 0xFFFBF8FF.toInt(), 0xFF121318.toInt())
     val onSurface get() = col("onSurface", 0xFF1B1B21.toInt(), 0xFFE4E1E9.toInt())
     val muted get() = col("muted", 0xFF46464F.toInt(), 0xFFC6C5D0.toInt())
     val primary get() = col("primary", 0xFF4A5891.toInt(), 0xFFB8C4FF.toInt())

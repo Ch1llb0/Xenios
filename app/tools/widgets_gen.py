@@ -13,15 +13,15 @@ TGT = lambda n: [(None, 40), (f't{n}_minus', 22), (None, 34), (f't{n}_plus', 22)
 # Zeile: (Name, Gewicht, Spalten oder None, Spaltenabstand dp)
 SPECS = {
   'power':      [('head', 18, None, 0), (None, 4, None, 0), ('body', 40, None, 0)],
-  # 4×1 wie das frühere Widget: Status links, Ein/Eco/Aus rechts
-  'mode':       [('row', 1, [('head', 1.6), ('btn_on', 1), ('btn_eco', 1), ('btn_off', 1)], 6)],
+  # 4×1: Kopfzeile mit Symbol, Titel und Zustand rechts, darunter Ein/Eco/Aus über die ganze Breite
+  'mode':       [('head', 18, None, 0), (None, 6, None, 0), ('seg', 36, SEG, 6)],
   'switch':     [('head', 18, None, 0), (None, 6, None, 0), ('seg', 36, SEG, 6), (None, 8, None, 0), ('tg_steam', 26, None, 0), ('tg_nosteam', 26, None, 0)],
   'large':      [('head', 18, None, 0), (None, 4, None, 0), ('status', 46, None, 0), (None, 4, None, 0), ('badges', 18, None, 0), (None, 8, None, 0),
                  ('seg', 36, SEG, 6), (None, 8, None, 0), ('tg_steam', 26, None, 0), ('tg_nosteam', 26, None, 0)],
   'large_live': [('head', 18, None, 0), (None, 4, None, 0), ('info', 60, None, 0), (None, 6, None, 0), ('chart', 60, None, 0), (None, 8, None, 0), ('stop', 36, None, 0)],
   'gauges':     [('head', 18, None, 0), (None, 4, None, 0), ('body', 100, None, 0)],
   'targets':    [('head', 18, None, 0), (None, 6, None, 0), ('t1', 30, TGT(1), 0), ('t2', 30, TGT(2), 0), ('t3', 30, TGT(3), 0)],
-  'care':       [('body', 1, None, 0)],
+  'care':       [('head', 18, None, 0), (None, 4, None, 0), ('body', 40, None, 0)],
   'history':    [('head', 18, None, 0), (None, 4, None, 0), ('body', 100, None, 0)],
   'lastshot':   [('head', 18, None, 0), (None, 2, None, 0), ('kpi', 34, None, 0), (None, 4, None, 0), ('body', 80, None, 0)],
   'shots':      [('head', 18, None, 0), (None, 4, None, 0), ('body', 100, None, 0)],
